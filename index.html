@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0a0a12">
+<title>Fabricio Tasca — Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%;background:#0a0a12;color:#fff;font-family:'Space Grotesk',system-ui,sans-serif;overflow-x:hidden}
+
+  /* Fondo animado */
+  .bg{position:fixed;inset:0;z-index:-2;background:radial-gradient(ellipse at 20% 20%,#1a103c 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,#0f2e2e 0%,transparent 50%),#0a0a12}
+  canvas#particles{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.6}
+
+  /* Header */
+  header{text-align:center;padding:clamp(40px,8vh,80px) 20px 20px}
+  .badge{display:inline-block;padding:8px 18px;border:1.5px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.05);font-size:11px;font-weight:700;letter-spacing:.28em;color:#a0a0b0;margin-bottom:18px;backdrop-filter:blur(10px)}
+  h1{font-family:'Bungee',sans-serif;font-size:clamp(42px,10vw,90px);line-height:.95;letter-spacing:-.02em;background:linear-gradient(180deg,#fff 30%,#8b8b9a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .subtitle{font-size:clamp(16px,2.5vw,20px);color:#a0a0b0;margin-top:14px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.5;font-weight:500}
+
+  /* Grid */
+  .container{max-width:1200px;margin:0 auto;padding:30px 20px 60px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:24px}
+
+  /* Tarjetas */
+  .card{position:relative;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:28px 24px 24px;cursor:pointer;transition:transform .25s cubic-bezier(.2,1.4,.3,1),box-shadow .25s,border-color .25s;overflow:hidden;backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:14px;text-decoration:none;color:inherit}
+  .card::before{content:"";position:absolute;inset:0;border-radius:20px;padding:1.5px;background:linear-gradient(135deg,var(--glow) 0%,transparent 60%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .3s;pointer-events:none}
+  .card:hover::before{opacity:1}
+  .card:hover{transform:translateY(-6px) scale(1.01);border-color:rgba(255,255,255,.15);box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 30px var(--glow-soft)}
+
+  .icon-wrap{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);transition:transform .3s}
+  .card:hover .icon-wrap{transform:scale(1.1) rotate(-4deg)}
+
+  .card h2{font-family:'Bungee',sans-serif;font-size:22px;line-height:1.1;color:#fff}
+  .card p{font-size:14px;color:#a0a0b0;line-height:1.55;flex:1}
+
+  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .tag{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:6px;background:rgba(255,255,255,.06);color:#888; border:1px solid rgba(255,255,255,.06)}
+  .tag.highlight{background:var(--accent-bg);color:var(--accent-text);border-color:transparent}
+
+  .play-btn{margin-top:8px;display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:12px;border:none;background:#fff;color:#0a0a12;font-family:'Bungee',sans-serif;font-size:14px;letter-spacing:.04em;cursor:pointer;transition:transform .15s,box-shadow .15s}
+  .play-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,255,255,.15)}
+  .play-btn:active{transform:translateY(0)}
+
+  /* Footer */
+  footer{text-align:center;padding:40px 20px;color:#555;font-size:13px;letter-spacing:.1em;font-weight:700}
+  footer span{color:#888}
+
+  /* Responsive */
+  @media (max-width:640px){
+    .grid{grid-template-columns:1fr}
+    .card{padding:22px 18px 18px}
+  }
+
+  /* Animación de entrada */
+  @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+  .card{animation:fadeUp .6s both}
+  .card:nth-child(1){animation-delay:.05s}
+  .card:nth-child(2){animation-delay:.1s}
+  .card:nth-child(3){animation-delay:.15s}
+  .card:nth-child(4){animation-delay:.2s}
+  .card:nth-child(5){animation-delay:.25s}
+  .card:nth-child(6){animation-delay:.3s}
+  .card:nth-child(7){animation-delay:.35s}
+  .card:nth-child(8){animation-delay:.4s}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<canvas id="particles"></canvas>
+
+<header>
+  <div class="badge">✦ COLECCIÓN HTML5 ✦</div>
+  <h1>Mini Arcade</h1>
+  <p class="subtitle">Ocho mundos listos para jugar. Sin instalación. En cualquier dispositivo.</p>
+</header>
+
+<div class="container">
+  <div class="grid">
+
+    <a href="clavado.html" class="card" style="--glow:#ff6b5d;--glow-soft:rgba(255,107,93,.15);--accent-bg:rgba(255,107,93,.12);--accent-text:#ff9e8a">
+      <div class="icon-wrap">🔪</div>
+      <div>
+        <h2>¡CLAVADO!</h2>
+        <p>Clavá cuchillos en el tronco giratorio, esquivá tu propio acero, cortá manzanas y sobreviví a cada nivel.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">PC + Android</span>
+        <span class="tag highlight">Un toque</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+    <a href="fruta_furia.html" class="card" style="--glow:#8be07a;--glow-soft:rgba(139,224,122,.15);--accent-bg:rgba(139,224,122,.12);--accent-text:#b3f0a0">
+      <div class="icon-wrap">🍉</div>
+      <div>
+        <h2>FRUTA FURIA</h2>
+        <p>Deslizá el filo y hacé volar la fruta. Pero ni se te ocurra tocar la bomba. Combo, frenesí y oleadas.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">PC + Android</span>
+        <span class="tag highlight">Deslizar</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+    <a href="muerte_gloriosa.html" class="card" style="--glow:#87ceeb;--glow-soft:rgba(135,206,235,.15);--accent-bg:rgba(135,206,235,.12);--accent-text:#b0e0ff">
+      <div class="icon-wrap">🤕</div>
+      <div>
+        <h2>MUERTE GLORIOSA</h2>
+        <p>Parece un juego de caminar y saltar… pero el nivel te odia. Yunques, pinchos, barriles y trampolines traicioneros.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">6 Niveles</span>
+        <span class="tag highlight">Parkour</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+    <a href="NEON_SURVIVOR.html" class="card" style="--glow:#0ff;--glow-soft:rgba(0,255,255,.15);--accent-bg:rgba(0,255,255,.12);--accent-text:#8ff">
+      <div class="icon-wrap">🟣</div>
+      <div>
+        <h2>NEON SURVIVOR</h2>
+        <p>Sobreviví a las hordas. Subí de nivel. Elegí mejoras. Disparo automático, upgrades y hordas infinitas.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">Roguelite</span>
+        <span class="tag highlight">Neon</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+    <a href="Salva_al_rey.html" class="card" style="--glow:#c9a24b;--glow-soft:rgba(201,162,75,.15);--accent-bg:rgba(201,162,75,.12);--accent-text:#e8c87a">
+      <div class="icon-wrap">👑</div>
+      <div>
+        <h2>¡SALVA AL REY!</h2>
+        <p>Defendé el reino medieval en 3D. 10 oleadas de monstruos contra el portón y el rey. Modo exploración incluido.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">Three.js</span>
+        <span class="tag highlight">3D</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+    <a href="torre_infinita.html" class="card" style="--glow:#ffd93d;--glow-soft:rgba(255,217,61,.15);--accent-bg:rgba(255,217,61,.12);--accent-text:#ffe99d">
+      <div class="icon-wrap">🧱</div>
+      <div>
+        <h2>TORRE INFINITA</h2>
+        <p>Apilá bloques, clavá caídas perfectas y subí hasta donde el cielo se apague. Cielos que cambian con la altura.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">PC + Android</span>
+        <span class="tag highlight">Reflejos</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+    <a href="turbo_furia.html" class="card" style="--glow:#ff8c1a;--glow-soft:rgba(255,140,26,.15);--accent-bg:rgba(255,140,26,.12);--accent-text:#ffb85a">
+      <div class="icon-wrap">🏁</div>
+      <div>
+        <h2>TURBO FURIA</h2>
+        <p>Carreras 3D a toda velocidad. Elegí tu vehículo, esquivá el tráfico, activá el nitro y batí tu récord.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">Three.js</span>
+        <span class="tag highlight">Carreras</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+    <a href="valle_encantado.html" class="card" style="--glow:#ff8fb8;--glow-soft:rgba(255,143,184,.15);--accent-bg:rgba(255,143,184,.12);--accent-text:#ffc2d8">
+      <div class="icon-wrap">🧚</div>
+      <div>
+        <h2>EL VALLE ENCANTADO</h2>
+        <p>Un mundo de cuentos en 3D. Explorá, hablá con 8 habitantes, encontrá 12 fragmentos de estrella o defendé el valle.</p>
+      </div>
+      <div class="tags">
+        <span class="tag">Three.js</span>
+        <span class="tag highlight">Aventura</span>
+      </div>
+      <div class="play-btn">▶ JUGAR</div>
+    </a>
+
+  </div>
+</div>
+
+<footer>
+  <span>CREADO POR FABRICIO TASCA</span> · HECHO CON HTML5 · 2026
+</footer>
+
+<script>
+  /* Partículas sutiles de fondo */
+  const cvs=document.getElementById('particles'),ctx=cvs.getContext('2d');
+  let W,H;
+  function resize(){W=cvs.width=innerWidth;H=cvs.height=innerHeight}
+  addEventListener('resize',resize);resize();
+  const parts=Array.from({length:60},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.5+.5,o:Math.random()*.5+.2}));
+  function frame(){ctx.clearRect(0,0,W,H);for(const p of parts){p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fillStyle=`rgba(255,255,255,${p.o})`;ctx.fill()}requestAnimationFrame(frame)}
+  frame();
+</script>
+</body>
+</html>
