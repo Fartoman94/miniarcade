@@ -52,7 +52,7 @@ export const GAMES = [
     id: 'neon_survivor', file: 'NEON_SURVIVOR.html', title: 'NEON SURVIVOR', icon: '🟣', accent: '#00ffff',
     category: 'accion', tags: ['Roguelite', 'Neón'], tech: 'Canvas 2D',
     description: 'Sobreviví a las hordas. Subí de nivel. Elegí mejoras. Disparo automático, upgrades y hordas infinitas.',
-    controls: { pc: 'WASD / Flechas para moverte · disparo automático', touch: 'Joystick en pantalla', gamepad: 'Stick izquierdo para moverte' },
+    controls: { pc: 'WASD / Flechas para moverte · disparo automático · 1/2/3 para elegir mejora', touch: 'Arrastrá el dedo en cualquier lado (joystick)', gamepad: 'Stick para moverte · A elegir mejora' },
     score: 'high', scoreLabel: 'puntos', legacyBestKey: 'neonBest', orientation: 'any',
   },
   {
