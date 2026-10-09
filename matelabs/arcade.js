@@ -65,7 +65,8 @@
   /** @typedef {{id:string, title?:string, help?:string[],
    *  isActive?:()=>boolean, onPause?:()=>void, onResume?:()=>void, onRestart?:()=>void, onExit?:()=>void,
    *  onMute?:(muted:boolean)=>void, toolbar?:'tl'|'tr'|'bl'|'br'|'none',
-   *  gamepad?:Record<string,string>|false, pauseKeys?:string[], pauseOnBlur?:boolean, legacyBestKey?:string}} InitOpts */
+   *  gamepad?:Record<string,string>|false, pauseKeys?:string[], pauseOnBlur?:boolean, legacyBestKey?:string,
+   *  actions?:{label:string, fn:()=>void}[]}} InitOpts */
 
   /* ---------- estilos ---------- */
   const css = document.createElement('style');
@@ -151,6 +152,7 @@
         <h2 id="mla-ptitle">PAUSA</h2>
         <button type="button" class="mla-primary" data-a="resume">▶ Reanudar</button>
         ${state.opts.onRestart ? '<button type="button" data-a="restart">↻ Reiniciar partida</button>' : ''}
+        ${state.opts.actions.map((a, i) => `<button type="button" data-a="custom" data-i="${i}">${escapeHTML(a.label)}</button>`).join('')}
         <button type="button" data-a="help" aria-expanded="false">? Cómo jugar</button>
         <ul class="mla-help" hidden>${help}</ul>
         <button type="button" data-a="mute"></button>
@@ -163,6 +165,11 @@
       const a = t.getAttribute('data-a');
       if (a === 'resume') resume();
       else if (a === 'restart') { resume(true); track('restart'); state.opts.onRestart && state.opts.onRestart(); }
+      else if (a === 'custom') {
+        const act = state.opts.actions[Number(t.getAttribute('data-i'))];
+        resume(true); track('action', { label: act.label });
+        try { act.fn(); } catch (err) { reportError(err); }
+      }
       else if (a === 'help') { const u = /** @type {HTMLElement} */ (pauseEl && pauseEl.querySelector('.mla-help')); u.hidden = !u.hidden; t.setAttribute('aria-expanded', String(!u.hidden)); }
       else if (a === 'mute') setSetting('muted', !settings.muted);
       else if (a === 'exit') track('exit', { via: 'pause' });
@@ -411,7 +418,8 @@
     return {
       /** @param {boolean} on */
       toggle(on) {
-        if (on && !raf) { box = el('div', { class: 'mla-fps', 'aria-hidden': 'true' }, '…'); document.body.appendChild(box); t0 = last = performance.now(); raf = requestAnimationFrame(tick); }
+        if (on && !raf) { box = el('div', { class: 'mla-fps', 'aria-hidden': 'true' }, '…');
+          if (state.opts && state.opts.toolbar === 'bl') { box.style.left = 'auto'; box.style.right = '6px'; } document.body.appendChild(box); t0 = last = performance.now(); raf = requestAnimationFrame(tick); }
         if (!on && raf) { cancelAnimationFrame(raf); raf = 0; box && box.remove(); box = null; }
       },
     };
@@ -436,7 +444,7 @@
         id: o.id, title: o.title || '', help: o.help || [], isActive: o.isActive || (() => false),
         onPause: o.onPause || noop, onResume: o.onResume || noop, onRestart: o.onRestart || null, onExit: o.onExit || noop,
         onMute: o.onMute || noop, toolbar: o.toolbar || 'tr', gamepad: o.gamepad === false ? false : Object.assign({}, DEFAULT_PAD, o.gamepad || {}),
-        pauseKeys: o.pauseKeys || ['Escape', 'KeyP'], pauseOnBlur: !!o.pauseOnBlur, legacyBestKey: o.legacyBestKey || '',
+        pauseKeys: o.pauseKeys || ['Escape', 'KeyP'], pauseOnBlur: !!o.pauseOnBlur, legacyBestKey: o.legacyBestKey || '', actions: o.actions || [],
       });
       const ready = () => {
         buildUI();

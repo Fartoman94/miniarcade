@@ -59,7 +59,7 @@ export const GAMES = [
     id: 'salva_al_rey', file: 'Salva_al_rey.html', title: '¡SALVA AL REY!', icon: '👑', accent: '#c9a24b',
     category: 'accion', tags: ['3D', 'Oleadas'], tech: 'Three.js (WebGL)',
     description: 'Defendé el reino medieval en 3D. 10 oleadas de monstruos contra el portón y el rey. Modo exploración incluido.',
-    controls: { pc: 'WASD mover · clic golpear · Espacio saltar · Shift correr', touch: 'Joystick · botones ⚔️ y ⬆️ · deslizá la cámara', gamepad: 'Stick mover · A saltar · X golpear' },
+    controls: { pc: 'WASD mover · clic o J golpear · Espacio saltar · Shift correr · Q/E cámara', touch: 'Joystick · botones ⚔️ y ⬆️ · deslizá la cámara', gamepad: 'Stick mover · A saltar · X golpear · B correr · LB/RB cámara' },
     score: 'level', scoreLabel: 'oleada', legacyBestKey: 'rey_best', orientation: 'landscape', heavy: true,
   },
   {
