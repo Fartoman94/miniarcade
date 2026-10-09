@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0a0a12">
-<title>Fabricio Tasca — Arcade</title>
+<link rel="icon" type="image/png" href="matelabs/favicon.png">
+<title>Mini Arcade — MateLabs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
@@ -46,9 +47,23 @@
   .play-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,255,255,.15)}
   .play-btn:active{transform:translateY(0)}
 
+  /* Marca MateLabs */
+  .brand{display:inline-flex;align-items:center;gap:12px;margin-bottom:22px;padding:6px 18px 6px 6px;border-radius:999px;
+    background:rgba(46,230,230,.06);border:1px solid rgba(46,230,230,.22);text-decoration:none;color:#dffcfc;
+    box-shadow:0 0 30px rgba(46,230,230,.12);backdrop-filter:blur(10px)}
+  .brand img{width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(46,230,230,.5),0 0 18px rgba(46,230,230,.45);
+    animation:brandFloat 3s ease-in-out infinite}
+  .brand b{font-family:'Bungee',sans-serif;font-weight:400;font-size:15px;letter-spacing:.06em}
+  .brand b span{color:#2ee6e6}
+  .brand small{display:block;font-size:10px;letter-spacing:.28em;color:#7fa9ad;font-weight:700;text-align:left}
+  @keyframes brandFloat{50%{transform:translateY(-3px) rotate(-3deg)}}
+
   /* Footer */
   footer{text-align:center;padding:40px 20px;color:#555;font-size:13px;letter-spacing:.1em;font-weight:700}
   footer span{color:#888}
+  footer .made{display:inline-flex;align-items:center;gap:10px;color:#8fb9bd}
+  footer .made img{width:28px;height:28px;border-radius:50%;box-shadow:0 0 12px rgba(46,230,230,.4)}
+  footer .made b{color:#2ee6e6;font-weight:700}
 
   /* Responsive */
   @media (max-width:640px){
@@ -70,10 +85,15 @@
 </style>
 </head>
 <body>
+<script src="matelabs/intro.js" data-accent="#2ee6e6"></script>
 <div class="bg"></div>
 <canvas id="particles"></canvas>
 
 <header>
+  <div class="brand">
+    <img src="matelabs/mascota-128.webp" alt="Mascota de MateLabs" width="44" height="44">
+    <div><small>UNA COLECCIÓN DE</small><b>MATE<span>LABS</span></b></div>
+  </div><br>
   <div class="badge">✦ COLECCIÓN HTML5 ✦</div>
   <h1>Mini Arcade</h1>
   <p class="subtitle">Ocho mundos listos para jugar. Sin instalación. En cualquier dispositivo.</p>
@@ -190,7 +210,7 @@
 </div>
 
 <footer>
-  <span>CREADO POR FABRICIO TASCA</span> · HECHO CON HTML5 · 2026
+  <span class="made"><img src="matelabs/mascota-128.webp" alt="" width="28" height="28">CREADO POR <b>MATELABS</b></span> · HECHO CON HTML5 · 2026
 </footer>
 
 <script>

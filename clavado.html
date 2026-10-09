@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b1d17">
-<title>¡CLAVADO! — un juego de Fabricio Tasca</title>
+<title>¡CLAVADO! — un juego de MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AA%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -77,25 +77,10 @@
   .btn:active{transform:translateY(5px);box-shadow:0 2px 0 #7e1f16}
   .hint{font-size:12px;color:rgba(255,255,255,.6);letter-spacing:.08em}
 
-  #splash{z-index:20;gap:14px;background:radial-gradient(90% 70% at 50% 42%,#12352a 0%,#050f0a 74%)}
-  .splash-marks{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
-  .splash-marks i{width:10px;height:52px;border-radius:3px;transform-origin:top;
-       background:linear-gradient(180deg,#eef3f8,#8fa1b4);transform:skewX(-18deg);animation:markIn .45s both}
-  .splash-marks i:nth-child(2){height:66px;animation-delay:.12s}
-  .splash-marks i:nth-child(3){height:42px;animation-delay:.24s}
-  @keyframes markIn{from{transform:skewX(-18deg) scaleY(0);opacity:0}to{transform:skewX(-18deg) scaleY(1);opacity:1}}
-  .splash-name{font-family:'Bungee';font-size:clamp(42px,11vw,94px);line-height:.95;color:#ffd93d;
-       text-shadow:0 6px 0 #8C2F1B,0 0 46px rgba(255,217,61,.3);
-       animation:splashIn .9s cubic-bezier(.2,1.4,.3,1) .15s both}
-  @keyframes splashIn{from{transform:scale(.6);opacity:0;letter-spacing:.28em}to{transform:scale(1);opacity:1;letter-spacing:.02em}}
-  .splash-sub{font-size:13px;font-weight:700;letter-spacing:.55em;color:rgba(255,255,255,.85);
-       animation:subIn .6s .7s both}
-  @keyframes subIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .splash-skip{position:absolute;bottom:22px;font-size:10px;letter-spacing:.3em;
-       color:rgba(255,255,255,.45);font-weight:700;animation:blink 1.4s steps(2) infinite}
 </style>
 </head>
 <body>
+<script src="matelabs/intro.js" data-game="¡CLAVADO!" data-accent="#ff6b5d"></script>
 <canvas id="c"></canvas>
 <div class="vignette"></div>
 
@@ -104,14 +89,8 @@
   <div style="text-align:right"><div class="label">NIVEL</div><div class="num small" id="level">1</div></div>
 </div>
 <div id="combo">×2</div>
-<div class="watermark">FABRICIO TASCA</div>
+<div class="watermark">MATELABS</div>
 
-<div class="overlay" id="splash">
-  <div class="splash-marks"><i></i><i></i><i></i></div>
-  <div class="splash-name">FABRICIO<br>TASCA</div>
-  <div class="splash-sub">PRESENTA</div>
-  <div class="splash-skip">TOCA PARA SALTAR</div>
-</div>
 
 <div class="overlay" id="menu">
   <div class="chip">HTML5 · PC + ANDROID · UN SOLO TOQUE</div>
@@ -119,7 +98,7 @@
   <p class="tag">Clavá cuchillos en el tronco giratorio.<br>Esquivá tu propio acero, cortá manzanas y sobreviví a cada nivel.</p>
   <div class="credit">
     <span class="credit-k">CREADO POR</span>
-    <span class="credit-n">FABRICIO TASCA</span>
+    <span class="credit-n"><img class="ml-ava" src="matelabs/mascota-128.webp" alt="">MATELABS</span>
   </div>
   <div class="controls">
     <span class="chip">🖱️ CLIC / ESPACIO</span>
@@ -127,7 +106,7 @@
   </div>
   <div class="blink">▶ TOCA PARA JUGAR</div>
   <div class="chip" id="menuBest" style="display:none"></div>
-  <div class="foot">© 2026 FABRICIO TASCA · HECHO CON HTML5</div>
+  <div class="foot">© 2026 MATELABS · HECHO CON HTML5</div>
 </div>
 
 <div class="overlay hidden" id="over">
@@ -138,7 +117,7 @@
   <div class="stats"><span id="overLevel">NIVEL 1</span><span>·</span><span id="overApples">🍎 0</span><span>·</span><span>RÉCORD <b id="overBest">0</b></span></div>
   <button class="btn" type="button">OTRA VEZ</button>
   <div class="hint">o toca en cualquier parte</div>
-  <div class="foot">UN JUEGO DE FABRICIO TASCA</div>
+  <div class="foot">UN JUEGO DE MATELABS</div>
 </div>
 
 <script>
@@ -148,7 +127,7 @@ const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
 const $=id=>document.getElementById(id);
 const scoreEl=$('score'),levelEl=$('level'),comboEl=$('combo'),hud=$('hud'),menu=$('menu'),
       over=$('over'),overScore=$('overScore'),overLevel=$('overLevel'),overApples=$('overApples'),
-      overBest=$('overBest'),recordBadge=$('recordBadge'),menuBest=$('menuBest'),splash=$('splash');
+      overBest=$('overBest'),recordBadge=$('recordBadge'),menuBest=$('menuBest');
 
 let W=0,H=0,DPR=1,CX=0,CY=0,R=100;
 function layout(){CX=W/2;CY=H*0.335;R=Math.max(68,Math.min(W*0.27,H*0.17,132));}
@@ -181,7 +160,7 @@ const sLevel=()=>{tone(523,.12,'triangle',.2);tone(659,.12,'triangle',.2,.1);ton
 const sOver=()=>{tone(320,.55,'sawtooth',.2,0,60);tone(160,.6,'triangle',.18,.12,45);};
 
 /* ---- estado ---- */
-let state='splash',time=0,levelT=0,botT=1;
+let state='menu',time=0,levelT=0,botT=1;
 let level=1,score=0,combo=0,lastStickT=-9,applesCut=0;
 let theta=0,wobble=0,levelCfg={base:1,mode:'const',freq:1.2};
 let stuck=[],applesArr=[],throwsLeft=6;
@@ -189,7 +168,6 @@ let knifeState='ready',flyT=0,overAt=0;
 let parts=[],shards=[],texts=[];
 let best=0;try{best=+localStorage.getItem('clavado_best')||0;}catch(e){}
 
-setTimeout(()=>{if(state==='splash'){splash.classList.add('hidden');state='menu';}},1800);
 
 const flies=Array.from({length:16},()=>({fx:Math.random(),fy:Math.random()*.75,ph:rand(0,6.28),sp:rand(.4,1.1)}));
 
@@ -471,7 +449,6 @@ requestAnimationFrame(frame);
 /* ---- entrada ---- */
 function action(){
   audio();
-  if(state==='splash'){splash.classList.add('hidden');state='menu';return;}
   if(state==='menu')startGame();
   else if(state==='playing')throwKnife();
   else if(state==='over'&&performance.now()-overAt>500)startGame();
