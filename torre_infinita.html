@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0a1233">
-<title>TORRE INFINITA — un juego de Fabricio Tasca</title>
+<title>TORRE INFINITA — un juego de MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%B1%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -79,25 +79,10 @@
   .hint{font-size:12px;color:rgba(255,255,255,.6);letter-spacing:.08em}
 
   /* ---- pantalla de presentación ---- */
-  #splash{z-index:20;gap:14px;background:radial-gradient(90% 70% at 50% 42%,#121c4e 0%,#060a22 72%)}
-  .splash-tower{display:flex;flex-direction:column-reverse;align-items:center;gap:3px;margin-bottom:10px}
-  .splash-tower i{display:block;height:11px;border-radius:2px;animation:brickIn .5s both}
-  .splash-tower i:nth-child(1){width:58px;background:#FF5D5D;animation-delay:.05s}
-  .splash-tower i:nth-child(2){width:43px;background:#FFD93D;animation-delay:.22s}
-  .splash-tower i:nth-child(3){width:28px;background:#2EC4B6;animation-delay:.4s}
-  @keyframes brickIn{from{transform:translateY(-16px) scale(.6);opacity:0}to{transform:none;opacity:1}}
-  .splash-name{font-family:'Bungee';font-size:clamp(42px,11vw,94px);line-height:.95;color:#FFD93D;
-       text-shadow:0 6px 0 #C2452F,0 0 46px rgba(255,217,61,.35);
-       animation:splashIn .9s cubic-bezier(.2,1.4,.3,1) .15s both}
-  @keyframes splashIn{from{transform:scale(.6);opacity:0;letter-spacing:.28em}to{transform:scale(1);opacity:1;letter-spacing:.02em}}
-  .splash-sub{font-size:13px;font-weight:700;letter-spacing:.55em;color:rgba(255,255,255,.85);
-       animation:subIn .6s .7s both}
-  @keyframes subIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .splash-skip{position:absolute;bottom:22px;font-size:10px;letter-spacing:.3em;
-       color:rgba(255,255,255,.45);font-weight:700;animation:blink 1.4s steps(2) infinite}
 </style>
 </head>
 <body>
+<script src="matelabs/intro.js" data-game="TORRE INFINITA" data-accent="#ffd93d"></script>
 <canvas id="c"></canvas>
 <div class="vignette"></div>
 
@@ -106,15 +91,9 @@
   <div style="text-align:right"><div class="label">RÉCORD</div><div class="num small" id="best">0</div></div>
 </div>
 <div id="combo">COMBO ×2</div>
-<div class="watermark">FABRICIO TASCA</div>
+<div class="watermark">MATELABS</div>
 
 <!-- Pantalla de presentación -->
-<div class="overlay" id="splash">
-  <div class="splash-tower"><i></i><i></i><i></i></div>
-  <div class="splash-name">FABRICIO<br>TASCA</div>
-  <div class="splash-sub">PRESENTA</div>
-  <div class="splash-skip">TOCA PARA SALTAR</div>
-</div>
 
 <!-- Portada -->
 <div class="overlay" id="menu">
@@ -123,7 +102,7 @@
   <p class="tag">Apilá bloques, clavá caídas perfectas<br>y subí hasta donde el cielo se apague.</p>
   <div class="credit">
     <span class="credit-k">CREADO POR</span>
-    <span class="credit-n">FABRICIO TASCA</span>
+    <span class="credit-n"><img class="ml-ava" src="matelabs/mascota-128.webp" alt="">MATELABS</span>
   </div>
   <div class="controls">
     <span class="chip">🖱️ CLIC / ESPACIO</span>
@@ -131,7 +110,7 @@
   </div>
   <div class="blink">▶ TOCA PARA EMPEZAR</div>
   <div class="chip" id="menuBest" style="display:none"></div>
-  <div class="foot">© 2026 FABRICIO TASCA · HECHO CON HTML5</div>
+  <div class="foot">© 2026 MATELABS · HECHO CON HTML5</div>
 </div>
 
 <!-- Fin de partida -->
@@ -143,7 +122,7 @@
   <div class="stats"><span id="overCombo">MEJOR COMBO ×1</span><span>·</span><span>RÉCORD <b id="overBest">0</b></span></div>
   <button class="btn" type="button">OTRA VEZ</button>
   <div class="hint">o toca en cualquier parte</div>
-  <div class="foot">UN JUEGO DE FABRICIO TASCA</div>
+  <div class="foot">UN JUEGO DE MATELABS</div>
 </div>
 
 <script>
@@ -153,7 +132,7 @@ const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
 const $=id=>document.getElementById(id);
 const scoreEl=$('score'),bestEl=$('best'),comboEl=$('combo'),hud=$('hud'),menu=$('menu'),
       over=$('over'),overScore=$('overScore'),overBest=$('overBest'),overCombo=$('overCombo'),
-      recordBadge=$('recordBadge'),menuBest=$('menuBest'),splash=$('splash');
+      recordBadge=$('recordBadge'),menuBest=$('menuBest');
 
 let W=0,H=0,DPR=1;
 function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
@@ -185,13 +164,12 @@ const sPerfect=()=>{const m=Math.pow(1.122,Math.min(combo,8));
 const sOver=()=>{tone(300,.6,'sawtooth',.22,0,55);tone(150,.7,'triangle',.2,.1,40);};
 
 /* ---- estado ---- */
-let state='splash',tower=[],cur=null,pieces=[],parts=[],texts=[];
+let state='menu',tower=[],cur=null,pieces=[],parts=[],texts=[];
 let camY=0,score=0,combo=0,maxCombo=0,shakeT=0,shakeMag=0,overAt=0,time=0,botErr=0;
 let BASE_W=300,BH=34;const GROUND_PAD=90;
 let best=0;try{best=+localStorage.getItem('torre_best')||0;}catch(e){}
 
 /* la presentación dura 1.8 s (o se saltea con un toque) */
-setTimeout(()=>{if(state==='splash'){splash.classList.add('hidden');state='menu';}},1800);
 
 const hueFor=r=>(r*16+8)%360;
 const blockTopY=row=>H-GROUND_PAD-(row+1)*BH+camY;
@@ -417,7 +395,6 @@ requestAnimationFrame(frame);
 /* ---- entrada (PC + móvil, un solo toque) ---- */
 function action(){
   audio();
-  if(state==='splash'){splash.classList.add('hidden');state='menu';return;}
   if(state==='menu')startGame();
   else if(state==='playing')dropBlock();
   else if(state==='over'&&performance.now()-overAt>500)startGame();
