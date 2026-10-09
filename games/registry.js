@@ -73,7 +73,7 @@ export const GAMES = [
     id: 'turbo_furia', file: 'turbo_furia.html', title: 'TURBO FURIA', icon: '🏁', accent: '#ff8c1a',
     category: 'carreras', tags: ['3D', 'Nitro'], tech: 'Three.js (WebGL)',
     description: 'Carreras 3D a toda velocidad. Elegí tu vehículo, esquivá el tráfico, activá el nitro y batí tu récord.',
-    controls: { pc: '← → / A D carril · Shift nitro', touch: 'Deslizá o usá los botones', gamepad: 'Stick/cruceta carril · A nitro' },
+    controls: { pc: '← → / A D carril · ↓ freno · Shift/Espacio nitro', touch: 'Deslizá o usá los botones', gamepad: 'Stick/cruceta carril · A nitro · X/LT freno' },
     score: 'high', scoreLabel: 'metros', legacyBestKey: 'turbo_best', orientation: 'any', heavy: true,
   },
   {

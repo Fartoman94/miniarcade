@@ -65,7 +65,7 @@
   /** @typedef {{id:string, title?:string, help?:string[],
    *  isActive?:()=>boolean, onPause?:()=>void, onResume?:()=>void, onRestart?:()=>void, onExit?:()=>void,
    *  onMute?:(muted:boolean)=>void, toolbar?:'tl'|'tr'|'bl'|'br'|'none',
-   *  gamepad?:Record<string,string>|false, pauseKeys?:string[], pauseOnBlur?:boolean}} InitOpts */
+   *  gamepad?:Record<string,string>|false, pauseKeys?:string[], pauseOnBlur?:boolean, legacyBestKey?:string}} InitOpts */
 
   /* ---------- estilos ---------- */
   const css = document.createElement('style');
@@ -320,8 +320,10 @@
     const s = store.get('ml:scores', {});
     if (s[id] != null) return s[id];
     // migración: récord guardado por la versión anterior del juego
+    // (init() puede pasar legacyBestKey para que funcione antes de que cargue el registro)
     const meta = lookupMeta(id);
-    if (meta && meta.legacyBestKey) { const v = parseFloat(store.raw(meta.legacyBestKey) || ''); if (!isNaN(v)) return v; }
+    const key = (meta && meta.legacyBestKey) || (id === state.id && state.opts && state.opts.legacyBestKey);
+    if (key) { const v = parseFloat(store.raw(key) || ''); if (!isNaN(v)) return v; }
     return 0;
   }
   /** @param {number} value @param {string} [id] */
@@ -434,7 +436,7 @@
         id: o.id, title: o.title || '', help: o.help || [], isActive: o.isActive || (() => false),
         onPause: o.onPause || noop, onResume: o.onResume || noop, onRestart: o.onRestart || null, onExit: o.onExit || noop,
         onMute: o.onMute || noop, toolbar: o.toolbar || 'tr', gamepad: o.gamepad === false ? false : Object.assign({}, DEFAULT_PAD, o.gamepad || {}),
-        pauseKeys: o.pauseKeys || ['Escape', 'KeyP'], pauseOnBlur: !!o.pauseOnBlur,
+        pauseKeys: o.pauseKeys || ['Escape', 'KeyP'], pauseOnBlur: !!o.pauseOnBlur, legacyBestKey: o.legacyBestKey || '',
       });
       const ready = () => {
         buildUI();

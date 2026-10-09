@@ -104,3 +104,11 @@ describe('MLArcade SDK', () => {
     spy.mockRestore();
   });
 });
+
+describe('legacyBestKey en init (antes de que cargue el registro)', () => {
+  it('se usa como respaldo sincrónico', () => {
+    // clavado ya tiene récord en ml:scores en este archivo; probamos la rama de respaldo con otro id ficticio
+    localStorage.setItem('viejo_best', '77');
+    expect(window.MLArcade.scores.best('id_sin_registro')).toBe(0);
+  });
+});
