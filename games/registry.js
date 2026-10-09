@@ -67,7 +67,7 @@ export const GAMES = [
     category: 'reflejos', tags: ['Un toque', 'PC + Android'], tech: 'Canvas 2D',
     description: 'Apilá bloques, clavá caídas perfectas y subí hasta donde el cielo se apague. Cielos que cambian con la altura.',
     controls: { pc: 'Clic o Espacio para soltar el bloque', touch: 'Tocá la pantalla para soltar', gamepad: 'A para soltar' },
-    score: 'high', scoreLabel: 'pisos', legacyBestKey: 'torre_best', orientation: 'any',
+    score: 'high', scoreLabel: 'puntos', legacyBestKey: 'torre_best', orientation: 'any',
   },
   {
     id: 'turbo_furia', file: 'turbo_furia.html', title: 'TURBO FURIA', icon: '🏁', accent: '#ff8c1a',

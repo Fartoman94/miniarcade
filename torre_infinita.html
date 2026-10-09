@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="matelabs/arcade.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;overflow:hidden}
@@ -78,12 +79,16 @@
   .btn:active{transform:translateY(5px);box-shadow:0 2px 0 #A93648}
   .hint{font-size:12px;color:rgba(255,255,255,.6);letter-spacing:.08em}
 
-  /* ---- pantalla de presentación ---- */
+  /* el pie de las pantallas ya dice MATELABS: la marca de agua se oculta para no encimarse */
+  body:has(.overlay:not(.hidden)) .watermark{opacity:0}
+  /* la barra del arcade va abajo a la izquierda: en pantallas angostas subimos los textos del pie */
+  @media (max-width:760px){.watermark{bottom:52px}.foot{bottom:54px}}
+  @media (max-height:520px){.overlay{gap:10px;padding:16px}.foot{display:none}}
 </style>
 </head>
 <body>
 <script src="matelabs/intro.js" data-game="TORRE INFINITA" data-accent="#ffd93d"></script>
-<canvas id="c"></canvas>
+<canvas id="c" role="img" aria-label="Torre de bloques apilados"></canvas>
 <div class="vignette"></div>
 
 <div class="hud" id="hud">
@@ -92,8 +97,6 @@
 </div>
 <div id="combo">COMBO ×2</div>
 <div class="watermark">MATELABS</div>
-
-<!-- Pantalla de presentación -->
 
 <!-- Portada -->
 <div class="overlay" id="menu">
@@ -108,7 +111,7 @@
     <span class="chip">🖱️ CLIC / ESPACIO</span>
     <span class="chip">👆 TOQUE</span>
   </div>
-  <div class="blink">▶ TOCA PARA EMPEZAR</div>
+  <div class="blink">▶ TOCÁ PARA EMPEZAR</div>
   <div class="chip" id="menuBest" style="display:none"></div>
   <div class="foot">© 2026 MATELABS · HECHO CON HTML5</div>
 </div>
@@ -121,7 +124,7 @@
   <div class="badge" id="recordBadge">★ ¡NUEVO RÉCORD! ★</div>
   <div class="stats"><span id="overCombo">MEJOR COMBO ×1</span><span>·</span><span>RÉCORD <b id="overBest">0</b></span></div>
   <button class="btn" type="button">OTRA VEZ</button>
-  <div class="hint">o toca en cualquier parte</div>
+  <div class="hint">o tocá en cualquier parte</div>
   <div class="foot">UN JUEGO DE MATELABS</div>
 </div>
 
@@ -150,14 +153,19 @@ const mix=(a,b,t)=>{const A=hex2rgb(a),B=hex2rgb(b);
 const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
 
 /* ---- audio sintetizado (sin archivos) ---- */
-let AC=null;
-function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
-  if(AC&&AC.state==='suspended')AC.resume();}
-function tone(f,d,type,v,delay=0,slide=0){if(!AC)return;const t0=AC.currentTime+delay;
+let AC=null,master=null,muted=false,paused=false;
+const ML=window.MLArcade||null;
+try{muted=!!(ML&&ML.settings.get('muted'));}catch(e){}
+function audio(){
+  if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain();master.gain.value=muted?0:1;master.connect(AC.destination);}catch(e){AC=null;}}
+  if(AC&&AC.state==='suspended'&&!paused)AC.resume().catch(()=>{});}
+function setMuted(m){muted=!!m;if(master)master.gain.setValueAtTime(muted?0:1,AC.currentTime);}
+function tone(f,d,type,v,delay=0,slide=0){if(!AC||muted||AC.state!=='running')return;const t0=AC.currentTime+delay;
   const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t0);
   if(slide)o.frequency.exponentialRampToValueAtTime(slide,t0+d);
   g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+d);
-  o.connect(g);g.connect(AC.destination);o.start(t0);o.stop(t0+d+.05);}
+  o.connect(g);g.connect(master);o.start(t0);o.stop(t0+d+.05);}
 const sPlace=()=>{tone(170,.1,'triangle',.3);tone(340,.06,'sine',.12);};
 const sPerfect=()=>{const m=Math.pow(1.122,Math.min(combo,8));
   tone(440*m,.12,'sine',.22);tone(660*m,.16,'sine',.2,.07);tone(880*m,.22,'triangle',.14,.13);};
@@ -167,9 +175,10 @@ const sOver=()=>{tone(300,.6,'sawtooth',.22,0,55);tone(150,.7,'triangle',.2,.1,4
 let state='menu',tower=[],cur=null,pieces=[],parts=[],texts=[];
 let camY=0,score=0,combo=0,maxCombo=0,shakeT=0,shakeMag=0,overAt=0,time=0,botErr=0;
 let BASE_W=300,BH=34;const GROUND_PAD=90;
+/* récord: se guarda en MLArcade.scores y también en la clave vieja 'torre_best' (compatibilidad) */
 let best=0;try{best=+localStorage.getItem('torre_best')||0;}catch(e){}
-
-/* la presentación dura 1.8 s (o se saltea con un toque) */
+if(ML){try{best=Math.max(best,+ML.scores.best()||0);}catch(e){}}
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const hueFor=r=>(r*16+8)%360;
 const blockTopY=row=>H-GROUND_PAD-(row+1)*BH+camY;
@@ -200,9 +209,12 @@ function spawnCurrent(){
        dir:fromLeft?1:-1,hue:hueFor(row)};
   botErr=(state==='menu')?rand(-1,1)*Math.min(16,cur.w*.3):0;
 }
+/* T = segundos para cruzar la pantalla (baja con la altura). El tope antes era fijo (760 px/s) y en
+   pantallas anchas se alcanzaba en el piso 4: la dificultad dejaba de subir. Ahora el tope es
+   proporcional al ancho de la base, así la curva progresa igual en PC y en celular. */
 function curSpeed(){
   const T=Math.max(1.35,2.5-cur.row*.03);
-  return Math.min((W+cur.w+80)/T,760);
+  return Math.min((W+cur.w+80)/T,BASE_W*2.4);
 }
 
 function dropBlock(){
@@ -255,6 +267,7 @@ function dropBlock(){
 function showOver(){
   const rec=score>best;
   if(rec){best=score;try{localStorage.setItem('torre_best',best);}catch(e){}bestEl.textContent=best;}
+  if(ML){try{ML.ended({score});}catch(e){}}
   overScore.textContent=score;overBest.textContent=best;
   overCombo.textContent='MEJOR COMBO ×'+Math.max(1,maxCombo);
   recordBadge.style.display=rec?'inline-block':'none';
@@ -265,13 +278,14 @@ function startGame(){
   newGame();state='playing';
   menu.classList.add('hidden');over.classList.add('hidden');
   hud.classList.add('show');bestEl.textContent=best;
+  if(ML){try{ML.started();}catch(e){}}
 }
 function popScore(){scoreEl.classList.remove('pop');void scoreEl.offsetWidth;scoreEl.classList.add('pop');}
 function showCombo(){if(combo>=2){comboEl.textContent='COMBO ×'+combo;
   comboEl.classList.add('show');comboEl.classList.remove('pop');void comboEl.offsetWidth;comboEl.classList.add('pop');}}
 
 /* ---- efectos ---- */
-function shake(m){shakeT=1;shakeMag=m;}
+function shake(m){if(reduceMotion)return;shakeT=1;shakeMag=m;}
 function confetti(x,y,hue){for(let i=0;i<26;i++)
   parts.push({x:x+rand(-30,30),y:y+rand(-4,4),vx:rand(-160,160),vy:rand(-320,-60),
     life:rand(.6,1),c:Math.random()<.4?'#FFD93D':(Math.random()<.5?'#fff':`hsl(${hue},80%,60%)`),s:rand(3,6)});}
@@ -320,12 +334,13 @@ function drawBlock(cx,w,row,hue){
   ctx.fillStyle=`hsl(${hue},70%,56%)`;ctx.fillRect(x,y,w,BH);
   ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x,y+BH-4,w,4);
 }
+let skyGrad=null,skyKey=NaN,skyH=0;
 function render(){
   const alt=camY;
-  const[topC,botC]=skyColors(alt);
-  const g=ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,topC);g.addColorStop(1,botC);
-  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const altK=Math.round(alt);
+  if(altK!==skyKey||H!==skyH){skyKey=altK;skyH=H;const[topC,botC]=skyColors(altK);
+    skyGrad=ctx.createLinearGradient(0,0,0,H);skyGrad.addColorStop(0,topC);skyGrad.addColorStop(1,botC);}
+  ctx.fillStyle=skyGrad;ctx.fillRect(0,0,W,H);
 
   const night=smooth(2600,4200,alt);
   if(night>0){ctx.fillStyle='#fff';
@@ -363,7 +378,9 @@ function render(){
   if(gy<H+80){ctx.fillStyle='#232a4d';ctx.fillRect(0,gy,W,H-gy+80);
     ctx.fillStyle='#39437a';ctx.fillRect(0,gy,W,7);}
 
-  for(const b of tower)drawBlock(b.cx,b.w,b.row,b.hue);
+  /* sólo las filas visibles (tower[i].row===i): la torre crece sin límite */
+  const r0=Math.max(0,Math.floor((camY-80-GROUND_PAD)/BH)-1),r1=Math.min(tower.length-1,Math.ceil((camY+H+80)/BH)+1);
+  for(let i=r0;i<=r1;i++){const b=tower[i];drawBlock(b.cx,b.w,b.row,b.hue);}
   for(const p of pieces){const y=H-GROUND_PAD-p.alt+camY;
     ctx.save();ctx.translate(W/2+p.x,y+BH/2);ctx.rotate(p.rot);
     ctx.fillStyle=`hsl(${p.hue},70%,56%)`;ctx.fillRect(-p.w/2,-BH/2,p.w,BH);
@@ -385,22 +402,60 @@ function render(){
   ctx.globalAlpha=1;
 }
 
-let last=performance.now();
+let last=performance.now(),raf=0,stopped=false;
 function frame(now){
-  const dt=Math.min(.033,(now-last)/1000);last=now;
-  update(dt);render();requestAnimationFrame(frame);
+  raf=0;if(paused||stopped)return;               /* en pausa el bucle se detiene por completo */
+  const dt=Math.min(.033,Math.max(0,(now-last)/1000));last=now;
+  update(dt);render();raf=requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+function startLoop(){if(!raf&&!stopped){last=performance.now();raf=requestAnimationFrame(frame);}}
+startLoop();
 
 /* ---- entrada (PC + móvil, un solo toque) ---- */
 function action(){
+  if(paused)return;
   audio();
   if(state==='menu')startGame();
   else if(state==='playing')dropBlock();
-  else if(state==='over'&&performance.now()-overAt>500)startGame();
+  else if(state==='over'&&performance.now()-overAt>600)startGame();   /* recién cuando ya se ve el resultado */
 }
-addEventListener('pointerdown',e=>{e.preventDefault();action();},{passive:false});
-addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();action();}});
+const onUI=t=>t instanceof Element&&!!t.closest('.mla-bar,.mla-pause,.mla-toast');
+addEventListener('pointerdown',e=>{
+  if(onUI(e.target))return;
+  if(e.pointerType==='mouse'&&e.button!==0)return;        /* clic derecho/medio no suelta bloques */
+  e.preventDefault();action();},{passive:false});
+addEventListener('keydown',e=>{
+  if(e.code!=='Space'&&e.code!=='Enter')return;
+  if(onUI(e.target))return;                                /* Enter/Espacio sobre la barra del arcade */
+  e.preventDefault();
+  if(e.repeat)return;                                      /* mantener apretado no suelta varios bloques */
+  action();});
+
+/* ---- integración con el SDK de MateLabs Arcade ---- */
+if(ML){
+  ML.init({
+    id:'torre_infinita',title:'TORRE INFINITA',toolbar:'bl',
+    help:['Clic, Espacio o Enter: soltar el bloque','Táctil: tocá la pantalla para soltar',
+          'Gamepad: A para soltar','Si lo soltás justo encima es caída perfecta: no se recorta y sumás combo',
+          'Esc, P o Start: pausa'],
+    gamepad:{a:'Space',b:'Escape'},
+    isActive:()=>state==='playing'&&!stopped,
+    onPause:()=>{paused=true;if(AC&&AC.state==='running')AC.suspend().catch(()=>{});},
+    onResume:()=>{paused=false;if(AC&&AC.state==='suspended')AC.resume().catch(()=>{});startLoop();},
+    onRestart:()=>{paused=false;if(AC&&AC.state==='suspended')AC.resume().catch(()=>{});startGame();startLoop();},
+    onMute:setMuted,
+    onExit:()=>{stopped=true;if(raf)cancelAnimationFrame(raf);raf=0;if(AC){AC.close().catch(()=>{});AC=null;master=null;}},
+  });
+  /* volver con el botón Atrás (bfcache) después de onExit: reactivar el bucle */
+  addEventListener('pageshow',e=>{if(e.persisted&&stopped){stopped=false;startLoop();}});
+  /* el registro carga en diferido: si ahí aparece un récord migrado mayor, mostrarlo */
+  ML.registry().then(()=>{try{const b=+ML.scores.best()||0;if(b>best){best=b;bestEl.textContent=best;
+    if(state==='menu'){menuBest.style.display='inline-flex';menuBest.textContent='TU RÉCORD · '+best;}}}catch(e){}});
+}
+/* gancho de solo lectura para pruebas automáticas */
+Object.defineProperty(window,'__torre',{value:Object.freeze({
+  get state(){return state;},get score(){return score;},get rows(){return tower.length;},
+  get curX(){return cur?cur.cx:null;},get paused(){return paused;},get best(){return best;}})});
 
 bestEl.textContent=best;
 if(best>0){menuBest.style.display='inline-flex';menuBest.textContent='TU RÉCORD · '+best;}
