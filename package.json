@@ -1,0 +1,20 @@
+{
+  "name": "miniarcade",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MiniArcade de MateLabs: portal de juegos HTML5 estático (sin build).",
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8765",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -p jsconfig.json",
+    "perf": "node tests/perf/measure.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

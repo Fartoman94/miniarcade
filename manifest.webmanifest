@@ -1,0 +1,15 @@
+{
+  "name": "Mini Arcade — MateLabs",
+  "short_name": "Mini Arcade",
+  "description": "8 juegos HTML5 de MateLabs para jugar en el navegador.",
+  "lang": "es",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0a12",
+  "theme_color": "#0a0a12",
+  "icons": [
+    { "src": "matelabs/mascota.webp", "sizes": "512x512", "type": "image/webp", "purpose": "any" },
+    { "src": "matelabs/mascota-128.webp", "sizes": "128x128", "type": "image/webp", "purpose": "any" }
+  ]
+}
