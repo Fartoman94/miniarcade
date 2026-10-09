@@ -45,8 +45,8 @@ export const GAMES = [
     id: 'muerte_gloriosa', file: 'muerte_gloriosa.html', title: 'MUERTE GLORIOSA', icon: '🤕', accent: '#87ceeb',
     category: 'plataformas', tags: ['Parkour', '6 niveles'], tech: 'Canvas 2D',
     description: 'Parece un juego de caminar y saltar… pero el nivel te odia. Yunques, pinchos, barriles y trampolines traicioneros.',
-    controls: { pc: '← → caminar · Espacio saltar · R reiniciar', touch: 'Botones en pantalla', gamepad: 'Stick/cruceta mover · A saltar' },
-    score: 'level', scoreLabel: 'nivel', legacyBestKey: 'mg_best', orientation: 'landscape',
+    controls: { pc: '← → caminar · Espacio saltar · R reiniciar nivel · Esc pausa', touch: 'Botones ◀ ▶ y SALTAR en pantalla', gamepad: 'Stick/cruceta mover · A saltar · X reiniciar nivel' },
+    score: 'high', scoreLabel: 'niveles superados', legacyBestKey: 'mg_best', orientation: 'landscape',
   },
   {
     id: 'neon_survivor', file: 'NEON_SURVIVOR.html', title: 'NEON SURVIVOR', icon: '🟣', accent: '#00ffff',

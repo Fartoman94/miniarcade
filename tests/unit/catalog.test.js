@@ -65,7 +65,8 @@ describe('catálogo', () => {
   it('bestText / fmtTime / totals / norm', () => {
     expect(bestText(getGame('clavado'), 0)).toBe('—');
     expect(bestText(getGame('clavado'), 42)).toBe('42 puntos');
-    expect(bestText(getGame('muerte_gloriosa'), 3)).toBe('nivel 3');
+    expect(bestText(getGame('salva_al_rey'), 3)).toBe('oleada 3');
+    expect(bestText(getGame('muerte_gloriosa'), 3)).toBe('3 niveles superados');
     expect(fmtTime(10_000)).toBe('< 1 min');
     expect(fmtTime(125 * 60_000)).toBe('2 h 5 min');
     expect(totals(GAMES, g => ({ ...noInfo(), plays: 1, timeMs: 10 }))).toEqual({ plays: GAMES.length, timeMs: GAMES.length * 10, tried: GAMES.length });
