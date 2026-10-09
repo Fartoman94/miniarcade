@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0d2033">
 <title>FRUTA FURIA — creado por MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%89%3C/text%3E%3C/svg%3E">
+<script src="matelabs/arcade.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
@@ -70,6 +71,10 @@
   .credit-n{font-family:'Bungee';font-size:clamp(17px,4vw,23px);color:#ffd93d;letter-spacing:.04em}
   .foot{position:absolute;bottom:16px;left:0;right:0;font-size:10px;letter-spacing:.26em;
        color:rgba(255,255,255,.55);font-weight:700}
+  /* la marca de agua fija ya muestra el crédito: el pie de los overlays se superponía con ella (texto doble) */
+  .overlay .foot{display:none}
+  /* en pantallas angostas la barra del arcade (abajo a la izquierda) tapaba la marca de agua */
+  @media (max-width:640px){.watermark{bottom:calc(54px + env(safe-area-inset-bottom))}}
 
   .kicker{font-size:12px;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.75)}
   .finalScore{font-family:'Bungee';font-size:clamp(72px,18vw,150px);line-height:1;color:#8be07a;
@@ -136,11 +141,23 @@ const scoreEl=$('score'),livesEl=$('lives'),hud=$('hud'),menu=$('menu'),over=$('
       overKicker=$('overKicker'),overScore=$('overScore'),overFruits=$('overFruits'),
       overBest=$('overBest'),recordBadge=$('recordBadge'),menuBest=$('menuBest');
 
-let W=0,H=0,DPR=1;
+let W=0,H=0,DPR=1,G=980;
+// Gradientes del fondo: dependen sólo del tamaño, se crean al redimensionar y no en cada frame.
+let skyGrad=null,moonGlow=null,horizonGrad=null;
 function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
-  canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+'px';canvas.style.height=H+'px';
-  ctx.setTransform(DPR,0,0,DPR,0,0);}
-addEventListener('resize',resize);resize();
+  canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  // La gravedad escala con la altura de la pantalla: el vuelo dura lo mismo en un celular
+  // apaisado que en un monitor alto (antes la fruta no subía en pantallas bajas y se iba por arriba en las altas).
+  G=980*clamp(H/800,.55,1.8);
+  skyGrad=ctx.createLinearGradient(0,0,0,H);
+  skyGrad.addColorStop(0,'#0d2033');skyGrad.addColorStop(.55,'#14384a');skyGrad.addColorStop(1,'#0e2c26');
+  const mx=W*.8,my=H*.15;
+  moonGlow=ctx.createRadialGradient(mx,my,6,mx,my,90);
+  moonGlow.addColorStop(0,'rgba(244,236,216,.28)');moonGlow.addColorStop(1,'rgba(244,236,216,0)');
+  horizonGrad=ctx.createLinearGradient(0,H*.6,0,H*.86);
+  horizonGrad.addColorStop(0,'rgba(255,150,80,0)');horizonGrad.addColorStop(.7,'rgba(255,150,80,.12)');
+  horizonGrad.addColorStop(1,'rgba(255,150,80,0)');}
 addEventListener('contextmenu',e=>e.preventDefault());
 
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -148,16 +165,20 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const hex2rgb=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
 const hexA=(h,a)=>{const[r,g,b]=hex2rgb(h);return `rgba(${r},${g},${b},${a})`;};
 const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
+addEventListener('resize',resize);resize();
 
 /* ---- audio sintetizado ---- */
-let AC=null;
-function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
-  if(AC&&AC.state==='suspended')AC.resume();}
-function tone(f,d,type,v,delay=0,slide=0){if(!AC)return;const t0=AC.currentTime+delay;
+const ML=window.MLArcade||null;
+let AC=null,master=null,muted=!!(ML&&ML.settings.get('muted'));
+function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain();master.gain.value=muted?0:1;master.connect(AC.destination);}catch(e){AC=null;}}
+  if(AC&&AC.state==='suspended'&&!paused)AC.resume().catch(()=>{});}
+function setMuted(m){muted=m;if(master)master.gain.value=m?0:1;}
+function tone(f,d,type,v,delay=0,slide=0){if(!AC||muted||paused||AC.state==='closed')return;const t0=AC.currentTime+delay;
   const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t0);
   if(slide)o.frequency.exponentialRampToValueAtTime(slide,t0+d);
   g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+d);
-  o.connect(g);g.connect(AC.destination);o.start(t0);o.stop(t0+d+.05);}
+  o.connect(g);g.connect(master);o.start(t0);o.stop(t0+d+.05);}
 const sSlice=r=>{tone(520-r*4,.07,'square',.1,0,180);tone(170,.09,'sine',.28);tone(1300,.05,'sine',.07,0,420);};
 const sCombo=n=>tone(440*Math.pow(1.122,Math.min(n,10)),.11,'sine',.2);
 const sGolden=()=>[660,880,1100,1320].forEach((f,i)=>tone(f,.12,'sine',.16,i*.06));
@@ -182,12 +203,16 @@ const stars=Array.from({length:46},()=>({fx:Math.random(),fy:Math.random()*.5,ph
 const flies=Array.from({length:14},()=>({fx:Math.random(),fy:rand(.3,.85),ph:rand(0,6.28),sp:rand(.4,1.1)}));
 
 /* ---- estado ---- */
-let state='menu',time=0,botT=.8;
+let state='menu',time=0,botT=.8,paused=false,boomT=0;
 let score=0,misses=0,slicedCount=0,swipeCombo=0;
 let playT0=0,spawnT=.5,waveT=14,flashT=0,overAt=0;
 let fruits=[],halves=[],parts=[],texts=[],trail=[],shock=[],spawnQueue=[];
 let shakeT=0,shakeMag=0;
-let best=0;try{best=+localStorage.getItem('fruta_best')||0;}catch(e){}
+let activePtr=null,swiping=false;
+const LEGACY_KEY='fruta_best';
+function readBest(){let b=0;try{b=+localStorage.getItem(LEGACY_KEY)||0;}catch(e){}
+  if(ML){const s=+ML.scores.best();if(s>b)b=s;}return b;}
+let best=readBest();
 
 /* ---- helpers de juego ---- */
 function shake(m){shakeT=1;shakeMag=m;}
@@ -202,17 +227,17 @@ function launchOne(noBomb){
   else if(r<bp+.06)type='dorada';
   else{const p=Math.random();
     type=p<.22?'sandia':p<.42?'naranja':p<.62?'manzana':p<.81?'limon':'kiwi';}
-  fruits.push({type,x:rand(W*.1,W*.9),y:H+50,
-    vx:((W/2-(W*.5))/W)*0+((W/2-rand(W*.1,W*.9))*0), // placeholder replaced below
-    vy:0,rot:rand(0,6.28),vr:rand(-3,3),r:type==='bomba'?24:FRUITS[type].r});
-  const f=fruits[fruits.length-1];
-  f.x=rand(W*.1,W*.9);
-  f.vx=((W/2-f.x)/W)*rand(90,280)+rand(-50,50);
-  f.vy=-rand(H*1.05,H*1.28);
+  const x=rand(W*.1,W*.9),y=H+50;
+  // apuntar el punto más alto del vuelo a una franja fija de la pantalla (15%–48% desde arriba)
+  const peak=H*rand(.15,.48);
+  fruits.push({type,x,y,vx:((W/2-x)/W)*rand(90,280)+rand(-50,50),
+    vy:-Math.sqrt(2*G*(y-peak)),rot:rand(0,6.28),vr:rand(-3,3),r:type==='bomba'?24:FRUITS[type].r});
 }
 function launchGroup(noBomb){
   const el=state==='playing'?time-playT0:0;
-  let n=1+(Math.random()<.35?1:0)+(el>25&&Math.random()<.25?1:0);
+  // después del minuto, más grupos dobles y triples (antes la curva se aplanaba a los ~50 s)
+  const extra=clamp((el-60)/60,0,1);
+  let n=1+(Math.random()<.35+.2*extra?1:0)+(el>25&&Math.random()<.25+.2*extra?1:0);
   while(n--)launchOne(noBomb);
 }
 function wave(){
@@ -279,7 +304,7 @@ function hitBomb(f){
   for(let k=0;k<26;k++)parts.push({x:f.x,y:f.y,vx:rand(-420,420),vy:rand(-420,160),
     life:rand(.4,.9),c:Math.random()<.4?'#ffb545':(Math.random()<.5?'#ff6b5d':'#3a4252'),s:rand(3,7)});
   sBomb();buzz([90,40,110]);shake(16);
-  setTimeout(()=>gameOver('bomba'),750);
+  boomT=.75; // temporizador simulado: se congela con la pausa y se anula al reiniciar
 }
 function miss(){
   misses++;
@@ -301,8 +326,11 @@ function gameOver(reason){
   if(state==='over')return;
   state='over';overAt=performance.now();
   overKicker.textContent=reason==='bomba'?'¡BOOM! TOCASTE LA BOMBA':'¡SE TE ESCAPARON TRES FRUTAS!';
+  activePtr=null;swiping=false;
+  best=Math.max(best,readBest());
   const rec=score>best;
-  if(rec){best=score;try{localStorage.setItem('fruta_best',best);}catch(e){}}
+  if(rec){best=score;try{localStorage.setItem(LEGACY_KEY,String(best));}catch(e){}}
+  if(ML)ML.ended({score});
   overScore.textContent=score;
   overFruits.textContent='🍉 '+slicedCount+' CORTADAS';
   overBest.textContent=best;
@@ -314,14 +342,17 @@ function startGame(){
   score=0;misses=0;slicedCount=0;swipeCombo=0;scoreEl.textContent='0';
   for(const i of livesEl.children)i.classList.remove('lost');
   fruits=[];halves=[];parts=[];texts=[];trail=[];shock=[];spawnQueue=[];
-  playT0=time;spawnT=.6;waveT=14;flashT=0;
+  playT0=time;spawnT=.6;waveT=14;flashT=0;boomT=0;shakeT=0;
+  activePtr=null;swiping=false;
   state='playing';
+  if(ML)ML.started();
   menu.classList.add('hidden');over.classList.add('hidden');hud.classList.add('show');
 }
 
 /* ---- update ---- */
 function update(dt){
   time+=dt;
+  if(state==='boom'){boomT-=dt;if(boomT<=0)gameOver('bomba');}
   if(shakeT>0)shakeT-=dt*2.6;
   if(flashT>0)flashT-=dt*2.2;
 
@@ -332,7 +363,7 @@ function update(dt){
     if(spawnT<=0){launchGroup(state==='menu');
       spawnT=clamp(1.5-el*.018,.55,1.5)*rand(.8,1.2)*mul;}
     if(state==='playing'){
-      waveT-=dt;if(waveT<=0){wave();waveT=16;}
+      waveT-=dt;if(waveT<=0){wave();waveT=Math.max(10,16-(time-playT0)/30);}
       for(let i=spawnQueue.length-1;i>=0;i--){spawnQueue[i]-=dt;
         if(spawnQueue[i]<=0){spawnQueue.splice(i,1);launchOne(true);}}
     }
@@ -354,13 +385,13 @@ function update(dt){
   }
 
   for(let i=fruits.length-1;i>=0;i--){const f=fruits[i];
-    f.vy+=980*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.rot+=f.vr*dt;
+    f.vy+=G*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.rot+=f.vr*dt;
     if(f.type==='bomba'&&Math.random()<.6)fuseSpark(f);
     if(f.y>H+80&&f.vy>0){fruits.splice(i,1);
       if(state==='playing'&&f.type!=='bomba'&&f.type!=='dorada')miss();}}
 
   for(let i=halves.length-1;i>=0;i--){const h=halves[i];
-    h.vy+=980*dt;h.x+=h.vx*dt;h.y+=h.vy*dt;h.angle+=h.vr*dt;h.life-=dt*.55;
+    h.vy+=G*dt;h.x+=h.vx*dt;h.y+=h.vy*dt;h.angle+=h.vr*dt;h.life-=dt*.55;
     if(h.life<=0||h.y>H+80)halves.splice(i,1);}
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];
     p.vy+=900*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt*1.6;if(p.life<=0)parts.splice(i,1);}
@@ -368,7 +399,9 @@ function update(dt){
     t.y-=46*dt*(t.slow?.4:1);t.life-=dt*(t.slow?.55:1.1);if(t.life<=0)texts.splice(i,1);}
   for(let i=shock.length-1;i>=0;i--){const s=shock[i];
     s.r+=850*dt;s.a-=dt*2;if(s.a<=0)shock.splice(i,1);}
-  trail=trail.filter(p=>performance.now()-p.t<130);
+  const now=performance.now();let k=0; // compactar en el lugar (sin crear un array nuevo por frame)
+  for(let i=0;i<trail.length;i++)if(now-trail[i].t<130)trail[k++]=trail[i];
+  trail.length=k;
 }
 function fuseSpark(f){
   const rot=f.rot,lx=13,ly=-36;
@@ -538,9 +571,7 @@ function drawPicado(){
   }
 }
 function render(){
-  const g=ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,'#0d2033');g.addColorStop(.55,'#14384a');g.addColorStop(1,'#0e2c26');
-  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=skyGrad;ctx.fillRect(0,0,W,H);
 
   ctx.fillStyle='#fff';
   for(const s of stars){ctx.globalAlpha=(.4+.6*(.5+.5*Math.sin(time*1.8+s.ph)))*.8;
@@ -548,17 +579,12 @@ function render(){
   ctx.globalAlpha=1;
 
   const mx=W*.8,my=H*.15;
-  const mg=ctx.createRadialGradient(mx,my,6,mx,my,90);
-  mg.addColorStop(0,'rgba(244,236,216,.28)');mg.addColorStop(1,'rgba(244,236,216,0)');
-  ctx.fillStyle=mg;ctx.fillRect(mx-90,my-90,180,180);
+  ctx.fillStyle=moonGlow;ctx.fillRect(mx-90,my-90,180,180);
   ctx.fillStyle='#f2e9d4';ctx.beginPath();ctx.arc(mx,my,30,0,7);ctx.fill();
   ctx.fillStyle='rgba(0,0,0,.07)';
   ctx.beginPath();ctx.arc(mx-9,my-5,6,0,7);ctx.arc(mx+8,my+9,4,0,7);ctx.fill();
 
-  const hg=ctx.createLinearGradient(0,H*.6,0,H*.86);
-  hg.addColorStop(0,'rgba(255,150,80,0)');hg.addColorStop(.7,'rgba(255,150,80,.12)');
-  hg.addColorStop(1,'rgba(255,150,80,0)');
-  ctx.fillStyle=hg;ctx.fillRect(0,H*.6,W,H*.26);
+  ctx.fillStyle=horizonGrad;ctx.fillRect(0,H*.6,W,H*.26);
   hills();
   drawLanterns();drawPicado();
 
@@ -611,15 +637,16 @@ function render(){
   if(flashT>0){ctx.fillStyle=`rgba(255,240,220,${flashT*.85})`;ctx.fillRect(0,0,W,H);}
 }
 
-let last=performance.now();
+let last=performance.now(),raf=0;
 function frame(now){
-  const dt=Math.min(.033,(now-last)/1000);last=now;
-  update(dt);render();requestAnimationFrame(frame);
+  raf=0;if(paused)return;
+  const dt=clamp((now-last)/1000,0,.033);last=now;
+  update(dt);render();raf=requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+function startLoop(){if(!raf){last=performance.now();raf=requestAnimationFrame(frame);}}
+startLoop();
 
 /* ---- entrada ---- */
-let activePtr=null,swiping=false;
 addEventListener('pointerdown',e=>{
   e.preventDefault();audio();
   if(state==='menu'){startGame();return;}
@@ -630,17 +657,55 @@ addEventListener('pointerdown',e=>{
   }
 },{passive:false});
 addEventListener('pointermove',e=>{
-  if(swiping&&e.pointerId===activePtr&&state==='playing')addTrailPoint(e.clientX,e.clientY);
+  if(!swiping||e.pointerId!==activePtr||state!=='playing')return;
+  // si el botón se soltó fuera de la ventana no llega pointerup: no seguir cortando "en el aire"
+  if(e.pointerType==='mouse'&&e.buttons===0){endPtr(e);return;}
+  // en pantallas rápidas el navegador agrupa movimientos: usar todos para no saltear frutas
+  const evs=e.getCoalescedEvents?e.getCoalescedEvents():null;
+  if(evs&&evs.length>1){for(const c of evs){addTrailPoint(c.clientX,c.clientY);if(state!=='playing')break;}}
+  else addTrailPoint(e.clientX,e.clientY);
 });
-const endPtr=e=>{if(e.pointerId===activePtr){activePtr=null;swiping=false;
-  if(state==='playing')endSwipe();}};
+function endPtr(e){if(e.pointerId===activePtr){activePtr=null;swiping=false;
+  if(state==='playing')endSwipe();}}
 addEventListener('pointerup',endPtr);
 addEventListener('pointercancel',endPtr);
 addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();audio();
   if(state==='menu')startGame();
   else if(state==='over'&&performance.now()-overAt>500)startGame();}});
 
-if(best>0){menuBest.style.display='inline-flex';menuBest.textContent='TU RÉCORD · '+best;}
+function showMenuBest(){if(best>0){menuBest.style.display='inline-flex';menuBest.textContent='TU RÉCORD · '+best;}}
+showMenuBest();
+
+/* ---- MateLabs Arcade SDK ---- */
+if(ML){
+  ML.init({
+    id:'fruta_furia',title:'FRUTA FURIA',toolbar:'bl',gamepad:false,
+    help:['Arrastrá el mouse o deslizá el dedo para cortar la fruta.',
+      'Cortá varias de un solo tajo para combo; 3 o más dan FRENESÍ con bonus.',
+      'La fruta dorada vale 50. Si se te escapan 3 frutas, perdés.',
+      '¡Ni se te ocurra tocar la bomba!','Esc o P: pausa'],
+    isActive:()=>state==='playing'||state==='boom',
+    onPause(){
+      paused=true;
+      if(swiping){activePtr=null;swiping=false;if(state==='playing')endSwipe();}
+      trail.length=0;
+      if(AC&&AC.state==='running')AC.suspend().catch(()=>{});
+    },
+    onResume(){
+      paused=false;
+      if(AC&&AC.state==='suspended')AC.resume().catch(()=>{});
+      startLoop(); // startLoop reinicia 'last': no hay salto de dt al volver
+    },
+    onRestart(){paused=false;audio();startGame();startLoop();},
+    onMute:setMuted,
+    onExit(){paused=true;if(raf){cancelAnimationFrame(raf);raf=0;}if(AC){AC.close().catch(()=>{});AC=null;master=null;}},
+  });
+  // el récord viejo puede migrarse cuando termina de cargar el registro
+  ML.registry().then(()=>{const b=readBest();if(b>best){best=b;showMenuBest();}});
+}
+// gancho de sólo lectura para las pruebas automatizadas
+window.__fruta={snap:()=>({state,score,misses,sliced:slicedCount,time,best,paused,G,
+  fruits:fruits.map(f=>({x:f.x,y:f.y,r:f.r,type:f.type,vy:f.vy}))})};
 })();
 </script>
 </body>
