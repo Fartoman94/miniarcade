@@ -80,8 +80,8 @@ export const GAMES = [
     id: 'valle_encantado', file: 'valle_encantado.html', title: 'EL VALLE ENCANTADO', icon: '🧚', accent: '#ff8fb8',
     category: 'aventura', tags: ['3D', 'Exploración'], tech: 'Three.js (WebGL)',
     description: 'Un mundo de cuentos en 3D. Explorá, hablá con 8 habitantes, encontrá 12 fragmentos de estrella o defendé el valle.',
-    controls: { pc: 'WASD mover · mouse cámara · clic golpear · E hablar · Shift correr', touch: 'Joystick · botón ⚔️', gamepad: 'Stick mover · A saltar · X golpear' },
-    score: 'high', scoreLabel: 'puntos', legacyBestKey: 'valle_best', orientation: 'landscape', heavy: true,
+    controls: { pc: 'WASD mover · clic der. + arrastrar cámara · clic/Espacio golpear · E hablar · Shift correr', touch: 'Joystick · deslizá cámara · botón ⚔️ · 💬 hablar', gamepad: 'Stick izq. mover · stick der. cámara · A golpear · X/B hablar · RB correr' },
+    score: 'level', scoreLabel: 'oleada', legacyBestKey: 'valle_best', orientation: 'landscape', heavy: true,
   },
 ];
 
