@@ -15,7 +15,7 @@ export async function openGame(page, file, { intro = false } = {}) {
 
 /** Falla si hubo errores (ignora fallos de red de fuentes externas, que no dependen del juego). */
 export function expectNoErrors(errors) {
-  const real = errors.filter(e => !/fonts\.(googleapis|gstatic)\.com|ERR_NAME_NOT_RESOLVED|net::ERR_INTERNET_DISCONNECTED/.test(e));
+  const real = errors.filter(e => !/fonts\.(googleapis|gstatic)\.com|ERR_NAME_NOT_RESOLVED|net::ERR_INTERNET_DISCONNECTED|net::ERR_NETWORK_CHANGED/.test(e));
   expect(real, real.join('\n')).toEqual([]);
 }
 

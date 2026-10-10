@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b1d14">
+<title>Cocina del Caos — MateLabs</title>
+<meta name="description" content="Cocina del Caos: picá, horneá, emplatá y serví pedidos contra reloj en tres cocinas 3D llenas de caos — fuego, derrames y roedores — con tu ayudante Pipo, hasta superar el Gran Banquete del Rey.">
+<link rel="icon" type="image/png" href="matelabs/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"./vendor/three-0.186.1/build/three.module.js","three/addons/":"./vendor/three-0.186.1/addons/"}}</script>
+<script src="matelabs/arcade.js"></script>
+<script src="matelabs/missions.js"></script>
+<style>
+  :root{--acc:#ff5c7a;--ink:#2a0d14;--plate:rgba(28,16,20,.84);--line:rgba(255,92,122,.4);--gold:#ffd23a}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#2b1d14;color:#fff;font-family:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+    overscroll-behavior:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  .plate{background:var(--plate);border:1.5px solid var(--line);border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:30}
+  #hud[hidden]{display:none}
+  #hTop{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));padding:6px 11px 7px;width:min(330px,calc(100vw - 196px));min-width:200px}
+  #hTop .r1{display:flex;gap:10px;align-items:baseline;font-weight:900;font-size:14px;white-space:nowrap}
+  #hKitchen{font-size:11px;letter-spacing:.06em;color:#ffd6de;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  #hTime.hurry{color:#ff8a8a;animation:ccPulse .6s infinite alternate}
+  #hFails{color:#ff6b6b;letter-spacing:-1px;font-size:12px}
+  #hFails i{color:rgba(255,255,255,.22);font-style:normal}
+  #hStarBar{position:relative;height:8px;margin-top:6px;border-radius:5px;background:rgba(0,0,0,.5)}
+  #hStarFill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#ff5c7a,#ffd23a);transition:width .25s}
+  #hStars span{position:absolute;top:-6px;transform:translateX(-50%);font-size:14px;color:rgba(255,255,255,.35);text-shadow:0 1px 2px #000}
+  #hStars span.on{color:var(--gold)}
+  #tickets{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 58px);left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));display:flex;gap:7px;flex-wrap:nowrap;overflow:hidden}
+  .tk{width:128px;flex:none;background:#fffaf0;color:#2a1a14;border-radius:10px;padding:5px 7px 6px;box-shadow:0 4px 12px rgba(0,0,0,.35);border-top:5px solid var(--acc)}
+  .tk[hidden]{display:none}
+  .tk.in{animation:ccDrop .35s ease-out}
+  .tk.royal{background:#fff3c4;border-top-color:var(--gold);outline:2px solid #e0a820}
+  .tk.low{animation:ccShake .5s infinite}
+  .tk-h{display:flex;align-items:center;gap:5px}
+  .tk-i{font-size:22px;line-height:1}
+  .tk-n{font-weight:900;font-size:11.5px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .tk-p{display:flex;flex-wrap:wrap;align-items:center;gap:2px;margin-top:3px;font-size:15px}
+  .tk-c{position:relative;padding-right:3px}
+  .tk-c b{position:absolute;right:-3px;bottom:-3px;font-size:9px}
+  .tk-s{margin-left:auto;font-size:9px;font-weight:800;color:#8a6a5a}
+  .tk-b{height:6px;margin-top:4px;border-radius:4px;background:#e8dccb;overflow:hidden}
+  .tk-b i{display:block;height:100%;width:100%;background:#3fbf5f;transition:width .2s linear}
+  .tk.mid .tk-b i{background:#f0b020}
+  .tk.low .tk-b i{background:#e5322a}
+  #missions{position:absolute;left:max(8px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + 150px);margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;max-width:250px}
+  #missions li{background:rgba(20,10,14,.72);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #missions li span{margin-right:5px;color:var(--gold)}
+  #missions li.done{background:rgba(26,90,40,.75);border-color:#6be38a}
+  #missions li.failed{opacity:.45;text-decoration:line-through}
+  #missions small{opacity:.7}
+  #helperBar{position:absolute;left:max(10px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:5px;align-items:center;pointer-events:auto;
+    background:var(--plate);border:1.5px solid var(--line);border-radius:14px;padding:5px 7px}
+  .hb-k{font:400 11px 'Bungee',system-ui;color:#ffd6de;margin:0 3px}
+  #helperBar button{appearance:none;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff;border-radius:10px;width:44px;height:40px;cursor:pointer;position:relative;font-size:18px;padding:0}
+  #helperBar button.on{background:var(--acc);border-color:#fff}
+  #helperBar kbd{position:absolute;right:2px;bottom:0;font:900 9px 'Nunito',system-ui;opacity:.8}
+  #helperBar button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  #prompt{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);padding:9px 16px;border-radius:999px;background:rgba(20,10,14,.9);
+    border:2px solid rgba(255,255,255,.35);font-weight:900;font-size:15px;white-space:nowrap;max-width:min(560px,calc(100vw - 420px));overflow:hidden;text-overflow:ellipsis}
+  #prompt.ok{border-color:var(--acc);box-shadow:0 0 18px rgba(255,92,122,.45)}
+  #prompt[hidden]{display:none}
+  #phase{position:absolute;right:max(8px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 48px);padding:5px 10px;border-radius:999px;background:#3a2a08;border:1.5px solid var(--gold);color:#fff3c4;font-weight:900;font-size:11px;max-width:calc(100vw - 16px)}
+  #phase[hidden]{display:none}
+  #coach{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 150px);left:max(8px,env(safe-area-inset-left));width:min(360px,calc(100vw - 16px));padding:10px 12px;pointer-events:auto;
+    border-color:#ffe066;font-size:14px;font-weight:800;line-height:1.38;z-index:2}
+  #coach[hidden]{display:none}
+  #coachStep{font-size:9px;letter-spacing:.22em;color:#ffe066;font-weight:900}
+  #coach b{color:#ffe066}
+  #coach button{margin-top:6px;appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:9px;padding:6px 10px;font:800 12px 'Nunito',system-ui;cursor:pointer}
+  #pipoTag{position:fixed;left:0;top:0;z-index:29;pointer-events:none;font-weight:900;font-size:11px;padding:2px 7px;border-radius:999px;background:rgba(20,40,14,.78);border:1px solid #8fd16a;white-space:nowrap}
+  #pipoTag[hidden]{display:none}
+  .wm{position:absolute;right:10px;bottom:8px;font:400 10px 'Bungee',system-ui;letter-spacing:.12em;opacity:.5}
+  #pops{position:fixed;inset:0;pointer-events:none;z-index:31;overflow:hidden}
+  .cc-pop{position:absolute;left:0;top:0;font-weight:900;font-size:16px;text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 8px rgba(0,0,0,.5);white-space:nowrap;will-change:transform}
+  #banner{position:fixed;left:50%;top:34%;transform:translate(-50%,-10px);z-index:44;pointer-events:none;opacity:0;text-align:center;transition:opacity .3s,transform .3s;
+    font:400 clamp(22px,5vw,40px)/1.1 'Bungee',system-ui,sans-serif;text-shadow:0 4px 0 rgba(0,0,0,.4),0 0 24px rgba(255,92,122,.7);width:min(92vw,700px)}
+  #banner small{display:block;font:900 13px 'Nunito',system-ui;letter-spacing:.06em;color:#fff3c4;margin-top:6px;text-shadow:0 2px 4px #000;order:2}
+  #banner.on{opacity:1;transform:translate(-50%,0)}
+  #banner.warn{color:#ffd0c0;text-shadow:0 4px 0 rgba(0,0,0,.4),0 0 24px rgba(255,60,40,.9)}
+  #banner.royal{color:#fff3c4;text-shadow:0 4px 0 rgba(0,0,0,.4),0 0 24px rgba(255,210,58,.9)}
+  #cut{position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:46;width:min(600px,92vw);text-align:center;padding:16px 18px;border-radius:18px;background:rgba(20,12,4,.82);border:2px solid var(--gold);pointer-events:none}
+  #cut[hidden]{display:none}
+  #cut small{display:block;font-weight:900;letter-spacing:.24em;color:var(--gold);font-size:11px}
+  #cut b{display:block;font:400 clamp(26px,6vw,44px) 'Bungee',system-ui;color:#fff3c4;margin:4px 0 6px}
+  #cut span{display:block;font-size:14px;line-height:1.45;color:#f3e6c8}
+  #cut strong{color:var(--gold)}
+  #cut em{display:block;margin-top:8px;font-size:12px;opacity:.75}
+  /* paneles */
+  #panel{position:fixed;inset:0;z-index:2147482700;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(10,4,6,.6)}
+  #panel[hidden]{display:none}
+  .cc-card{width:min(520px,100%);max-height:min(88vh,100%);overflow:auto;background:linear-gradient(180deg,#3a1a22,#1e0c12);border:1.5px solid var(--line);border-radius:18px;padding:12px 14px 14px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  .cc-ph{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .cc-ph h2{margin:0;font:400 19px 'Bungee',system-ui;color:var(--acc)}
+  .cc-x{appearance:none;border:none;background:rgba(255,255,255,.12);color:#fff;border-radius:10px;width:38px;height:38px;font-size:16px;cursor:pointer;flex:none}
+  .cc-list{padding-left:18px;font-size:13.5px;line-height:1.45;color:#ffe9ee}
+  .cc-h3{font:400 13px 'Bungee',system-ui;color:#ffd6de;margin:10px 0 6px}
+  .cc-rec{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+  .cc-rec div{display:grid;grid-template-columns:30px 1fr;gap:0 6px;background:rgba(255,255,255,.06);border-radius:10px;padding:6px 8px;font-size:13px}
+  .cc-rec span{grid-row:span 2;font-size:22px}
+  .cc-rec small{color:#e8c8d0;font-size:12px}
+  .cc-mis{list-style:none;padding:0;margin:10px 0;display:grid;gap:5px}
+  .cc-mis li{display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:6px;background:rgba(255,255,255,.06);border-radius:10px;padding:7px 10px;font-size:13.5px}
+  .cc-mis li.done{background:rgba(40,110,60,.4)}
+  .cc-mis small{color:#ffd6de;font-weight:800}
+  .cc-keys{display:grid;gap:6px;margin:8px 0}
+  .cc-keys.row{grid-template-columns:repeat(3,1fr)}
+  .cc-keys button,.cc-reset{appearance:none;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff;border-radius:11px;padding:10px 12px;font:800 14px 'Nunito',system-ui;cursor:pointer;min-height:44px}
+  .cc-keys button[aria-pressed="true"],.cc-keys button.wait{background:var(--acc);border-color:#fff;color:#fff}
+  .cc-keys.row button{justify-content:center}
+  .cc-keys kbd{font:900 13px 'Nunito',system-ui;background:rgba(0,0,0,.35);padding:3px 9px;border-radius:7px}
+  .cc-reset{width:100%;justify-content:center;margin-top:4px}
+  .cc-small{font-size:12px!important;color:#f0d0d8!important}
+  /* menú y fin */
+  #ccMenu .k3-panel,#ccEnd .k3-panel{width:min(600px,100%)}
+  #ccMenu .k3-panel h1,#ccEnd .k3-panel h1{color:#fff4f6}
+  .k3-b.sm{padding:10px 14px;font-size:12px}
+  .cc-kgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+  .cc-k{appearance:none;display:flex;align-items:center;gap:10px;text-align:left;border:2px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);color:#fff;border-radius:14px;padding:9px 11px;cursor:pointer;min-height:58px;font-family:'Nunito',system-ui}
+  .cc-k.sel{border-color:var(--acc);background:rgba(255,92,122,.22);box-shadow:0 0 0 2px rgba(255,92,122,.25)}
+  .cc-k.royal.sel{border-color:var(--gold);background:rgba(255,210,58,.18)}
+  .cc-k.locked{opacity:.5;cursor:not-allowed}
+  .cc-k:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  .cc-ki{font-size:26px;flex:none}
+  .cc-kt{display:flex;flex-direction:column;min-width:0}
+  .cc-kt b{font-size:14px;font-weight:900}
+  .cc-kt small{font-size:11.5px;color:#ffd6de;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cc-score{font-size:18px!important;color:#ffe066!important}
+  .cc-unlock{font-size:15px!important;color:#9df7b0!important;font-weight:800}
+  .cc-credit{margin-top:4px;font:400 12px 'Bungee',system-ui;letter-spacing:.14em;color:#ffd6de}
+  #ccDiffInfo{max-width:50ch;text-align:center}
+  .cc-stars{display:flex;gap:6px;justify-content:center;font-size:clamp(34px,9vw,54px);line-height:1}
+  .cc-stars .st{color:rgba(255,255,255,.18)}
+  .cc-stars .st.on{color:var(--gold);text-shadow:0 0 18px rgba(255,210,58,.8);animation:ccStar .5s both}
+  @keyframes ccStar{0%{transform:scale(0) rotate(-40deg)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+  @keyframes ccDrop{0%{transform:translateY(-30px);opacity:0}100%{transform:none;opacity:1}}
+  @keyframes ccShake{0%,100%{transform:none}25%{transform:rotate(-2deg)}75%{transform:rotate(2deg)}}
+  @keyframes ccPulse{to{opacity:.55}}
+  /* táctil: botón de acción grande y contextual */
+  .k3-btns{width:206px;height:200px;max-width:none!important;display:block!important}
+  .k3-btn{position:absolute}
+  .k3-btn[aria-label="act"]{right:0;bottom:0;width:104px;height:104px;font-size:14px;background:rgba(120,30,50,.62);border:3px solid rgba(255,255,255,.45)}
+  .k3-btn[aria-label="act"].ready{background:rgba(255,92,122,.75);border-color:#fff;box-shadow:0 0 22px rgba(255,92,122,.7)}
+  .k3-btn[aria-label="dash"]{right:116px;bottom:6px;font-size:22px}
+  .k3-btn[aria-label="help"]{right:20px;bottom:118px;font-size:24px}
+  @media (pointer:coarse){
+    #helperBar,.wm,#missions{display:none}
+    #prompt{bottom:calc(max(24px,env(safe-area-inset-bottom)) + 214px);font-size:13px;max-width:calc(100vw - 24px)}
+    .tk{width:72px;padding:4px 5px 5px}
+    .tk-n,.tk-s{display:none}
+    .tk-i{font-size:20px}
+    .tk-p{font-size:13px}
+    #coach{top:calc(max(8px,env(safe-area-inset-top)) + 140px)}
+  }
+  @media (pointer:coarse) and (orientation:landscape){
+    #prompt{bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100vw - 470px)}
+    #coach{width:min(330px,calc(100vw - 440px));font-size:13px;left:max(160px,env(safe-area-inset-left));top:auto;bottom:max(70px,env(safe-area-inset-bottom))}
+    #phase{top:auto;bottom:max(64px,env(safe-area-inset-bottom));right:auto;left:50%;transform:translateX(-50%)}
+  }
+  @media (max-width:520px){#hTop{width:calc(100vw - 186px);min-width:0}#hTop .r1{gap:7px;font-size:13px}#hKitchen{display:none}#phase{top:auto;bottom:calc(max(24px,env(safe-area-inset-bottom)) + 256px);right:50%;transform:translateX(50%)}
+    .cc-kgrid{grid-template-columns:1fr 1fr}.cc-k{padding:7px 8px;gap:6px}.cc-ki{font-size:22px}}
+  @media (max-height:500px){#banner{top:28%;font-size:22px}}
+  @media (prefers-reduced-motion:reduce){#banner,.tk.in,.tk.low,#hTime.hurry,.cc-stars .st.on{animation:none;transition:none}}
+</style>
+</head>
+<body>
+<script src="matelabs/intro.js" data-game="COCINA DEL CAOS" data-accent="#ff5c7a"></script>
+<div id="hud" hidden>
+  <div id="hTop" class="plate" aria-live="off">
+    <div class="r1"><span id="hKitchen"></span><span id="hTime">⏱ 0:00</span><span id="hScore">⭐ 0</span><span id="hFails" aria-label="Pedidos fallidos"></span></div>
+    <div id="hStarBar" aria-hidden="true"><div id="hStarFill"></div><div id="hStars"></div></div>
+  </div>
+  <div id="tickets" aria-label="Pedidos"></div>
+  <ul id="missions" aria-hidden="true"></ul>
+  <div id="phase" hidden></div>
+  <div id="helperBar" role="toolbar" aria-label="Encargos del ayudante"></div>
+  <div id="prompt" hidden role="status"></div>
+  <div id="coach" class="plate" hidden><div id="coachStep">TUTORIAL</div><div id="coachTx"></div><button id="coachSkip" type="button">Saltar tutorial</button></div>
+  <div class="wm">CREADO POR MATELABS</div>
+</div>
+<div id="pipoTag" hidden></div>
+<div id="pops"></div>
+<div id="cut" hidden></div>
+<div id="panel" hidden></div>
+<div id="banner" role="status" aria-live="polite"></div>
+<script type="module" src="games/cocina_caos/main.js"></script>
+</body>
+</html>

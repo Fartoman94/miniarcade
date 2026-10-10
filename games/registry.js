@@ -139,6 +139,34 @@ export const GAMES = [
     controls: { pc: 'WASD mover · mouse/flechas apuntar · clic/J disparar · Espacio rodar · E usar · Q pulso · F barricada · R recargar', touch: 'Doble stick (mover y apuntar) · FUEGO o disparo automático · RODAR · USAR · PULSO · BARR.', gamepad: 'Sticks mover y cámara · RT disparar · LT mira · A rodar · X usar · LB pulso · Y barricada · B recargar' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'carrera_vertical', thumb: 'games/thumbs/carrera_vertical.webp', file: 'carrera_vertical.html', title: 'CARRERA VERTICAL', icon: '🏃', accent: '#ff7a2f',
+    category: 'plataformas', tags: ['Parkour 3D', 'Contrarreloj'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Corré por azoteas y paredes, colgate de tirolinas, batí a tu fantasma en tres distritos y escapá del dron jefe.',
+    controls: { pc: 'WASD correr · Espacio saltar/trepar · Shift deslizar · F tirolina · R punto de control · mouse/Q-E cámara', touch: 'Joystick + botones SALTO/DESLIZ/ACCIÓN · arrastrar para mirar', gamepad: 'Stick correr · A saltar · B deslizar · X acción · Y punto de control · LB/RB cámara' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
+  {
+    id: 'mareas_profundas', thumb: 'games/thumbs/mareas_profundas.webp', file: 'mareas_profundas.html', title: 'MAREAS PROFUNDAS', icon: '🌊', accent: '#ffb547',
+    category: 'aventura', tags: ['Exploración submarina', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Piloteá un minisubmarino con sonar, escaneá fauna, recuperá la caja negra y encendé el faro de la fosa ante el Leviatán.',
+    controls: { pc: 'W/S avanzar · A/D girar · Espacio/Shift subir-bajar · E usar/escanear · Q sonar · C foto · L luz', touch: 'Joystick + botones SUBIR/BAJAR/SONAR/USAR/FOTO/LUZ · arrastrar para mirar', gamepad: 'Stick mover · A usar · B sonar · X foto · Y luz · RB/LB subir/bajar' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
+  {
+    id: 'cocina_caos', thumb: 'games/thumbs/cocina_caos.webp', file: 'cocina_caos.html', title: 'COCINA DEL CAOS', icon: '🍳', accent: '#ff5c7a',
+    category: 'accion', tags: ['Cocina 3D', 'Contra reloj'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Picá, horneá y serví pedidos contra reloj en 3 cocinas 3D con fuego, derrames y roedores, hasta superar el Gran Banquete.',
+    controls: { pc: 'WASD mover · E acción (mantener: picar/lavar/apagar) · Q ayudante · Shift impulso', touch: 'Joystick · ACCIÓN contextual grande · ⚡ impulso · 🧑‍🍳 encargo del ayudante', gamepad: 'Stick mover · A acción · X ayudante · B impulso · LB/RB encargos' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
+  {
+    id: 'corsarios_abismo', thumb: 'games/thumbs/corsarios_abismo.webp', file: 'corsarios_abismo.html', title: 'CORSARIOS DEL ABISMO', icon: '🏴‍☠️', accent: '#ffbe3d',
+    category: 'aventura', tags: ['Naval 3D', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Navegá con el viento, cañoneá de costado, desenterrá tesoros en 3 mares, tomá el fuerte y hundí al Almirante Espectral.',
+    controls: { pc: 'W/S velas · A/D timón · Q/E andanadas babor/estribor · Espacio acción · R kit', touch: 'Timón virtual (velas y giro) + botones BABOR, ESTRIB., ACCIÓN y KIT', gamepad: 'Stick timón y velas · LB/RB andanadas · A acción · X kit' },
+    score: 'high', scoreLabel: 'botín', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

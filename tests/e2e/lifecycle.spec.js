@@ -21,6 +21,10 @@ const START = {
   bastiones_elementales: async p => { await p.keyboard.press('Enter'); },
   derby_chatarra: async p => { await p.keyboard.press('Enter'); },
   arena_mutante: async p => { await p.keyboard.press('Enter'); },
+  carrera_vertical: async p => { await p.keyboard.press('Enter'); },
+  mareas_profundas: async p => { await p.keyboard.press('Enter'); },
+  cocina_caos: async p => { await p.keyboard.press('Enter'); },
+  corsarios_abismo: async p => { await p.click('#ca-menu [data-go]'); },
 };
 
 /** Cuenta callbacks de rAF por segundo para detectar loops duplicados. */
