@@ -118,6 +118,13 @@ export const GAMES = [
     controls: { pc: 'WASD mover · E usar · Q semilla · Z/X cámara · J diario · clic para ir y usar', touch: 'Joystick · USAR · 🌱 · ⟲ · 📖 · tocá objetos para ir y usarlos', gamepad: 'Stick mover · A usar · X semilla · LB/RB cámara · Y diario' },
     score: 'high', scoreLabel: 'puntos de granja', orientation: 'any', heavy: true,
   },
+  {
+    id: 'bastiones_elementales', thumb: 'games/thumbs/bastiones_elementales.webp', file: 'bastiones_elementales.html', title: 'BASTIONES ELEMENTALES', icon: '🏰', accent: '#8f7bff',
+    category: 'estrategia', tags: ['Tower defense 3D', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Torres de fuego, hielo y rayo con sinergias, puentes que desvían la ruta enemiga y el Titán Elemental en 3 fases.',
+    controls: { pc: 'Clic elegir/construir · arrastrar/WASD cámara · rueda zoom · Q/E girar · 1-4 torres · U mejorar · X vender · Espacio oleada', touch: 'Tocar para elegir · arrastrar, pellizcar y girar con dos dedos · botones ▶▶ oleada y x2', gamepad: 'Stick cámara · A elegir (retícula) · B cerrar · X mejorar · Y oleada · LB/RB girar · LT/RT zoom' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */
