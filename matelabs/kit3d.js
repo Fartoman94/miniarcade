@@ -2,8 +2,8 @@
 /* MateLabs Kit3D — base común para los juegos 3D nuevos de MiniArcade (Three.js moderno, módulos ES).
 
    Cada juego nuevo es una página propia con un import map:
-     <script type="importmap">{"imports":{"three":"vendor/three-0.186.1/build/three.module.js",
-                                          "three/addons/":"vendor/three-0.186.1/addons/"}}</script>
+     <script type="importmap">{"imports":{"three":"./vendor/three-0.186.1/build/three.module.js",
+                                          "three/addons/":"./vendor/three-0.186.1/addons/"}}</script>
      <script src="matelabs/arcade.js"></script> <script src="matelabs/missions.js"></script>
      <script type="module"> import { createGame } from './matelabs/kit3d.js'; ... </script>
 
@@ -325,7 +325,7 @@ export function createGame(o) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoftShadowMap fue retirado en 0.186
   root.appendChild(renderer.domElement);
   renderer.domElement.style.cssText = 'display:block;width:100%;height:100%';
   renderer.domElement.setAttribute('role', 'img');
@@ -410,7 +410,8 @@ export function createGame(o) {
         o.onQuality && o.onQuality(q);
         if (paused) draw(1);
       },
-      actions: o.actions,
+      // el SDK reanuda «en silencio» antes de una acción propia: acá se relanza el loop y el audio
+      actions: (o.actions || []).map(a => ({ label: a.label, fn() { paused = false; audio.resume(); start(); a.fn(); } })),
     });
   }
   // volver desde bfcache

@@ -5,7 +5,10 @@ const PORT = Number(process.env.ML_PORT || 8765);
 
 export default defineConfig({
   testDir: 'tests/e2e',
-  timeout: 60_000,
+  timeout: process.env.CI ? 120_000 : 60_000,
+  // CI (2 núcleos, WebGL por software): esperas más largas y 1 reintento; los reintentos quedan como «flaky» en el reporte
+  retries: process.env.CI ? 1 : 0,
+  expect: { timeout: process.env.CI ? 20_000 : 5_000 },
   // Los juegos 3D usan WebGL por software en headless: pocos workers para no saturar la CPU.
   workers: Number(process.env.ML_WORKERS || 3),
   reporter: [['list'], ['json', { outputFile: 'test-results/results.json' }]],

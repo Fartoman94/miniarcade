@@ -196,3 +196,15 @@ Máximo de entidades vivas en la versión nueva (fruta + partículas, muestreo c
 - `prefers-reduced-motion` (sin sacudón, destello al 25 %) se verificó sólo leyendo el código.
 - Mediciones tomadas con la máquina muy cargada; conviene repetirlas en reposo.
 - Récord único para las 4 dificultades (no es por dificultad).
+
+### Ajuste por CI (GitHub Actions, 2 núcleos)
+
+En CI, la prueba de misiones falló dos veces: `swipeUntil` nunca vio la condición. La fruta que pone `debug.spawn` ya era estática (`still`), así que no se movía. La causa probable es un gesto real que llega tarde o incompleto: si el primer tajo corta sólo 3 de las 4 manzanas, el combo ×4 ya no se puede cumplir aunque se reintente.
+
+Se agregó `__fruta.debug.cut(x1,y1,x2,y2)` (sólo con `?debug`). Arma un tajo sintético que pasa por el mismo `addTrailPoint` + `endSwipe` que el gesto real, con la misma colisión.
+
+- **Usan el gancho**, porque prueban lógica y no entrada: las misiones (combo, petardo/Intacto, jefe), el tope de partículas en la prueba de calidad y los 3 tajos del ananá.
+- **Siguen con gesto real** (mouse o toques CDP): helada y dorada, petardo y bomba, el tajo al jefe, multitáctil, y las pruebas originales de cortar y de fin de partida.
+- La helada ahora espera el puntaje (que no se vence) en vez de la ventana de cámara lenta.
+
+Resultado: `ML_WORKERS=1` → **23 passed, 1 skipped (7,9 min)**; `ML_WORKERS=4` → **23 passed, 1 skipped (3,9 min)**. Load average de la máquina entre 15 y 37. No se corrió en GitHub Actions.

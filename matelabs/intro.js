@@ -86,7 +86,9 @@
   const key = 'ml-intro:' + location.pathname;
   try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}
 
-  const dur = reduced ? 1400 : 3400;
+  // ?introms=N alarga la intro (sólo pruebas: en headless la entrada puede llegar con segundos de demora)
+  const durQ = Number(new URLSearchParams(location.search).get('introms')) || 0;
+  const dur = durQ > 0 ? Math.min(durQ, 120000) : reduced ? 1400 : 3400;
   const el = document.createElement('div');
   el.id = 'ml-intro';
   el.setAttribute('role', 'dialog');
@@ -116,16 +118,19 @@
   const block = e => {
     e.stopImmediatePropagation();
     if (e.cancelable) e.preventDefault();
-    if (!done && (e.type === 'pointerdown' || e.type === 'keydown') && performance.now() - t0 > 350) finish();
+    if (!done && (e.type === 'pointerdown' || e.type === 'keydown') && performance.now() - t0 > 350) finish(true);
     // fin del gesto que saltó la intro: liberar la entrada cuando termine este evento
     else if (done && (e.type === 'click' || e.type === 'keyup' || e.type === 'touchend')) queueMicrotask(release);
   };
   evs.forEach(t => addEventListener(t, block, { capture: true, passive: false }));
   const timer = setTimeout(finish, dur);
 
-  function finish() {
+  /** @param {boolean} [byUser] true si la cerró el jugador (queda marcado para pruebas/telemetría) */
+  function finish(byUser) {
     if (done) return;
     done = true;
+    // marca persistente en <html> (sobrevive a que se quite el nodo): «intro salteada por el jugador»
+    document.documentElement.dataset.introEnd = byUser ? 'skipped' : 'auto';
     clearTimeout(timer);
     el.classList.add('ml-out');
     el.style.pointerEvents = 'none';

@@ -58,8 +58,10 @@ function renderHero() {
   const a = /** @type {HTMLAnchorElement} */ ($('playNow'));
   a.href = g.file;
   $('playNowSub').textContent = last ? `Seguir con ${g.title}` : g.title;
-  const n = GAMES.length;
-  $('orbit').innerHTML = GAMES.map((x, i) => `<a href="${x.file}" style="${vars(x)};--a:${(360 / n) * i - 90}deg" title="${esc(x.title)}" aria-label="Jugar ${esc(x.title)}"><span aria-hidden="true">${x.icon}</span></a>`).join('');
+  // el anillo muestra hasta 10 accesos (con 20 íconos se encimaban en celular): nuevos, selección y el resto
+  const ring = [...GAMES.filter(x => x.added), ...GAMES.filter(x => x.pick && !x.added), ...GAMES.filter(x => !x.pick && !x.added)].slice(0, 10);
+  const n = ring.length;
+  $('orbit').innerHTML = ring.map((x, i) => `<a href="${x.file}" style="${vars(x)};--a:${(360 / n) * i - 90}deg" title="${esc(x.title)}" aria-label="Jugar ${esc(x.title)}"><span aria-hidden="true">${x.icon}</span></a>`).join('');
 }
 
 /** «Nuevos»: juegos agregados en los últimos 45 días según la fecha real del registro. */

@@ -45,6 +45,7 @@
     /** @type {Record<string, RunState>} */ run: {},
     running: false,
     secondaryPerRun: 2,
+    primaryPerRun: 1,
     hud: 'top',
     /** @type {Set<(ev:{type:string, mission:Mission})=>void>} */ listeners: new Set(),
   };
@@ -81,8 +82,9 @@
     const rot = data.runs % Math.max(1, sec.length);
     const rotated = sec.slice(rot).concat(sec.slice(0, rot));
     rotated.sort((a, b) => (data.done[a.id] ? 1 : 0) - (data.done[b.id] ? 1 : 0));
-    const primary = prim.find(m => !data.done[m.id]) || prim[0];
-    return [...(primary ? [primary] : []), ...rotated.slice(0, S.secondaryPerRun)];
+    // principales: primero las pendientes, en el orden declarado (campañas con varias metas)
+    const primaries = [...prim.filter(m => !data.done[m.id]), ...prim.filter(m => data.done[m.id])].slice(0, Math.max(1, S.primaryPerRun));
+    return [...primaries, ...rotated.slice(0, S.secondaryPerRun)];
   }
 
   /* ---------- UI: HUD + aviso + sección de pausa ---------- */
@@ -278,12 +280,13 @@
   }
 
   /**
-   * @param {{gameId:string, missions:Mission[], secondaryPerRun?:number, hud?:'top'|'tl'|'tr'|'bl'|'br'|'none'}} o
+   * @param {{gameId:string, missions:Mission[], secondaryPerRun?:number, primaryPerRun?:number, hud?:'top'|'tl'|'tr'|'bl'|'br'|'none'}} o
    */
   function setup(o) {
     S.gameId = o.gameId;
     S.all = o.missions.map(m => ({ kind: 'secondary', mode: 'count', ...m }));
     S.secondaryPerRun = o.secondaryPerRun ?? 2;
+    S.primaryPerRun = o.primaryPerRun ?? 1;
     S.hud = o.hud || 'top';
     const ids = new Set();
     for (const m of S.all) {
