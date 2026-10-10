@@ -2,226 +2,252 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a12">
-<link rel="icon" type="image/png" href="matelabs/favicon.png">
 <title>Mini Arcade — MateLabs</title>
+<meta name="description" content="Mini Arcade de MateLabs: 8 juegos HTML5 gratis para jugar en el navegador, en PC y celular. Sin instalación.">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="icon" type="image/png" href="matelabs/favicon.png">
+<link rel="apple-touch-icon" href="matelabs/mascota.webp">
+<link rel="manifest" href="manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Mini Arcade — MateLabs">
+<meta property="og:description" content="8 juegos HTML5 para jugar en el navegador. Sin instalación, en cualquier dispositivo.">
+<meta property="og:image" content="matelabs/mascota.webp">
+<meta name="twitter:card" content="summary">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"ItemList","name":"Mini Arcade — MateLabs","itemListElement":[
+{"@type":"ListItem","position":1,"item":{"@type":"VideoGame","name":"¡CLAVADO!","url":"clavado.html","genre":"Reflejos","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}},
+{"@type":"ListItem","position":2,"item":{"@type":"VideoGame","name":"FRUTA FURIA","url":"fruta_furia.html","genre":"Reflejos","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}},
+{"@type":"ListItem","position":3,"item":{"@type":"VideoGame","name":"MUERTE GLORIOSA","url":"muerte_gloriosa.html","genre":"Plataformas","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}},
+{"@type":"ListItem","position":4,"item":{"@type":"VideoGame","name":"NEON SURVIVOR","url":"NEON_SURVIVOR.html","genre":"Acción","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}},
+{"@type":"ListItem","position":5,"item":{"@type":"VideoGame","name":"¡SALVA AL REY!","url":"Salva_al_rey.html","genre":"Acción","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}},
+{"@type":"ListItem","position":6,"item":{"@type":"VideoGame","name":"TORRE INFINITA","url":"torre_infinita.html","genre":"Reflejos","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}},
+{"@type":"ListItem","position":7,"item":{"@type":"VideoGame","name":"TURBO FURIA","url":"turbo_furia.html","genre":"Carreras","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}},
+{"@type":"ListItem","position":8,"item":{"@type":"VideoGame","name":"EL VALLE ENCANTADO","url":"valle_encantado.html","genre":"Aventura","gamePlatform":"Navegador web","author":{"@type":"Organization","name":"MateLabs"}}}
+]}
+</script>
+<script src="matelabs/arcade.js"></script>
 <style>
+  :root{
+    --bg:#0a0a12;--panel:rgba(255,255,255,.04);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.15);
+    --text:#fff;--muted:#a0a0b0;--dim:#7c7c8c;--brand:#2ee6e6;--brand-ink:#04121a;
+  }
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{min-height:100%;background:#0a0a12;color:#fff;font-family:'Space Grotesk',system-ui,sans-serif;overflow-x:hidden}
+  html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Space Grotesk',system-ui,sans-serif;overflow-x:hidden}
+  a{color:inherit}
+  :focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:8px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .skip{position:absolute;left:12px;top:-60px;z-index:10;background:var(--brand);color:var(--brand-ink);padding:10px 14px;border-radius:10px;font-weight:700;text-decoration:none}
+  .skip:focus{top:12px}
 
   /* Fondo animado */
-  .bg{position:fixed;inset:0;z-index:-2;background:radial-gradient(ellipse at 20% 20%,#1a103c 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,#0f2e2e 0%,transparent 50%),#0a0a12}
-  canvas#particles{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.6}
+  .bg{position:fixed;inset:0;z-index:-2;background:radial-gradient(ellipse at 20% 20%,#1a103c 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,#0f2e2e 0%,transparent 50%),var(--bg)}
+  canvas#particles{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.6;width:100%;height:100%}
 
   /* Header */
-  header{text-align:center;padding:clamp(40px,8vh,80px) 20px 20px}
-  .badge{display:inline-block;padding:8px 18px;border:1.5px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.05);font-size:11px;font-weight:700;letter-spacing:.28em;color:#a0a0b0;margin-bottom:18px;backdrop-filter:blur(10px)}
-  h1{font-family:'Bungee',sans-serif;font-size:clamp(42px,10vw,90px);line-height:.95;letter-spacing:-.02em;background:linear-gradient(180deg,#fff 30%,#8b8b9a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .subtitle{font-size:clamp(16px,2.5vw,20px);color:#a0a0b0;margin-top:14px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.5;font-weight:500}
-
-  /* Grid */
-  .container{max-width:1200px;margin:0 auto;padding:30px 20px 60px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:24px}
-
-  /* Tarjetas */
-  .card{position:relative;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:28px 24px 24px;cursor:pointer;transition:transform .25s cubic-bezier(.2,1.4,.3,1),box-shadow .25s,border-color .25s;overflow:hidden;backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:14px;text-decoration:none;color:inherit}
-  .card::before{content:"";position:absolute;inset:0;border-radius:20px;padding:1.5px;background:linear-gradient(135deg,var(--glow) 0%,transparent 60%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .3s;pointer-events:none}
-  .card:hover::before{opacity:1}
-  .card:hover{transform:translateY(-6px) scale(1.01);border-color:rgba(255,255,255,.15);box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 30px var(--glow-soft)}
-
-  .icon-wrap{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);transition:transform .3s}
-  .card:hover .icon-wrap{transform:scale(1.1) rotate(-4deg)}
-
-  .card h2{font-family:'Bungee',sans-serif;font-size:22px;line-height:1.1;color:#fff}
-  .card p{font-size:14px;color:#a0a0b0;line-height:1.55;flex:1}
-
-  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
-  .tag{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:6px;background:rgba(255,255,255,.06);color:#888; border:1px solid rgba(255,255,255,.06)}
-  .tag.highlight{background:var(--accent-bg);color:var(--accent-text);border-color:transparent}
-
-  .play-btn{margin-top:8px;display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:12px;border:none;background:#fff;color:#0a0a12;font-family:'Bungee',sans-serif;font-size:14px;letter-spacing:.04em;cursor:pointer;transition:transform .15s,box-shadow .15s}
-  .play-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,255,255,.15)}
-  .play-btn:active{transform:translateY(0)}
-
-  /* Marca MateLabs */
-  .brand{display:inline-flex;align-items:center;gap:12px;margin-bottom:22px;padding:6px 18px 6px 6px;border-radius:999px;
-    background:rgba(46,230,230,.06);border:1px solid rgba(46,230,230,.22);text-decoration:none;color:#dffcfc;
-    box-shadow:0 0 30px rgba(46,230,230,.12);backdrop-filter:blur(10px)}
-  .brand img{width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(46,230,230,.5),0 0 18px rgba(46,230,230,.45);
-    animation:brandFloat 3s ease-in-out infinite}
+  header{text-align:center;padding:clamp(36px,7vh,72px) 16px 8px}
+  .brand{display:inline-flex;align-items:center;gap:12px;margin-bottom:20px;padding:6px 18px 6px 6px;border-radius:999px;
+    background:rgba(46,230,230,.06);border:1px solid rgba(46,230,230,.22);color:#dffcfc;box-shadow:0 0 30px rgba(46,230,230,.12);backdrop-filter:blur(10px)}
+  .brand img{width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(46,230,230,.5),0 0 18px rgba(46,230,230,.45);animation:brandFloat 3s ease-in-out infinite}
   .brand b{font-family:'Bungee',sans-serif;font-weight:400;font-size:15px;letter-spacing:.06em}
-  .brand b span{color:#2ee6e6}
+  .brand b span{color:var(--brand)}
   .brand small{display:block;font-size:10px;letter-spacing:.28em;color:#7fa9ad;font-weight:700;text-align:left}
   @keyframes brandFloat{50%{transform:translateY(-3px) rotate(-3deg)}}
+  h1{font-family:'Bungee',sans-serif;font-weight:400;font-size:clamp(42px,10vw,90px);line-height:.95;letter-spacing:-.02em;background:linear-gradient(180deg,#fff 30%,#8b8b9a 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .subtitle{font-size:clamp(16px,2.5vw,20px);color:var(--muted);margin:14px auto 0;max-width:540px;line-height:1.5;font-weight:500}
+
+  /* Panel de estadísticas */
+  .me{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:22px auto 0;max-width:720px}
+  .me[hidden]{display:none}
+  .me div{min-width:120px;padding:10px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);text-align:center}
+  .me b{display:block;font-family:'Bungee',sans-serif;font-weight:400;font-size:20px}
+  .me span{font-size:10px;letter-spacing:.2em;color:var(--dim);font-weight:700}
+
+  /* Controles del catálogo */
+  .container{max-width:1200px;margin:0 auto;padding:24px 16px 60px}
+  .tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .search{position:relative;flex:1 1 260px;max-width:420px}
+  .search input{width:100%;padding:13px 14px 13px 42px;border-radius:14px;border:1px solid var(--line2);background:rgba(255,255,255,.05);color:#fff;font:500 15px 'Space Grotesk',system-ui,sans-serif}
+  .search input::placeholder{color:var(--dim)}
+  .search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.6}
+  .sort{padding:12px;border-radius:14px;border:1px solid var(--line2);background:#14141f;color:#fff;font:600 14px 'Space Grotesk',system-ui,sans-serif}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+  .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font:700 12px 'Space Grotesk',system-ui,sans-serif;letter-spacing:.06em;cursor:pointer;transition:.15s}
+  .chip:hover{color:#fff;border-color:rgba(255,255,255,.35)}
+  .chip[aria-pressed="true"]{background:#fff;color:var(--bg);border-color:#fff}
+
+  h2.row{font-family:'Bungee',sans-serif;font-weight:400;font-size:18px;letter-spacing:.04em;margin:6px 0 14px;color:#dcdce6}
+  section[hidden]{display:none}
+  .continue{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;margin-bottom:26px;scrollbar-width:thin}
+  .mini{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 14px 10px 10px;border-radius:14px;background:var(--panel);border:1px solid var(--line);text-decoration:none;transition:.2s}
+  .mini:hover{border-color:var(--glow);box-shadow:0 0 20px var(--glow-soft)}
+  .mini i{font-style:normal;font-size:22px;width:40px;height:40px;display:grid;place-items:center;border-radius:10px;background:rgba(255,255,255,.06)}
+  .mini b{font-family:'Bungee',sans-serif;font-weight:400;font-size:13px;display:block}
+  .mini small{color:var(--dim);font-size:11px}
+
+  /* Grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:24px}
+  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 10px}
+
+  /* Tarjetas */
+  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px 22px 22px;transition:transform .25s cubic-bezier(.2,1.4,.3,1),box-shadow .25s,border-color .25s;overflow:hidden;backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:14px;animation:fadeUp .5s both;text-decoration:none}
+  .card::before{content:"";position:absolute;inset:0;border-radius:20px;padding:1.5px;background:linear-gradient(135deg,var(--glow) 0%,transparent 60%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .3s;pointer-events:none}
+  .card:hover::before,.card:focus-within::before{opacity:1}
+  .card:hover{transform:translateY(-6px) scale(1.01);border-color:var(--line2);box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 30px var(--glow-soft)}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start}
+  .icon-wrap{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);transition:transform .3s}
+  .card:hover .icon-wrap{transform:scale(1.1) rotate(-4deg)}
+  .fav{width:40px;height:40px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--dim);font-size:18px;cursor:pointer;transition:.15s;display:grid;place-items:center}
+  .fav:hover{color:#fff}
+  .fav[aria-pressed="true"]{color:#ff5d8f;border-color:rgba(255,93,143,.5);background:rgba(255,93,143,.12)}
+  .card h3{font-family:'Bungee',sans-serif;font-weight:400;font-size:22px;line-height:1.1;color:#fff}
+  .card p{font-size:14px;color:var(--muted);line-height:1.55}
+  .card .grow{flex:1;display:flex;flex-direction:column;gap:8px}
+  .tags{display:flex;gap:8px;flex-wrap:wrap}
+  .tag{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:6px;background:rgba(255,255,255,.06);color:#9a9aa8;border:1px solid rgba(255,255,255,.06)}
+  .tag.highlight{background:var(--accent-bg);color:var(--accent-text);border-color:transparent}
+  .mystats{display:flex;gap:14px;font-size:12px;color:var(--dim);font-weight:700;letter-spacing:.04em}
+  .mystats b{color:#e6e6ee}
+  .actions{display:flex;gap:10px;margin-top:4px}
+  .play-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:12px;border:none;background:#fff;color:var(--bg);font-family:'Bungee',sans-serif;font-size:14px;letter-spacing:.04em;text-decoration:none;transition:transform .15s,box-shadow .15s}
+  .play-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,255,255,.15)}
+  .info-btn{padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:transparent;color:#fff;font:700 13px 'Space Grotesk',system-ui,sans-serif;cursor:pointer}
+  .info-btn:hover{background:rgba(255,255,255,.08)}
+
+  /* Ficha del juego */
+  dialog.detail{margin:auto;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px);border:1px solid var(--line2);border-radius:22px;padding:0;background:#10101a;color:#fff;box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 40px var(--glow-soft)}
+  dialog.detail::backdrop{background:rgba(3,3,8,.75);backdrop-filter:blur(6px)}
+  .d-head{display:flex;gap:16px;align-items:center;padding:24px 60px 14px 22px;background:linear-gradient(135deg,var(--accent-bg),transparent 70%)}
+  .d-head .icon-wrap{flex:0 0 auto}
+  .d-head h2{font-family:'Bungee',sans-serif;font-weight:400;font-size:clamp(20px,5vw,28px);line-height:1.05}
+  .d-head small{color:var(--accent-text);font-weight:700;letter-spacing:.14em;font-size:11px}
+  .d-close{position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:12px;border:1px solid var(--line2);background:rgba(0,0,0,.3);color:#fff;font-size:18px;cursor:pointer}
+  .d-body{padding:6px 22px 22px;display:flex;flex-direction:column;gap:16px}
+  .d-body p{color:#c9c9d4;line-height:1.55}
+  .d-body h3{font-size:11px;letter-spacing:.24em;color:var(--dim);font-weight:700;margin-bottom:8px}
+  .ctrl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;color:#dadae4}
+  .ctrl dt{color:var(--dim);font-weight:700}
+  .d-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .d-stats div{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+  .d-stats b{display:block;font-family:'Bungee',sans-serif;font-weight:400;font-size:18px}
+  .d-stats span{font-size:10px;letter-spacing:.16em;color:var(--dim);font-weight:700}
+  .recs{display:flex;gap:10px;flex-wrap:wrap}
+  .recs button{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:#fff;font:700 13px 'Space Grotesk',system-ui,sans-serif;cursor:pointer}
+  .recs button:hover{background:rgba(255,255,255,.1)}
 
   /* Footer */
-  footer{text-align:center;padding:40px 20px;color:#555;font-size:13px;letter-spacing:.1em;font-weight:700}
-  footer span{color:#888}
+  footer{text-align:center;padding:40px 16px calc(40px + env(safe-area-inset-bottom));color:#666;font-size:13px;letter-spacing:.1em;font-weight:700}
   footer .made{display:inline-flex;align-items:center;gap:10px;color:#8fb9bd}
   footer .made img{width:28px;height:28px;border-radius:50%;box-shadow:0 0 12px rgba(46,230,230,.4)}
-  footer .made b{color:#2ee6e6;font-weight:700}
+  footer .made b{color:var(--brand);font-weight:700}
 
-  /* Responsive */
   @media (max-width:640px){
-    .grid{grid-template-columns:1fr}
-    .card{padding:22px 18px 18px}
+    .grid{grid-template-columns:1fr;gap:16px}
+    .card{padding:20px 16px 16px}
+    .tools{flex-direction:column;align-items:stretch}
+    .tools label:last-child .sort{width:100%}
+    .search{max-width:none;flex:0 0 auto}
+    .chips{flex-wrap:nowrap;overflow-x:auto;margin-left:-16px;margin-right:-16px;padding:0 16px 4px;scrollbar-width:none}
+    .chip{flex:0 0 auto}
+    .me div{min-width:0;flex:1 1 0}
+    .d-stats b{font-size:15px}
   }
-
-  /* Animación de entrada */
-  @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
-  .card{animation:fadeUp .6s both}
-  .card:nth-child(1){animation-delay:.05s}
-  .card:nth-child(2){animation-delay:.1s}
-  .card:nth-child(3){animation-delay:.15s}
-  .card:nth-child(4){animation-delay:.2s}
-  .card:nth-child(5){animation-delay:.25s}
-  .card:nth-child(6){animation-delay:.3s}
-  .card:nth-child(7){animation-delay:.35s}
-  .card:nth-child(8){animation-delay:.4s}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){*,*::before{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <script src="matelabs/intro.js" data-accent="#2ee6e6"></script>
+<a class="skip" href="#catalogo">Saltar al catálogo</a>
 <div class="bg"></div>
-<canvas id="particles"></canvas>
+<canvas id="particles" aria-hidden="true"></canvas>
 
 <header>
   <div class="brand">
     <img src="matelabs/mascota-128.webp" alt="Mascota de MateLabs" width="44" height="44">
     <div><small>UNA COLECCIÓN DE</small><b>MATE<span>LABS</span></b></div>
-  </div><br>
-  <div class="badge">✦ COLECCIÓN HTML5 ✦</div>
+  </div>
   <h1>Mini Arcade</h1>
   <p class="subtitle">Ocho mundos listos para jugar. Sin instalación. En cualquier dispositivo.</p>
+  <div class="me" id="me" aria-label="Tus estadísticas" hidden></div>
 </header>
 
-<div class="container">
-  <div class="grid">
-
-    <a href="clavado.html" class="card" style="--glow:#ff6b5d;--glow-soft:rgba(255,107,93,.15);--accent-bg:rgba(255,107,93,.12);--accent-text:#ff9e8a">
-      <div class="icon-wrap">🔪</div>
-      <div>
-        <h2>¡CLAVADO!</h2>
-        <p>Clavá cuchillos en el tronco giratorio, esquivá tu propio acero, cortá manzanas y sobreviví a cada nivel.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">PC + Android</span>
-        <span class="tag highlight">Un toque</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
-    <a href="fruta_furia.html" class="card" style="--glow:#8be07a;--glow-soft:rgba(139,224,122,.15);--accent-bg:rgba(139,224,122,.12);--accent-text:#b3f0a0">
-      <div class="icon-wrap">🍉</div>
-      <div>
-        <h2>FRUTA FURIA</h2>
-        <p>Deslizá el filo y hacé volar la fruta. Pero ni se te ocurra tocar la bomba. Combo, frenesí y oleadas.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">PC + Android</span>
-        <span class="tag highlight">Deslizar</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
-    <a href="muerte_gloriosa.html" class="card" style="--glow:#87ceeb;--glow-soft:rgba(135,206,235,.15);--accent-bg:rgba(135,206,235,.12);--accent-text:#b0e0ff">
-      <div class="icon-wrap">🤕</div>
-      <div>
-        <h2>MUERTE GLORIOSA</h2>
-        <p>Parece un juego de caminar y saltar… pero el nivel te odia. Yunques, pinchos, barriles y trampolines traicioneros.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">6 Niveles</span>
-        <span class="tag highlight">Parkour</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
-    <a href="NEON_SURVIVOR.html" class="card" style="--glow:#0ff;--glow-soft:rgba(0,255,255,.15);--accent-bg:rgba(0,255,255,.12);--accent-text:#8ff">
-      <div class="icon-wrap">🟣</div>
-      <div>
-        <h2>NEON SURVIVOR</h2>
-        <p>Sobreviví a las hordas. Subí de nivel. Elegí mejoras. Disparo automático, upgrades y hordas infinitas.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">Roguelite</span>
-        <span class="tag highlight">Neon</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
-    <a href="Salva_al_rey.html" class="card" style="--glow:#c9a24b;--glow-soft:rgba(201,162,75,.15);--accent-bg:rgba(201,162,75,.12);--accent-text:#e8c87a">
-      <div class="icon-wrap">👑</div>
-      <div>
-        <h2>¡SALVA AL REY!</h2>
-        <p>Defendé el reino medieval en 3D. 10 oleadas de monstruos contra el portón y el rey. Modo exploración incluido.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">Three.js</span>
-        <span class="tag highlight">3D</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
-    <a href="torre_infinita.html" class="card" style="--glow:#ffd93d;--glow-soft:rgba(255,217,61,.15);--accent-bg:rgba(255,217,61,.12);--accent-text:#ffe99d">
-      <div class="icon-wrap">🧱</div>
-      <div>
-        <h2>TORRE INFINITA</h2>
-        <p>Apilá bloques, clavá caídas perfectas y subí hasta donde el cielo se apague. Cielos que cambian con la altura.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">PC + Android</span>
-        <span class="tag highlight">Reflejos</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
-    <a href="turbo_furia.html" class="card" style="--glow:#ff8c1a;--glow-soft:rgba(255,140,26,.15);--accent-bg:rgba(255,140,26,.12);--accent-text:#ffb85a">
-      <div class="icon-wrap">🏁</div>
-      <div>
-        <h2>TURBO FURIA</h2>
-        <p>Carreras 3D a toda velocidad. Elegí tu vehículo, esquivá el tráfico, activá el nitro y batí tu récord.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">Three.js</span>
-        <span class="tag highlight">Carreras</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
-    <a href="valle_encantado.html" class="card" style="--glow:#ff8fb8;--glow-soft:rgba(255,143,184,.15);--accent-bg:rgba(255,143,184,.12);--accent-text:#ffc2d8">
-      <div class="icon-wrap">🧚</div>
-      <div>
-        <h2>EL VALLE ENCANTADO</h2>
-        <p>Un mundo de cuentos en 3D. Explorá, hablá con 8 habitantes, encontrá 12 fragmentos de estrella o defendé el valle.</p>
-      </div>
-      <div class="tags">
-        <span class="tag">Three.js</span>
-        <span class="tag highlight">Aventura</span>
-      </div>
-      <div class="play-btn">▶ JUGAR</div>
-    </a>
-
+<main class="container" id="catalogo">
+  <div class="tools">
+    <label class="search">
+      <span class="sr">Buscar juegos</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Buscar por nombre, género o control…" autocomplete="off">
+    </label>
+    <label><span class="sr">Ordenar</span>
+      <select class="sort" id="sort">
+        <option value="featured">Destacados</option>
+        <option value="played">Más jugados</option>
+        <option value="recent">Jugados recientemente</option>
+        <option value="az">A → Z</option>
+      </select>
+    </label>
   </div>
-</div>
+  <div class="chips" id="chips" role="group" aria-label="Categorías"></div>
+
+  <section id="continueSec" hidden aria-labelledby="contTitle">
+    <h2 class="row" id="contTitle">Seguir jugando</h2>
+    <div class="continue" id="continue"></div>
+  </section>
+
+  <section aria-labelledby="allTitle">
+    <h2 class="row" id="allTitle">Todos los juegos</h2>
+    <p class="sr" id="count" aria-live="polite"></p>
+    <div class="grid" id="grid">
+      <!-- Enlaces estáticos (sin JS y para buscadores); se reemplazan al cargar el registro -->
+      <a class="card" href="clavado.html"><h3>¡CLAVADO!</h3></a>
+      <a class="card" href="fruta_furia.html"><h3>FRUTA FURIA</h3></a>
+      <a class="card" href="muerte_gloriosa.html"><h3>MUERTE GLORIOSA</h3></a>
+      <a class="card" href="NEON_SURVIVOR.html"><h3>NEON SURVIVOR</h3></a>
+      <a class="card" href="Salva_al_rey.html"><h3>¡SALVA AL REY!</h3></a>
+      <a class="card" href="torre_infinita.html"><h3>TORRE INFINITA</h3></a>
+      <a class="card" href="turbo_furia.html"><h3>TURBO FURIA</h3></a>
+      <a class="card" href="valle_encantado.html"><h3>EL VALLE ENCANTADO</h3></a>
+    </div>
+  </section>
+</main>
+
+<dialog class="detail" id="detail" aria-labelledby="dTitle"></dialog>
 
 <footer>
   <span class="made"><img src="matelabs/mascota-128.webp" alt="" width="28" height="28">CREADO POR <b>MATELABS</b></span> · HECHO CON HTML5 · 2026
 </footer>
 
+<script type="module" src="matelabs/portal.js"></script>
+
 <script>
-  /* Partículas sutiles de fondo */
-  const cvs=document.getElementById('particles'),ctx=cvs.getContext('2d');
-  let W,H;
-  function resize(){W=cvs.width=innerWidth;H=cvs.height=innerHeight}
-  addEventListener('resize',resize);resize();
-  const parts=Array.from({length:60},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.5+.5,o:Math.random()*.5+.2}));
-  function frame(){ctx.clearRect(0,0,W,H);for(const p of parts){p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fillStyle=`rgba(255,255,255,${p.o})`;ctx.fill()}requestAnimationFrame(frame)}
-  frame();
+  /* Partículas sutiles de fondo: se detienen con la pestaña oculta y con "reducir movimiento" */
+  (() => {
+    const cvs = document.getElementById('particles'), ctx = cvs.getContext('2d');
+    if (!ctx || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let W = 0, H = 0, raf = 0;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    function resize() { W = innerWidth; H = innerHeight; cvs.width = W * dpr; cvs.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    addEventListener('resize', resize); resize();
+    const parts = Array.from({ length: 60 }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .3, vy: (Math.random() - .5) * .3, r: Math.random() * 1.5 + .5, o: Math.random() * .5 + .2 }));
+    function frame() {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#fff';
+      for (const p of parts) {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+        ctx.globalAlpha = p.o; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(frame);
+    }
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else if (!raf) raf = requestAnimationFrame(frame); });
+    raf = requestAnimationFrame(frame);
+  })();
 </script>
 </body>
 </html>

@@ -1,0 +1,110 @@
+{
+  "index": {
+    "fps": 60.2,
+    "worstFrameMs": 16.8,
+    "dcl": 131,
+    "load": 228,
+    "heapMB": 1.2,
+    "longTasks": 0,
+    "domNodes": 106,
+    "requests": 6,
+    "kb": 65,
+    "errors": []
+  },
+  "clavado": {
+    "fps": 60.3,
+    "worstFrameMs": 16.8,
+    "dcl": 132,
+    "load": 252,
+    "heapMB": 2.9,
+    "longTasks": 0,
+    "domNodes": 57,
+    "requests": 6,
+    "kb": 75,
+    "errors": []
+  },
+  "fruta_furia": {
+    "fps": 60.5,
+    "worstFrameMs": 16.8,
+    "dcl": 157,
+    "load": 276,
+    "heapMB": 1.6,
+    "longTasks": 0,
+    "domNodes": 64,
+    "requests": 6,
+    "kb": 83,
+    "errors": []
+  },
+  "muerte_gloriosa": {
+    "fps": 60.4,
+    "worstFrameMs": 16.8,
+    "dcl": 201,
+    "load": 374,
+    "heapMB": 1.6,
+    "longTasks": 0,
+    "domNodes": 83,
+    "requests": 7,
+    "kb": 110,
+    "errors": []
+  },
+  "NEON_SURVIVOR": {
+    "fps": 60.4,
+    "worstFrameMs": 16.8,
+    "dcl": 13,
+    "load": 103,
+    "heapMB": 1.2,
+    "longTasks": 0,
+    "domNodes": 35,
+    "requests": 4,
+    "kb": 28,
+    "errors": []
+  },
+  "Salva_al_rey": {
+    "fps": 32,
+    "worstFrameMs": 83.4,
+    "dcl": 765,
+    "load": 765,
+    "heapMB": 8.8,
+    "longTasks": 2,
+    "domNodes": 102,
+    "requests": 8,
+    "kb": 753,
+    "errors": []
+  },
+  "torre_infinita": {
+    "fps": 60,
+    "worstFrameMs": 16.8,
+    "dcl": 128,
+    "load": 229,
+    "heapMB": 1.9,
+    "longTasks": 0,
+    "domNodes": 56,
+    "requests": 6,
+    "kb": 73,
+    "errors": []
+  },
+  "turbo_furia": {
+    "fps": 60.2,
+    "worstFrameMs": 16.8,
+    "dcl": 589,
+    "load": 589,
+    "heapMB": 5,
+    "longTasks": 0,
+    "domNodes": 94,
+    "requests": 7,
+    "kb": 684,
+    "errors": []
+  },
+  "valle_encantado": {
+    "fps": 31.1,
+    "worstFrameMs": 83.4,
+    "dcl": 791,
+    "load": 791,
+    "heapMB": 14.5,
+    "longTasks": 2,
+    "domNodes": 99,
+    "requests": 8,
+    "kb": 768,
+    "errors": []
+  }
+}
