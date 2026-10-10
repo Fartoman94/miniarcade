@@ -18,7 +18,7 @@
      - revisar `Geometry` / `BufferGeometry` en los helpers propios.
    - **Requiere:** regresión visual con capturas de antes y después.
    - **Ideas anotadas:** `MeshStandardMaterial` con PMREM y tráfico instanciado en TURBO FURIA.
-5. **Rendimiento 3D en calidad media frente a la versión anterior.** Ver RENDIMIENTO.md. ¡SALVA AL REY! y EL VALLE ENCANTADO quedan parejos con la versión anterior. En TURBO FURIA el garaje está siendo optimizado; ver el resultado en RENDIMIENTO.md. EL VALLE ENCANTADO en Explorar: si hace falta, bajar el pasto de media de 700 a unas 400 matas.
+5. **Rendimiento 3D en calidad media frente a la versión anterior.** Ver RENDIMIENTO.md. ¡SALVA AL REY! y EL VALLE ENCANTADO quedan parejos con la versión anterior. En TURBO FURIA el garaje ya quedó por encima de la versión anterior (dibujado a 30 Hz detrás del menú). EL VALLE ENCANTADO en Explorar: si hace falta, bajar el pasto de media de 700 a unas 400 matas.
 6. **Calidad automática:** se resuelve con memoria, núcleos y tipo de puntero, sin benchmark. En un desktop con muchos núcleos pero GPU débil puede elegir «alta». Algunos juegos 3D ya bajan un nivel si sostienen menos de 27 fps; habría que llevar eso al SDK para todos.
 7. **Modularizar los juegos.** La mecánica de cada juego sigue en su HTML. Cuando se partan en módulos tiene sentido pasar a Vite y TypeScript; el contrato del SDK ya está definido en ARQUITECTURA.md.
 8. **Récord por dificultad:** hoy hay un solo récord por juego. TURBO FURIA tiene ranking local por dificultad.
