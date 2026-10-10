@@ -1,0 +1,14 @@
+{
+  "turbo_furia": {
+    "fps": 60.1,
+    "worstFrameMs": 16.8,
+    "dcl": 405,
+    "load": 482,
+    "heapMB": 8,
+    "longTasks": 1,
+    "domNodes": 192,
+    "requests": 10,
+    "kb": 814,
+    "errors": []
+  }
+}

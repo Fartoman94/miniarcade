@@ -261,6 +261,24 @@ test.describe('TURBO FURIA', () => {
     expectNoErrors(errors);
   });
 
+  test('garaje: se dibuja a frecuencia reducida (menú encima) y la carrera en cada cuadro', async ({ page }) => {
+    test.setTimeout(120_000);
+    const { errors } = await openTest(page);
+    // ≤ 30 dibujos por segundo en el garaje (con margen), sea cual sea la frecuencia de la pantalla
+    const rate = await page.evaluate(() => new Promise(res => {
+      const r0 = window.__turbo.perf.renders, t0 = performance.now();
+      setTimeout(() => res((window.__turbo.perf.renders - r0) / ((performance.now() - t0) / 1000)), 3000);
+    }));
+    expect(rate).toBeGreaterThan(1);
+    expect(rate).toBeLessThanOrEqual(33);
+    await go(page);
+    const r0 = await G(page, () => window.__turbo.perf);
+    await expect.poll(() => G(page, () => window.__turbo.perf.frames), POLL).toBeGreaterThan(r0.frames + 20);
+    const r1 = await G(page, () => window.__turbo.perf);
+    expect(r1.renders - r0.renders).toBe(r1.frames - r0.frames);
+    expectNoErrors(errors);
+  });
+
   test('obras: se avisan, chocan en tu carril y suman al esquivarlas', async ({ page }) => {
     test.setTimeout(180_000);
     const { errors } = await openTest(page);
