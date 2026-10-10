@@ -56,7 +56,10 @@ test.describe('portal', () => {
     await expect(page.locator('#ml-intro')).toBeVisible();
     await page.waitForTimeout(500);
     await page.mouse.click(10, 10);
-    await expect(page.locator('#ml-intro')).toHaveCount(0);
+    // el salteo es síncrono: en el mismo pointerdown la intro pasa a 'ml-out' (antes de los 3,4 s automáticos).
+    // La remoción del nodo usa un setTimeout y headless a veces demora los timers, por eso se espera con margen.
+    await expect(page.locator('#ml-intro')).toHaveClass(/ml-out/, { timeout: 1000 });
+    await expect(page.locator('#ml-intro')).toHaveCount(0, { timeout: 10_000 });
     await page.reload();
     await page.waitForTimeout(200);
     await expect(page.locator('#ml-intro')).toHaveCount(0);
