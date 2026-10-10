@@ -92,3 +92,76 @@ Resultado (`ML_WORKERS=1 npx playwright test tests/e2e/valle_encantado.spec.js`)
 - No se guarda el progreso parcial de "Explorar" (la partida es corta; se guarda el mejor tiempo).
 - Los FPS medidos en headless no muestran mejora por el raster de SwiftShader y la carga de la máquina; falta medir en un dispositivo real.
 - El registro (`games/registry.js`) tiene datos desactualizados; ver la corrección sugerida en el informe.
+
+## Personaje Mati Octo
+
+### Qué se integró
+
+- Selector de personaje en el menú de inicio (columna "¿Cómo querés jugar?", debajo de los dos modos): **Mago del valle** (el original, por defecto) o **Mati Octo**. Usa `MLChars.picker` de `matelabs/characters.js` (radio group accesible: flechas, Tab, tap; vista previa giratoria con opción de detenerla). La elección se guarda en `ml:character` y persiste al recargar. Los clics/teclas del selector no llegan al juego.
+- `matelabs/characters.js` se carga en el `<head>` después de `arcade.js`. Los tres GLB (`mati_octo_idle/run/jump.glb`, ~116 KB c/u) se piden **sólo** si Mati está elegido (al cargar la página con esa elección o en el momento de elegirlo). Ojo: el selector compartido descarga siempre los WebP de la vista previa (~45 KB), aunque no se elija a Mati.
+- Las tres mallas se crean una sola vez y se agregan como hijas de `playerG` dentro de un grupo `mati`; cambiar de pose es alternar `visible`. Sin luces extra, sin re-crear nada por cuadro. Al activar a Mati se ocultan las partes del clásico (malla horneada, ojos, capa, piernas, brazos, bastón y orbe); la sombra circular la comparten los dos.
+
+### Poses (estáticas, no animadas)
+
+Los GLB son **poses estáticas**, no hay esqueleto ni animación. Mapeo discreto:
+
+| Estado del juego | Pose |
+|---|---|
+| quieto, en diálogo, cayendo al morir | `idle` |
+| caminando o corriendo (Shift) | `run` |
+| saltito al juntar un fragmento o al empezar a hablar con un habitante (0,42 s) | `jump` |
+
+Movimiento procedural barato encima: el rebote vertical que ya tenía el jugador, inclinación hacia adelante al moverse (más al correr), un leve balanceo lateral siguiendo el paso y un arco de 0,55 de alto durante el saltito (sólo visual: no cambia la posición lógica ni el colisionador). El juego no tiene salto, así que la pose `jump` sólo aparece en esos saltitos.
+
+### Escala, orientación y colisionador
+
+- Altura: se mide en tiempo de ejecución la caja del clásico (pies → punta del sombrero) = **2,517** unidades, y Mati se escala a esa misma altura (`classicH === matiH`, verificado en las pruebas). Pies en y=0 del grupo del jugador, igual que el clásico, así que apoya en el terreno con el mismo `groundH`.
+- Orientación: el modelo mira a +Z, como el clásico; hereda `playerG.rotation.y = prot`, así que mira hacia donde camina.
+- Colisionador: **sin cambios**. Se extrajo el radio a la constante `PLAYER_R = .5` (mismo valor que antes) y lo usan los dos personajes; las pruebas comprueban que al meter al jugador en una casa queda a 3,5 del centro (3 + 0,5) con ambos.
+- Mati a esa altura es más ancho que el mago (~1,9 contra ~1 de ancho total): con los colisionadores de árboles (0,8) y casas (3) no se ve metido en nada en las pruebas, pero en algún poste de cerca (radio 0,35) los tentáculos pueden rozar visualmente el poste.
+
+### Efectos
+
+- **Golpe del bastón**: el arco dorado en el suelo y las chispas son los mismos (son del mundo). Como Mati no tiene bastón ni orbe, se agregó un sprite de brillo (misma textura `glowWarm`) delante de Mati que sólo se ve durante el golpe y crece con el mismo pulso que el orbe; además Mati se inclina hacia adelante durante el golpe.
+- **Daño**: el parpadeo de invulnerabilidad funciona igual (es la visibilidad de `playerG`); además, mientras dura la invulnerabilidad, el material de Mati recibe un tinte emisivo rojo (se cambia sólo cuando cambia el estado, sin asignar memoria por cuadro).
+- **Muerte**: la caída (`playerG.rotation.x = -1.2`) se aplica igual a Mati, en pose `idle` y con el tinte rojo.
+
+### Si falla la carga
+
+Si los GLB no se pueden bajar o leer (red, archivo roto, WebGL), `loadMeshes` rechaza la promesa: el juego sigue con el clásico, la elección guardada no se toca, y aparece un aviso breve no bloqueante ("No se pudo cargar Mati Octo: seguís con el personaje clásico."). Al empezar otra partida se reintenta la carga. Si falta `characters.js` el selector no aparece y el juego es el de siempre.
+
+### Gancho de pruebas
+
+`window.__valle.snap()` suma (sólo lectura): `char` (elegido), `charActive` (el que se ve), `matiState` (`off|loading|ready|failed`), `pose`, `poseCount` (veces que se mostró cada pose), `matiVisible`, `classicVisible`, `playerR`, `classicH`, `matiH`, `frameMs` (update + render del último cuadro) y `heap`.
+
+### Pruebas
+
+4 casos nuevos en `tests/e2e/valle_encantado.spec.js` (describe "personaje Mati Octo"):
+
+1. Selector: dos opciones, no se piden GLB si no se elige; flecha derecha (escritorio) / tap (móvil) elige a Mati, el juego sigue en el menú, se bajan los 3 GLB, Mati visible y clásico oculto; tras recargar sigue elegido; flecha izquierda vuelve al clásico.
+2. Partida con Mati: mismo radio y altura que el clásico; `idle` quieto → `run` con W → `idle` al soltar → `jump` al juntar un fragmento; colisión contra una casa a 3,5; golpe con Espacio; en "Proteger" daño (5 → 4 corazones) y caída hasta la pantalla de fin.
+3. Clásico: el mismo choque contra la casa da 3,5.
+4. Con `page.route` abortando los `.glb`/`.webp`: `matiState = failed`, se ve el clásico, aparece el aviso, "Proteger" arranca y avanza, sin errores de página.
+
+Resultado (`ML_WORKERS=1 npx playwright test tests/e2e/valle_encantado.spec.js`): **20 passed, 2 skipped** — desktop 10/10, mobile 10/10 (los 2 salteados son los casos sólo-escritorio/sólo-móvil de siempre), 2,9 min.
+
+Capturas revisadas: menú a 1280×800 (el selector entra entero en la columna derecha), Pixel 7 vertical (el selector queda debajo de los modos, se llega desplazando el menú, como ya pasaba con "Proteger") y 915×412 apaisado (entra al desplazar; en pantallas bajas las miniaturas se achican a 38 px).
+
+### Rendimiento (medido)
+
+Headless Chromium con SwiftShader (WebGL por CPU), 1280×800, modo Explorar caminando 4 s, 2 corridas por personaje:
+
+| | draw calls (mediana, mín–máx) | update+render por cuadro (mediana) | heap JS | FPS |
+|---|---|---|---|---|
+| Clásico, corrida 1 | 104 (97–116) | 3,0 ms | 15,7 MB | 9,2 |
+| Mati, corrida 1 | 99 (96–104) | 3,4 ms | 15,3 MB | 9,0 |
+| Clásico, corrida 2 | 100 (97–107) | 3,4 ms | 15,8 MB | 9,2 |
+| Mati, corrida 2 | 86 (83–100) | 2,7 ms | 16,4 MB | 9,5 |
+
+Por construcción, el clásico son 10 draw calls (malla horneada, ojos, capa, 2 piernas, 2 brazos, bastón, orbe y su brillo) y Mati 1 (+1 sólo durante el golpe); la sombra es 1 en los dos. La variación entre corridas viene sobre todo de las partículas (humo, estelas) y de lo que entra en cámara. El costo por cuadro y el heap son equivalentes dentro del ruido; los FPS los limita el raster por CPU de SwiftShader.
+
+### Pendientes
+
+- El selector compartido baja los WebP de la vista previa aunque no se elija a Mati (cambio a pedir en `characters.js`, no en el juego).
+- Mati es más ancho que el mago con la misma altura: puede rozar visualmente postes finos de cerca.
+- No hay medición en GPU/celular real.

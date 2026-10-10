@@ -231,3 +231,142 @@ test.describe('El Valle Encantado', () => {
     expectNoErrors(errors);
   });
 });
+
+// ---------- Personaje seleccionable: Mati Octo ----------
+const pickMati = page => page.addInitScript(() => {
+  try { if (!sessionStorage.getItem('pick-once')) { sessionStorage.setItem('pick-once', '1'); localStorage.setItem('ml:character', JSON.stringify({ valle_encantado: 'mati' })); } } catch (e) {}
+});
+/** Distancia al centro de una casa (colisionador de radio 3) tras meter al jugador adentro. */
+async function houseDist(page) {
+  await page.evaluate(() => window.__valle.goto(-7.5, -6));
+  await until(page, () => { const s = window.__valle.snap(); return Math.hypot(s.px + 8, s.pz + 6) > 2; });
+  const s = await snap(page);
+  return Math.hypot(s.px + 8, s.pz + 6);
+}
+
+test.describe('El Valle Encantado — personaje Mati Octo', () => {
+  test('selector: teclado/tap, persiste al recargar y no carga los GLB si no se elige', async ({ page, isMobile }) => {
+    const glb = [];
+    page.on('request', r => { if (r.url().endsWith('.glb')) glb.push(r.url()); });
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    const s0 = await snap(page);
+    expect([s0.char, s0.charActive, s0.matiState]).toEqual(['clasico', 'clasico', 'off']);
+    const cards = page.locator('#charPick [role="radio"]');
+    await expect(cards).toHaveCount(2);
+    await expect(page.locator('#charPick [role="radiogroup"]')).toBeVisible();
+    expect(glb).toEqual([]);
+
+    if (isMobile) {
+      await cards.nth(1).scrollIntoViewIfNeeded();
+      await cards.nth(1).tap();
+    } else {
+      await cards.nth(0).focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(cards.nth(1)).toBeFocused();
+    }
+    await expect(cards.nth(1)).toHaveAttribute('aria-checked', 'true');
+    // las flechas/el toque del selector no llegan al juego (sigue en el menú, sin moverse)
+    expect((await snap(page)).state).toBe('menu');
+    await expect.poll(async () => (await snap(page)).charActive, { timeout: 40_000 }).toBe('mati');
+    expect(glb.length).toBe(3);
+    const s1 = await snap(page);
+    expect(s1.matiVisible).toBe(true);
+    expect(s1.classicVisible).toBe(false);
+
+    await page.reload();
+    await ready(page);
+    await expect(page.locator('#charPick [data-char="mati"]')).toHaveAttribute('aria-checked', 'true');
+    await expect.poll(async () => (await snap(page)).charActive, { timeout: 40_000 }).toBe('mati');
+
+    // volver al clásico con el teclado (flecha izquierda) también funciona
+    if (!isMobile) {
+      await page.locator('#charPick [data-char="mati"]').focus();
+      await page.keyboard.press('ArrowLeft');
+      await expect.poll(async () => (await snap(page)).charActive).toBe('clasico');
+      expect((await snap(page)).classicVisible).toBe(true);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('partida con Mati: poses según el estado, golpe, daño y caída; mismo colisionador', async ({ page }) => {
+    test.setTimeout(150_000);
+    await pickMati(page);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await expect.poll(async () => (await snap(page)).charActive, { timeout: 40_000 }).toBe('mati');
+
+    // colisionador y altura: iguales a los del clásico
+    const a = await snap(page);
+    expect(a.playerR).toBe(0.5);
+    expect(a.matiH).toBeCloseTo(a.classicH, 3);
+    expect(a.classicH).toBeGreaterThan(2.3);
+
+    await page.locator('#modeExplore').click();
+    await until(page, () => window.__valle.snap().state === 'play');
+    await expect.poll(async () => (await snap(page)).pose, { timeout: 30_000 }).toBe('idle');
+
+    // moverse → pose de correr; soltar → quieto
+    await page.keyboard.down('KeyW');
+    await expect.poll(async () => (await snap(page)).pose, { timeout: 30_000 }).toBe('run');
+    await page.keyboard.up('KeyW');
+    await expect.poll(async () => (await snap(page)).pose, { timeout: 30_000 }).toBe('idle');
+
+    // juntar un fragmento → saltito con la pose de salto
+    const j0 = (await snap(page)).poseCount.jump;
+    const [fx, fz] = await page.evaluate(() => window.__valle.fragPos()[0]);
+    await page.evaluate(([x, z]) => window.__valle.goto(x + 0.5, z + 0.5), [fx, fz]);
+    await until(page, () => window.__valle.snap().fragsFound === 1);
+    await expect.poll(async () => (await snap(page)).poseCount.jump, { timeout: 30_000 }).toBeGreaterThan(j0);
+    await expect.poll(async () => (await snap(page)).pose, { timeout: 30_000 }).toBe('idle');
+
+    // el colisionador es el mismo: el jugador queda a 3 + 0,5 del centro de la casa
+    const dMati = await houseDist(page);
+    expect(dMati).toBeCloseTo(3.5, 2);
+
+    // golpe con el bastón (Espacio) sigue funcionando
+    const n = (await snap(page)).attacks;
+    await page.keyboard.press('Space');
+    await until(page, k => window.__valle.snap().attacks > k, n);
+
+    // Proteger: daño (parpadeo + tinte) y caída al morir
+    await page.keyboard.press('Escape');
+    await page.locator('.mla-pause [data-a="restart"]').click();
+    await until(page, () => window.__valle.snap().state === 'play' && !window.__valle.snap().paused);
+    await page.evaluate(() => window.__valle.hurt(1));
+    expect((await snap(page)).hearts).toBe(4);
+    await page.evaluate(() => window.__valle.hurt(4));
+    await until(page, () => ['dying', 'over'].includes(window.__valle.snap().state));
+    await until(page, () => window.__valle.snap().state === 'over', undefined, 60_000);
+    expect((await snap(page)).charActive).toBe('mati');
+    expectNoErrors(errors);
+  });
+
+  test('colisionador del clásico igual al de Mati', async ({ page }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await page.locator('#modeExplore').click();
+    await until(page, () => window.__valle.snap().state === 'play');
+    expect((await snap(page)).charActive).toBe('clasico');
+    expect(await houseDist(page)).toBeCloseTo(3.5, 2);
+    expectNoErrors(errors);
+  });
+
+  test('si fallan los GLB/WebP se juega con el clásico, con aviso y sin errores', async ({ page, isMobile }) => {
+    await page.route(/matelabs\/characters\/.*\.(glb|webp)$/, r => r.abort());
+    await pickMati(page);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await expect.poll(async () => (await snap(page)).matiState, { timeout: 40_000 }).toBe('failed');
+    const s = await snap(page);
+    expect([s.char, s.charActive, s.classicVisible, s.matiVisible]).toEqual(['mati', 'clasico', true, false]);
+    await expect(page.locator('#charToast')).toContainText('personaje clásico');
+    await press(page, '#modeMission', isMobile);
+    await until(page, () => window.__valle.snap().state === 'play');
+    const t0 = (await snap(page)).playTime;
+    await until(page, t => window.__valle.snap().playTime > t + 0.3, t0);
+    expect((await snap(page)).charActive).toBe('clasico');
+    // los fallos de red de los recursos abortados a propósito no son errores del juego
+    expectNoErrors(errors.filter(e => !/ERR_FAILED|Failed to load resource/.test(e)));
+  });
+});

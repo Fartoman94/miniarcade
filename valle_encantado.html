@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="matelabs/arcade.js"></script>
+<script src="matelabs/characters.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;overflow:hidden}
@@ -162,6 +163,16 @@
     #exploreHint{top:128px;font-size:11px;letter-spacing:.04em;max-width:calc(100vw - 24px);width:max-content;padding:6px 12px}
     #dialog{bottom:12px;padding:20px 16px 16px}#dlgText{font-size:15px}
   }
+  /* selector de personaje (matelabs/characters.js) dentro de la columna de modos */
+  #charPick .mlc-title{color:#ffd97a;font-family:'Nunito',system-ui,sans-serif}
+  #charPick .mlc-card{background:rgba(14,26,19,.85);border-color:rgba(201,162,75,.5)}
+  #charPick .mlc-card[aria-checked="true"]{border-color:#ffd97a;background:rgba(201,162,75,.2);box-shadow:0 0 14px rgba(255,200,110,.25)}
+  #charPick .mlc-card:focus-visible,#charPick .mlc-anim:focus-visible{outline-color:#ffd97a}
+  @media (max-height:560px){#charPick .mlc-prev,#charPick .mlc-prev canvas{width:38px;height:38px}#charPick .mlc-card{padding:4px 10px 4px 4px}}
+  #charToast{position:fixed;left:50%;bottom:170px;transform:translateX(-50%);z-index:12;pointer-events:none;
+       max-width:calc(100vw - 32px);padding:9px 16px;border-radius:10px;font-size:13px;font-weight:700;
+       background:rgba(14,26,19,.94);border:2px solid #c9a24b;color:#ffe9b0;opacity:0;transition:opacity .3s}
+  #charToast.show{opacity:1}
   #nogl{position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;
        padding:30px;text-align:center;font-size:15px;line-height:1.8;background:#10241a}
 </style>
@@ -185,6 +196,7 @@
 <div id="atkBtn">⚔️</div>
 <button id="promptBtn" type="button">💬 HABLAR</button>
 <div id="banner" role="status" aria-live="polite"></div>
+<div id="charToast" role="status" aria-live="polite"></div>
 <div id="dialog"><div id="dlgName">—</div><div id="dlgText"></div><div id="dlgNext">▼</div></div>
 
 <div class="overlay" id="menu">
@@ -218,6 +230,7 @@
       <span><span class="tt">Proteger el valle</span><br>
       <span class="dd">Oleadas de diablillos rojos y ogros marchan contra el Corazón del Valle. Defendelo con tu bastón mágico.</span></span>
     </button>
+    <div id="charPick"></div>
     <div class="m-foot">CREADO POR MATELABS · HECHO CON HTML5</div>
   </div>
 </div>
@@ -936,7 +949,9 @@ NPCS.forEach(n=>{
 let noteT=1;
 
 /* ================= JUGADOR ================= */
-let playerG,staffArm,cape,legs=[],arms=[],orbGlow;
+let playerG,staffArm,cape,legs=[],arms=[],orbGlow,classicParts=[],CLASSIC_H=0;
+/* radio del colisionador del jugador: el mismo para cualquier personaje */
+const PLAYER_R=.5;
 {
   playerG=new THREE.Group();
   const lam=c=>new THREE.MeshLambertMaterial({color:c});
@@ -980,6 +995,76 @@ let playerG,staffArm,cape,legs=[],arms=[],orbGlow;
   const bs=blobShadow(.6);bs.position.y=.03;playerG.add(bs);
   bakeGroup(playerG,[cape]);
   scene.add(playerG);
+  /* partes del personaje clásico (todo menos la sombra, que comparten ambos personajes) */
+  classicParts=playerG.children.filter(c=>c!==bs);
+  playerG.updateMatrixWorld(true);
+  const bb=new THREE.Box3();classicParts.forEach(o=>bb.expandByObject(o));
+  CLASSIC_H=+(bb.max.y-bb.min.y).toFixed(3);
+}
+
+/* ================= PERSONAJE MATI OCTO =================
+   Poses ESTÁTICAS (quieto / correr / saltar) de matelabs/characters.js: no hay esqueleto ni
+   animación; se muestra una u otra según el estado y se suma movimiento procedural barato
+   (balanceo, inclinación, saltito). Las tres mallas se crean una sola vez y se alterna su
+   visibilidad. El colisionador del jugador no cambia (PLAYER_R). */
+const GAME_ID='valle_encantado';
+const CH=window.MLChars||null;
+let charSel=CH?CH.get(GAME_ID):'clasico';   /* lo elegido en el selector */
+let charActive='clasico';                   /* lo que se ve de verdad (si Mati falla, queda el clásico) */
+let matiState='off',matiG=null,matiPoses=null,matiMat=null,matiGlow=null,matiPose=null,matiTint=false;
+let MATI_H=0,hopT=0,toastT=0;
+const poseCount={idle:0,run:0,jump:0}; /* veces que se mostró cada pose (para las pruebas) */
+function charToast(msg){
+  const el=$('charToast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),3800);
+}
+function setMatiPose(p){
+  if(p===matiPose)return;
+  matiPose=p;poseCount[p]++;
+  for(const k in matiPoses)matiPoses[k].visible=(k===p);
+}
+function applyChar(){
+  const mati=charSel==='mati'&&matiState==='ready';
+  charActive=mati?'mati':'clasico';
+  for(const o of classicParts)o.visible=!mati;
+  if(matiG)matiG.visible=mati;
+}
+function buildMati(m){
+  matiG=new THREE.Group();matiG.name='mati';
+  const inner=new THREE.Group();
+  /* misma altura visual que el clásico (sombrero incluido); los pies en y=0, como el clásico */
+  MATI_H=CLASSIC_H;
+  inner.scale.setScalar(MATI_H);
+  matiPoses={idle:m.idle,run:m.run,jump:m.jump};
+  for(const k in matiPoses){matiPoses[k].visible=false;inner.add(matiPoses[k]);}
+  matiG.add(inner);matiG.userData.inner=inner;
+  matiMat=m.material;
+  /* destello del golpe mágico (equivalente al orbe del bastón, que no existe en Mati) */
+  matiGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowWarm,transparent:true,depthWrite:false,opacity:.95}));
+  matiGlow.position.set(0,MATI_H*.55,.75);matiGlow.visible=false;matiG.add(matiGlow);
+  playerG.add(matiG);
+  matiPose=null;setMatiPose('idle');
+}
+function ensureMati(){
+  if(!CH||matiState==='ready'||matiState==='loading')return;
+  matiState='loading';
+  CH.loadMeshes(THREE).then(m=>{
+    if(!matiG)buildMati(m);
+    matiState='ready';applyChar();
+  }).catch(err=>{
+    matiState='failed';applyChar();
+    console.warn('Mati Octo no se pudo cargar:',err);
+    if(charSel==='mati')charToast('No se pudo cargar Mati Octo: seguís con el personaje clásico.');
+  });
+}
+function chooseChar(id){
+  charSel=id;
+  if(id==='mati')ensureMati();
+  applyChar();
+}
+if(CH){
+  CH.picker($('charPick'),{gameId:GAME_ID,classicIcon:'🧙',classicName:'Mago del valle',title:'TU PERSONAJE',onChange:chooseChar});
+  if(charSel==='mati')ensureMati();
 }
 /* brújula al fragmento más cercano */
 let compassG;
@@ -1228,6 +1313,7 @@ function openDialogue(n){
   dlgName.textContent=n.name;dlgText.textContent='';
   dialogEl.classList.add('show');
   n.g.rotation.y=Math.atan2(px-n.x,pz-n.z);
+  hopT=.42;
   sTalk();
   if(mode==='explore'&&!talked.has(n.name)){talked.add(n.name);setText($('npcN'),'💬 '+talked.size+' / 8 HABITANTES');}
 }
@@ -1307,6 +1393,8 @@ function clearWorld(){
 function startMode(m){
   audio();startAmbient();sBlip();
   mode=m;clearWorld();closeDlg();
+  hopT=0;
+  if(charSel==='mati'&&matiState==='failed')ensureMati();
   dyingT=0;litT=0;talked.clear();exploreHint.innerHTML=HINT_HTML;setText($('npcN'),'💬 0 / 8 HABITANTES');
   for(const k in keys)keys[k]=false;
   hearts=5;updateHearts(false);heartHP=100;heartBarEl.style.width='100%';heartWrap.classList.remove('low');
@@ -1698,7 +1786,7 @@ function update(dt){
         part(px,py+.15,pz,rand(-.5,.5),rand(.3,.8),rand(-.5,.5),'#cbb89a',.5,false,true,false);}
     }
   }
-  playerPos.x=px;playerPos.z=pz;collide(playerPos,.5);px=playerPos.x;pz=playerPos.z;
+  playerPos.x=px;playerPos.z=pz;collide(playerPos,PLAYER_R);px=playerPos.x;pz=playerPos.z;
   py=groundH(px,pz);
   playerG.position.set(px,py,pz);
   playerG.rotation.y=prot;
@@ -1713,6 +1801,7 @@ function update(dt){
   }else staffArm.rotation.x=moving?Math.sin(walkT)*.5:.25+Math.sin(time*2)*.05;
   cape.rotation.x=.14+(moving?Math.sin(walkT*2)*.12:Math.sin(time*1.6)*.05);
   invuln=Math.max(0,invuln-dt);
+  if(charActive==='mati')updateMati(dt,moving);
   playerG.visible=invuln>0?(Math.floor(time*12)%2===0):true;
   playerG.rotation.x=state==='dying'?-1.2:0;
   atkCd=Math.max(0,atkCd-dt);
@@ -1730,7 +1819,7 @@ function update(dt){
       fragN.textContent=fragsFound+' / 12';
       fragN.classList.remove('pop');void fragN.offsetWidth;fragN.classList.add('pop');
       sparkleBurst(f.x,f.baseY,f.z,'#ffe9a8',18);
-      sFrag();buzz(25);
+      sFrag();buzz(25);hopT=.42;
       banner('✦ FRAGMENTO '+fragsFound+' / 12 ✦');
       if(fragsFound>=12)lightUpValley();
     }
@@ -1900,13 +1989,36 @@ function update(dt){
   }
 }
 
-let last=performance.now(),rafId=0,stopped=false;
+/* Mati: pose discreta según el estado + movimiento procedural (sin asignar memoria por cuadro) */
+function updateMati(dt,moving){
+  const inner=matiG.userData.inner;
+  hopT=Math.max(0,hopT-dt);
+  let pose='idle',y=0,lean=0,roll=0;
+  if(hopT>0&&state==='play'){pose='jump';y=Math.sin((1-hopT/.42)*Math.PI)*.55;}
+  else if(moving){pose='run';lean=keys.run?.16:.1;roll=Math.sin(walkT)*.07;}
+  if(swingT>0){
+    /* golpe: se inclina hacia adelante y brilla delante suyo (el arco dorado del suelo es el mismo) */
+    const pr=1-Math.max(0,swingT)/.3;
+    lean+=Math.sin(pr*Math.PI)*.35;
+    matiGlow.visible=true;
+    const s=orbGlow.scale.x*1.2;matiGlow.scale.set(s,s,1);
+  }else matiGlow.visible=false;
+  setMatiPose(state==='dying'?'idle':pose);
+  inner.position.y=y;inner.rotation.x=lean;inner.rotation.z=roll;
+  /* golpe recibido: además del parpadeo, un tinte rojo mientras dura la invulnerabilidad */
+  const tint=invuln>0||state==='dying';
+  if(tint!==matiTint){matiTint=tint;matiMat.emissive.setHex(tint?0x7a1810:0x000000);}
+}
+
+let last=performance.now(),rafId=0,stopped=false,lastFrameMs=0;
 function frame(now){
   rafId=0;
   if(paused||stopped)return;
   const dt=Math.min(.033,Math.max(0,(now-last)/1000));last=now;
+  const t0=performance.now();
   update(dt);
   renderer.render(scene,camera);
+  lastFrameMs=performance.now()-t0;
   rafId=requestAnimationFrame(frame);
 }
 rafId=requestAnimationFrame(frame);
@@ -1961,7 +2073,11 @@ if(SDK){
 window.__valle={
   snap:()=>({state,mode,paused,time,playTime,px,pz,wave,kills,hearts,heartHP,fragsFound,talked:talked.size,
     attacks,enemies:enemies.length,pending:pending.length,drops:drops.length,arcs:arcs.length,bestWave,muted,
-    audio:AC?AC.state:null,calls:renderer.info.render.calls,geometries:renderer.info.memory.geometries}),
+    audio:AC?AC.state:null,calls:renderer.info.render.calls,geometries:renderer.info.memory.geometries,
+    char:charSel,charActive,matiState,pose:charActive==='mati'?matiPose:null,poseCount:{...poseCount},
+    matiVisible:!!(matiG&&matiG.visible),classicVisible:classicParts.some(o=>o.visible),
+    playerR:PLAYER_R,classicH:CLASSIC_H,matiH:charActive==='mati'?MATI_H:0,
+    frameMs:lastFrameMs,heap:performance.memory?performance.memory.usedJSHeapSize:null}),
 };
 /* atajos sólo con ?e2e en la URL, para llegar al final de la partida en tiempo de prueba */
 if(/[?&]e2e\b/.test(location.search)){

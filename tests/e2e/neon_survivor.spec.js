@@ -246,3 +246,103 @@ test.describe('Neon Survivor', () => {
     expectNoErrors(errors);
   });
 });
+
+test.describe('Neon Survivor — personaje Mati Octo', () => {
+  /** Personaje elegido/activo, pose visible y colisionador, vía el hook de sólo lectura. */
+  const C = page => page.evaluate(() => {
+    const n = /** @type {any} */ (window).__neon;
+    return { wanted: n.charWanted, char: n.char, failed: n.charFailed, pose: n.pose, face: n.face, r: n.r, state: n.state, time: n.time };
+  });
+  const preselectMati = page => page.addInitScript(() => {
+    if (!sessionStorage.getItem('mati-seeded')) { localStorage.setItem('ml:character', JSON.stringify({ neon_survivor: 'mati' })); sessionStorage.setItem('mati-seeded', '1'); }
+  });
+
+  test('el selector se ve en el menú, se opera con flechas o toque y la elección persiste', async ({ page, hasTouch }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    const group = page.locator('#charPick [role="radiogroup"]');
+    await expect(group).toBeVisible();
+    const clasico = page.locator('#charPick [data-char="clasico"]'), matiCard = page.locator('#charPick [data-char="mati"]');
+    await expect(clasico).toHaveAttribute('aria-checked', 'true'); // el clásico es el predeterminado
+    await expect(page.locator('#playBtn')).toBeInViewport();
+    if (hasTouch) await matiCard.tap();
+    else { await clasico.focus(); await page.keyboard.press('ArrowRight'); await expect(matiCard).toBeFocused(); }
+    await expect(matiCard).toHaveAttribute('aria-checked', 'true');
+    expect((await N(page)).state).toBe('menu'); // elegir no arranca la partida
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('ml:character') || '{}').neon_survivor)).toBe('mati');
+    await page.reload();
+    await ready(page);
+    await expect(page.locator('#charPick [data-char="mati"]')).toHaveAttribute('aria-checked', 'true');
+    expect((await C(page)).wanted).toBe('mati');
+    // y se puede volver al clásico
+    if (hasTouch) await page.locator('#charPick [data-char="clasico"]').tap();
+    else { await page.locator('#charPick [data-char="mati"]').focus(); await page.keyboard.press('ArrowLeft'); }
+    await expect(page.locator('#charPick [data-char="clasico"]')).toHaveAttribute('aria-checked', 'true');
+    expect((await C(page)).wanted).toBe('clasico');
+    expectNoErrors(errors);
+  });
+
+  test('partida con Mati: la pose cambia con el estado y el colisionador es el mismo', async ({ page, hasTouch }) => {
+    // colisionador del clásico como referencia
+    const { errors } = await openGame(page, FILE);
+    await start(page, hasTouch);
+    const rClasico = (await C(page)).r;
+    expect((await C(page)).pose).toBe('orb');
+    expect(rClasico).toBe(14);
+    await page.evaluate(() => localStorage.setItem('ml:character', JSON.stringify({ neon_survivor: 'mati' })));
+    await page.reload();
+    await start(page, hasTouch);
+    await expect.poll(async () => (await C(page)).char, { timeout: 15000 }).toBe('mati');
+    await godMode(page);
+    const c0 = await C(page);
+    expect(c0.r).toBe(rClasico);
+    expect(c0.pose).toBe('idle');
+    await page.keyboard.down('ArrowLeft');
+    await expect.poll(async () => (await C(page)).pose, { timeout: 15000 }).toBe('run');
+    expect((await C(page)).face).toBe(-1);
+    await page.keyboard.up('ArrowLeft');
+    await expect.poll(async () => (await C(page)).pose, { timeout: 15000 }).toBe('idle');
+    await page.keyboard.down('ArrowRight');
+    await expect.poll(async () => (await C(page)).face, { timeout: 15000 }).toBe(1);
+    await page.keyboard.up('ArrowRight');
+    // subir de nivel → pose de salto breve al volver a jugar
+    await page.evaluate('orbs.push({ x: player.x, y: player.y, vx: 0, vy: 0, value: 8, r: 5, dead: false })');
+    await expect.poll(async () => (await N(page)).state, { timeout: 15000 }).toBe('levelup');
+    expect((await C(page)).pose).toBe('jump');
+    await wait(page, 350);
+    if (hasTouch) await page.locator('#cards .card').first().tap(); else await page.keyboard.press('1');
+    await expect.poll(async () => (await C(page)).pose, { timeout: 15000 }).toBe('idle');
+    // el golpe usa el mismo círculo: un enemigo a r + e.r - 2 px lastima, a r + e.r + 2 px no
+    const hit = await page.evaluate(`(() => {
+      player.invul = 0; player.hp = player.maxHp = 100; const hp0 = player.hp;
+      enemies.length = 0;
+      enemies.push({ x: player.x + 30, y: player.y, r: 14, hp: 50, maxHp: 50, speed: 0, dmg: 10, xp: 1, score: 10, color: '#f55', tier: 1, id: -2 });
+      step(); const far = player.hp;
+      enemies[0].x = player.x + 26; step();
+      return { hp0, far, near: player.hp };
+    })()`);
+    expect(hit.far).toBe(hit.hp0);
+    expect(hit.near).toBeLessThan(hit.hp0);
+    expectNoErrors(errors);
+  });
+
+  test('si los sprites de Mati no cargan, se juega con el clásico y se avisa', async ({ page, hasTouch }) => {
+    await page.route('**/matelabs/characters/*.webp', r => r.abort());
+    await page.route('**/matelabs/characters/*.glb', r => r.abort());
+    await preselectMati(page);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await expect.poll(async () => (await C(page)).failed, { timeout: 15000 }).toBe(true);
+    await expect(page.locator('#charToast')).toBeVisible();
+    await expect(page.locator('#charToast')).toContainText('clásico');
+    await start(page, hasTouch);
+    const c = await C(page);
+    expect(c.wanted).toBe('mati');
+    expect(c.char).toBe('clasico');
+    expect(c.pose).toBe('orb');
+    await expect.poll(async () => (await N(page)).time, { timeout: 15000 }).toBeGreaterThan(1);
+    // sólo se toleran los avisos de recurso abortado a propósito; nada de errores no capturados
+    expectNoErrors(errors.filter(e => !/Failed to load resource|ERR_FAILED/.test(e)));
+    expect(errors.filter(e => e.startsWith('pageerror'))).toEqual([]);
+  });
+});

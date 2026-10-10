@@ -11,5 +11,5 @@
     "noImplicitAny": false,
     "skipLibCheck": true
   },
-  "include": ["matelabs/arcade.js", "matelabs/catalog.js", "matelabs/portal.js", "games/registry.js"]
+  "include": ["matelabs/arcade.js", "matelabs/characters.js", "matelabs/catalog.js", "matelabs/portal.js", "games/registry.js"]
 }

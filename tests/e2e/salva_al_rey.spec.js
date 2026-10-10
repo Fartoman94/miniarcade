@@ -220,3 +220,120 @@ test('modo exploración: "Menú del juego" en la pausa vuelve al menú de modos'
   expect((await snap(page)).time).toBeGreaterThan(t0); // el loop del menú sigue vivo
   expectNoErrors(errors);
 });
+
+/* ================= Personaje Mati Octo ================= */
+const MATI_RE = /matelabs\/characters\/.*\.(glb|webp)(\?|$)/;
+const preferMati = page => page.addInitScript(() => {
+  try { localStorage.setItem('ml:character', JSON.stringify({ salva_al_rey: 'mati' })); } catch (e) { /* */ }
+});
+const heroBox = page => page.evaluate(() => /** @type {any} */ (window).__rey.heroBox());
+
+test('selector de héroe: por defecto Caballero, sin pedir los GLB, operable con flechas y tap, y persiste', async ({ page, isMobile }) => {
+  const glbs = [];
+  page.on('request', r => { if (/\.glb(\?|$)/.test(r.url())) glbs.push(r.url()); });
+  const { errors } = await open(page);
+  const cards = page.locator('#charPick [role="radio"]');
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator('#charPick [data-char="clasico"]')).toHaveAttribute('aria-checked', 'true');
+  await wait(page, 800);
+  expect(glbs).toEqual([]); // carga diferida: con el clásico no se baja el modelo 3D
+  expect((await snap(page)).char).toBe('clasico');
+
+  // teclado: flechas dentro del radiogroup
+  await page.locator('#charPick [data-char="clasico"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#charPick [data-char="mati"]')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#charPick [data-char="mati"]')).toBeFocused();
+  await expect.poll(async () => (await snap(page)).char, { timeout: 20_000 }).toBe('mati');
+  expect(glbs.length).toBe(3);
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('#charPick [data-char="clasico"]')).toHaveAttribute('aria-checked', 'true');
+  expect((await snap(page)).char).toBe('clasico');
+  expect((await snap(page)).state).toBe('menu'); // las teclas del selector no llegan al juego
+
+  // tap / clic
+  if (isMobile) await page.tap('#charPick [data-char="mati"]'); else await page.click('#charPick [data-char="mati"]');
+  await expect(page.locator('#charPick [data-char="mati"]')).toHaveAttribute('aria-checked', 'true');
+  expect((await snap(page)).state).toBe('menu');
+
+  await page.reload();
+  await page.waitForFunction(() => /** @type {any} */ (window).__rey);
+  await expect(page.locator('#charPick [data-char="mati"]')).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(async () => (await snap(page)).char, { timeout: 20_000 }).toBe('mati');
+  expectNoErrors(errors);
+});
+
+test('partida con Mati: escala del caballero, pies en el piso, espada y poses según el estado', async ({ page, isMobile }) => {
+  await preferMati(page);
+  const { errors } = await open(page);
+  await expect.poll(async () => (await snap(page)).char, { timeout: 20_000 }).toBe('mati');
+  await startMission(page, isMobile);
+  await expect.poll(async () => (await snap(page)).pose).toBe('idle');
+  const b = await heroBox(page);
+  expect(b.maxY - b.minY).toBeGreaterThan(1.9);
+  expect(b.maxY - b.minY).toBeLessThan(2.15);
+  expect(Math.abs(b.minY - b.groundY)).toBeLessThan(0.08); // pies en el piso (hay un leve "respirar")
+  expect(b.swordIn).toBe(true);
+
+  // correr: la pose alterna corriendo ↔ quieto mientras se mueve
+  const seen = new Set();
+  await page.keyboard.down('KeyW');
+  await expect.poll(async () => { const s = await snap(page); seen.add(s.pose); return seen.has('run'); }, { timeout: 20_000 }).toBe(true);
+  await page.keyboard.up('KeyW');
+  await expect.poll(async () => (await snap(page)).pose, { timeout: 20_000 }).toBe('idle');
+
+  // salto: pose en el aire
+  if (isMobile) await page.tap('#jumpBtn'); else await page.keyboard.press('Space');
+  await expect.poll(async () => (await snap(page)).pose, { timeout: 20_000, intervals: [30, 50, 80] }).toBe('jump');
+  await expect.poll(async () => (await snap(page)).pose, { timeout: 20_000 }).toBe('idle');
+
+  // golpe: la espada sigue en el pivote y el ataque funciona
+  await page.keyboard.press('KeyJ');
+  await expect.poll(async () => (await snap(page)).atkCd).toBeGreaterThan(0);
+  expect((await heroBox(page)).swordIn).toBe(true);
+
+  // daño (parpadeo + tinte) y caída final siguen funcionando
+  await page.evaluate(() => /** @type {any} */ (window).__rey.hurt(1));
+  expect((await snap(page)).hearts).toBe(4);
+  await page.evaluate(() => /** @type {any} */ (window).__rey.hurt(5));
+  expect((await snap(page)).state).toBe('dying');
+  await expect(page.locator('#over')).not.toHaveClass(/hidden/, { timeout: 30_000 });
+  expectNoErrors(errors);
+});
+
+test('collider idéntico con Caballero y con Mati', async ({ page, isMobile }) => {
+  const { errors } = await open(page);
+  const pushOut = async () => {
+    await startMission(page, isMobile);
+    // dentro del collider del portón: el empuje depende solo del radio del héroe
+    await page.evaluate(() => /** @type {any} */ (window).__rey.teleport(0.4, -27.2));
+    await expect.poll(async () => (await snap(page)).pz, { timeout: 20_000 }).toBeGreaterThan(-26);
+    const s = await snap(page);
+    return { r: s.playerR, x: +s.px.toFixed(3), z: +s.pz.toFixed(3) };
+  };
+  const classic = await pushOut();
+  expect((await snap(page)).char).toBe('clasico');
+  await page.evaluate(() => /** @type {any} */ (window).MLChars.set('salva_al_rey', 'mati'));
+  await page.reload();
+  await page.waitForFunction(() => /** @type {any} */ (window).__rey);
+  await expect.poll(async () => (await snap(page)).char, { timeout: 20_000 }).toBe('mati');
+  const mati = await pushOut();
+  expect(classic.r).toBe(0.5);
+  expect(mati).toEqual(classic);
+  expectNoErrors(errors);
+});
+
+test('si fallan los archivos de Mati, se juega con el Caballero y se avisa', async ({ page, isMobile }) => {
+  await page.route(MATI_RE, r => r.abort());
+  await preferMati(page);
+  const { errors } = await open(page);
+  await expect(page.locator('#charMsg')).toHaveClass(/show/, { timeout: 20_000 });
+  await expect(page.locator('#charMsg')).toContainText('seguís con el caballero');
+  expect((await snap(page)).char).toBe('clasico');
+  await startMission(page, isMobile);
+  const t0 = (await snap(page)).playTime;
+  await expect.poll(async () => (await snap(page)).playTime).toBeGreaterThan(t0 + 0.2);
+  expect((await snap(page)).pose).toBe('caballero');
+  // los únicos errores permitidos son los de las descargas que el test abortó a propósito
+  expectNoErrors(errors.filter(e => !/Failed to load resource: net::ERR_FAILED/.test(e)));
+});
