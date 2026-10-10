@@ -1,0 +1,1 @@
+import{WireframeGeometry as r}from"three";import{LineSegmentsGeometry as t}from"./LineSegmentsGeometry.js";class m extends t{constructor(e){super(),this.isWireframeGeometry2=!0,this.type="WireframeGeometry2",this.fromWireframeGeometry(new r(e))}}export{m as WireframeGeometry2};

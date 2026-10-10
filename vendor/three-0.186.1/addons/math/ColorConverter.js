@@ -1,0 +1,1 @@
+import{MathUtils as c}from"three";const s={};class r{static setHSV(e,l,t,o){return l=c.euclideanModulo(l,1),t=c.clamp(t,0,1),o=c.clamp(o,0,1),e.setHSL(l,t*o/((l=(2-t)*o)<1?l:2-l),l*.5)}static getHSV(e,l){return e.getHSL(s),s.s*=s.l<.5?s.l:1-s.l,l.h=s.h,l.s=2*s.s/(s.l+s.s),l.v=s.l+s.s,l}}export{r as ColorConverter};

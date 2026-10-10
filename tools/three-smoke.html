@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<!-- Prueba de humo del Three.js moderno local (import map) + GLTFLoader con un GLB del paquete. -->
+<html lang="es"><head><meta charset="UTF-8"><title>Three smoke</title>
+<script type="importmap">{"imports":{"three":"../vendor/three-0.186.1/build/three.module.js","three/addons/":"../vendor/three-0.186.1/addons/"}}</script>
+</head><body style="margin:0">
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(320, 240); document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0x223344);
+s.add(new THREE.HemisphereLight(0xffffff, 0x333333, 2));
+const c = new THREE.PerspectiveCamera(40, 4/3, .1, 100); c.position.set(3, 2.5, 4); c.lookAt(0, .8, 0);
+const g = await new GLTFLoader().loadAsync('../assets/models/npc_guardia.glb');
+s.add(g.scene); r.render(s, c);
+window.__smoke = { rev: THREE.REVISION, meshes: (() => { let n = 0; g.scene.traverse(o => o.isMesh && n++); return n; })() };
+</script></body></html>
