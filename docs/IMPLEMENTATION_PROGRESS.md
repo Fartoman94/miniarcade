@@ -14,11 +14,11 @@ Estados: `pending` · `in_progress` · `test_failed` · `ready_for_review` · `r
 | 08 | EL VALLE ENCANTADO | valle_encantado.html | Three.js r128 | released (reino: pending) | main | reino explorable pendiente |
 | 09 | Guardianes Estelares* | guardianes_estelares.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | *renombrado (marca de terceros) · 37 tests ok |
 | 10 | Arena Mutante | arena_mutante.html | Three.js 0.186 | in_progress | — | |
-| 11 | Corsarios del Abismo | corsarios_abismo.html | Three.js 0.186 | pending | — | |
+| 11 | Corsarios del Abismo | corsarios_abismo.html | Three.js 0.186 | in_progress | — | |
 | 12 | Granja de Runas | granja_runas.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 39 tests ok |
 | 13 | Templo de los Ecos | templo_ecos.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 30 tests ok |
 | 14 | Bastiones Elementales | bastiones_elementales.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 32 tests ok |
-| 15 | Derby de Chatarra | derby_chatarra.html | Three.js 0.186 | in_progress | — | |
+| 15 | Derby de Chatarra | derby_chatarra.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 32 tests ok |
 | 16 | Academia de Dragones | academia_dragones.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 34 tests ok |
 | 17 | Mareas Profundas | mareas_profundas.html | Three.js 0.186 | in_progress | — | |
 | 18 | Carrera Vertical | carrera_vertical.html | Three.js 0.186 | in_progress | — | |

@@ -125,6 +125,13 @@ export const GAMES = [
     controls: { pc: 'Clic elegir/construir · arrastrar/WASD cámara · rueda zoom · Q/E girar · 1-4 torres · U mejorar · X vender · Espacio oleada', touch: 'Tocar para elegir · arrastrar, pellizcar y girar con dos dedos · botones ▶▶ oleada y x2', gamepad: 'Stick cámara · A elegir (retícula) · B cerrar · X mejorar · Y oleada · LB/RB girar · LT/RT zoom' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'derby_chatarra', thumb: 'games/thumbs/derby_chatarra.webp', file: 'derby_chatarra.html', title: 'DERBY DE CHATARRA', icon: '💥', accent: '#b8f52a',
+    category: 'accion', tags: ['Demolición 3D', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Embestí, derrapá y saltá en 3 arenas con imanes, escudos y trampas, ganá el torneo y destruí al Triturador Omega.',
+    controls: { pc: 'W/S acelerar-frenar · A/D girar · Espacio derrape · Shift nitro · E potenciador', touch: 'Volante + botones ACEL, FRENO, NITRO y PODER', gamepad: 'Stick girar · RT acelerar · LT frenar · A nitro · X potenciador · B derrape' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */
