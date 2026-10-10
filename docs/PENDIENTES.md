@@ -39,3 +39,11 @@
     - se mantuvo el colisionador original para no cambiar la jugabilidad.
 17. **Secundarias sin prueba de punta a punta:** varias solo emiten su evento, sin una prueba que las complete como misión. El detalle está en cada `docs/games/<juego>.md`.
 18. **Balance de la dificultad «Extremo»:** se ajustó con simulaciones y recorridos guionados, no con jugadores.
+
+## Agregados en la etapa 20 juegos (2026-10-10)
+
+19. **Prueba inestable conocida:** `granja_runas` «escenarios: granja → mercado → … caminando por las salidas» falló una vez en CI y pasó en el reintento. Hay que hacerla determinista con `simulate()`, igual que el resto.
+20. **Migrar a Three.js 0.186 los 3 juegos 3D originales** (¡SALVA AL REY!, TURBO FURIA y EL VALLE ENCANTADO, que siguen en r128). Los 12 nuevos ya usan 0.186.
+21. **Modelos GLB del paquete:** son prototipos y no los usa ningún juego; todos los modelos se generan por código. Reemplazarlos por arte final requiere assets con licencia, registrados en ASSET_LICENSES.md.
+22. **Balance de los juegos nuevos:** se ajustó con bots y simulaciones, no con jugadores. Faltan sesiones de juego reales y medir FPS en celulares y GPU reales.
+23. **EL VALLE ENCANTADO no tiene interiores propios:** el reino explorable con interiores se implementó como modo de ¡SALVA AL REY! (Reino del Alba).

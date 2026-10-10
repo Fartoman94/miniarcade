@@ -8,21 +8,21 @@ Estados: `pending` · `in_progress` · `test_failed` · `ready_for_review` · `r
 | 02 | FRUTA FURIA | fruta_furia.html | Canvas 2D | released | main | 3.0 |
 | 03 | MUERTE GLORIOSA | muerte_gloriosa.html | Canvas 2D | released | main | 3.0: 10 niveles |
 | 04 | NEON SURVIVOR | NEON_SURVIVOR.html | Canvas 2D | released | main | 3.0 |
-| 05 | ¡SALVA AL REY! | Salva_al_rey.html | Three.js r128 | released (reino: ready_for_review) | main | modo «Reino del Alba» en reino_alba.html (Three 0.186): 4 zonas, 8 interiores, 12 NPC, 9 misiones, 2 jefes · 38 tests ok |
+| 05 | ¡SALVA AL REY! | Salva_al_rey.html | Three.js r128 | released (reino: released) | main | modo «Reino del Alba» en reino_alba.html (Three 0.186): 4 zonas, 8 interiores, 12 NPC, 9 misiones, 2 jefes · 38 tests ok |
 | 06 | TORRE INFINITA | torre_infinita.html | Canvas 2D | released | main | 3.0 |
 | 07 | TURBO FURIA | turbo_furia.html | Three.js r128 | released | main | 3.0 |
 | 08 | EL VALLE ENCANTADO | valle_encantado.html | Three.js r128 | released (reino: pending) | main | reino explorable pendiente |
 | 09 | Guardianes Estelares* | guardianes_estelares.html | Three.js 0.186 | released | main (PR #7, 971fd82) | *renombrado (marca de terceros) · 37 tests ok |
 | 10 | Arena Mutante | arena_mutante.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 39 tests ok (+ bajo carga) |
-| 11 | Corsarios del Abismo | corsarios_abismo.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 31 tests ok (+ bajo carga) |
+| 11 | Corsarios del Abismo | corsarios_abismo.html | Three.js 0.186 | released | main | 31 tests ok (+ bajo carga) |
 | 12 | Granja de Runas | granja_runas.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 39 tests ok |
 | 13 | Templo de los Ecos | templo_ecos.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 30 tests ok |
 | 14 | Bastiones Elementales | bastiones_elementales.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 32 tests ok |
 | 15 | Derby de Chatarra | derby_chatarra.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 32 tests ok |
 | 16 | Academia de Dragones | academia_dragones.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 34 tests ok |
-| 17 | Mareas Profundas | mareas_profundas.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 31 tests ok (+ bajo carga) |
-| 18 | Carrera Vertical | carrera_vertical.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 30 tests ok (+ bajo carga) |
-| 19 | Cocina del Caos | cocina_caos.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 34 tests ok (+ bajo carga) |
-| 20 | Portales Imposibles | portales_imposibles.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 44 tests ok (+ bajo carga) |
+| 17 | Mareas Profundas | mareas_profundas.html | Three.js 0.186 | released | main | 31 tests ok (+ bajo carga) |
+| 18 | Carrera Vertical | carrera_vertical.html | Three.js 0.186 | released | main | 30 tests ok (+ bajo carga) |
+| 19 | Cocina del Caos | cocina_caos.html | Three.js 0.186 | released | main | 34 tests ok (+ bajo carga) |
+| 20 | Portales Imposibles | portales_imposibles.html | Three.js 0.186 | released | main | 44 tests ok (+ bajo carga) |
 
-**Total released: 15/20** (8 originales + 7 nuevos, PR #7 mergeado el 2026-10-10 con CI en verde). El reino explorable de 05/08 está en `docs/specs/REINO_EXPLORABLE.md`.
+**Total released: 20/20** — en producción desde el merge del PR #10 (`e3c0952`, 2026-10-10). Prueba de humo en producción: 22/22 páginas (portal, 20 juegos y Reino del Alba) cargan sin errores. Modo «Reino del Alba» incluido en ¡SALVA AL REY!.
