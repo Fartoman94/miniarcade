@@ -213,15 +213,17 @@ Los controles no cambian. El récord sigue siendo **uno solo** (mejor oleada, si
 | tope de pixel ratio | 1 | 1,5 | 2 |
 | sombras reales (PCF suave, mapa 1024, siguen al jugador) | no | no | sí |
 | pasto instanciado con viento | 0 | 700 | 1600 |
-| flores instanciadas | 60 | 160 | 320 |
-| tope de partículas | 50 | 120 | 150 |
-| luciérnagas / polen | 60 / 70 | 150 / 210 | 150 / 210 |
-| pétalos / destellos del cielo | 8 / 6 | 18 / 16 | 26 / 16 |
+| flores instanciadas | 0 | 160 | 320 |
+| tope de partículas | 40 | 120 | 150 |
+| luciérnagas / polen | 40 / 50 | 150 / 210 | 150 / 210 |
+| pétalos / destellos del cielo | 6 / 6 | 18 / 16 | 26 / 16 |
 | niebla (cerca / lejos) | 38 / 150 | 55 / 250 | 70 / 320 |
 | distancia de dibujo (camera.far) | 420 | 1400 | 1400 |
 | estelas de proyectiles y embestidas | no | sí | sí |
-| guardianes en reposo se dejan de dibujar a | 55 | 80 | 80 |
-| minimapa (redibujos/s) | 1,5 | 4 | 6 |
+| guardianes en reposo se dejan de dibujar a | 42 m | 62 m | 62 m |
+| Bosque Sombrío (cúpula, gemas, niebla) se dibuja a menos de | 85 m | 115 m | 115 m |
+| niebla violeta del bosque | no | sí | sí |
+| minimapa (redibujos/s) | apagado | 3 | 6 |
 
 `MLArcade.requireWebGL()` se llama antes de crear el renderer.
 
@@ -247,35 +249,59 @@ Pasto y flores instanciados con viento en el vértice, pinos oscuros instanciado
 
 `tests/e2e/valle_encantado.spec.js`: 11 casos existentes (+ Mati) y 11 nuevos (misiones completadas y persistencia; falla de "Sin un rasguño" y reinicio; dificultad con teclado/tap que persiste y cambia vida/aviso/tamaño de oleada; calidad baja/media/alta y botón de la pausa; diario; las 7 misiones de habitantes completables + alcanzabilidad de todos los objetivos con la colisión real + carrera fallida y revancha; guardianes que atacan, se curan al alejarte y rompen sellos; barrera, 3 fases del Rey y entrega a Alba; jefe en Proteger; desmayo; HUD sin solaparse en 412×915 y 915×412).
 
-Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/valle_encantado.spec.js`), última corrida completa: **42 passed, 2 skipped, 0 failed** — desktop 21/21, mobile 21/21 (los 2 salteados son los casos sólo-escritorio/sólo-móvil de siempre), 9,2 min. Una corrida intermedia dio 38 passed, 4 failed, 2 skipped; los 4 eran errores de las pruebas nuevas (argumento faltante en un `poll` y una marca que se actualiza al cuadro siguiente), corregidos y verificados (4/4 passed).
+Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/valle_encantado.spec.js`), última corrida completa: **42 passed, 2 skipped, 0 failed** — desktop 21/21, mobile 21/21 (los 2 salteados son los casos sólo-escritorio/sólo-móvil de siempre), 9,2 min. Después de la pasada de rendimiento: **42 passed, 2 skipped, 0 failed** otra vez (desktop 21/21, mobile 21/21, 6,4 min); se ajustaron 3 aserciones a los nuevos valores de baja (tope de partículas 40) y a las marcas recalculadas a 10 Hz (se esperan con `expect.poll`). Una corrida intermedia dio 38 passed, 4 failed, 2 skipped; los 4 eran errores de las pruebas nuevas (argumento faltante en un `poll` y una marca que se actualiza al cuadro siguiente), corregidos y verificados (4/4 passed).
 
 Nota: durante el trabajo había 2 joysticks físicos conectados a la máquina que inyectaban teclas (abrían el diario o golpeaban solos) y hacían fallar al azar "partida con Mati"; el SDK ahora ignora los gamepads reales bajo automatización.
 
-### Mediciones (headless Chromium + SwiftShader, 1280×800, máquina compartida con load average 26–30)
+### Mediciones
 
-`perf.cjs` (scratchpad): Explorar caminando 4 s y Proteger con la oleada 1 en pantalla; mediana por cuadro. Original servido desde una copia en otro puerto, intercalado.
+#### Pasada de rendimiento (después de la primera entrega)
 
-| corrida | Explorar: fps · draw calls · update+render · heap | Proteger: fps · draw calls · update+render · heap |
+La primera versión de 3.0 dejaba Explorar más pesado (+15–25 draw calls, ~+2 ms de JS). Cambios:
+
+- Destellos del cielo: 16 sprites → 1 nube de puntos.
+- Fragmentos: 12 mallas + 12 sprites → 1 malla instanciada + 1 nube de puntos (cada fragmento conserva un `Object3D` lógico; las pruebas no cambian).
+- Pétalos: 26 mallas con material propio → 1 `InstancedMesh` con color por instancia.
+- Brillos fijos (faroles, cristales, hongos, farolitos del muelle, ~20 sprites) → 1 nube de puntos por textura y tamaño, armada al hornear.
+- Ojos de habitantes, honguitos y jugador: `MeshLambertMaterial` casi negro en vez de `MeshBasic`, así se hornean con el cuerpo (un draw call menos cada uno).
+- Marcas ¡!/¿? de los habitantes: 8 sprites → 2 nubes de puntos; el estado se recalcula a 10 Hz.
+- Objetos de misión: la visibilidad se recalcula a 10 Hz y no se dibujan a más de 70 m.
+- Flores instanciadas sin tallo (1 draw call en vez de 2).
+- Pinos del Bosque Sombrío con esfera envolvente real (se descartan fuera de cámara). Cúpula, gemas, suelo y niebla del bosque sólo se dibujan con la cámara a menos de 115 m (85 en baja).
+- Guardianes en reposo: no se dibujan a más de 62 m (42 en baja).
+- Minimapa a 3 Hz en media; apagado en baja.
+- Baja: sin pasto ni flores ni niebla del bosque, luciérnagas 40, polen 50, pétalos 6, partículas 40.
+
+Método: `perf.cjs` (scratchpad). Headless Chromium + SwiftShader, 1280×800, dpr 1. Explorar caminando 4 s y Proteger con la oleada 1 en pantalla; mediana por cuadro. El original se sirve desde una copia en otro puerto y las corridas se intercalan (original → media → baja, ×3). Load average de la máquina: 6–12.
+
+| corrida | Explorar: fps · draw calls · JS update+render · heap | Proteger: fps · draw calls · JS · heap |
 |---|---|---|
-| original 1 | 9,5 · 104 · 2,4 ms · 15,4 MB | 22 · 101 · 2,4 ms · 15,7 MB |
-| original 2 | 9,2 · 106 · 5,5 ms · 12,1 MB | 8,3 · 90 · 4,7 ms · 14,9 MB |
-| original 3 | 5,1 · 101 · 5,6 ms · 16,7 MB | 9,9 · 92 · 5,2 ms · 15,7 MB |
-| nuevo media 1 | 4,7 · 123 · 4,3 ms · 12,6 MB | 10,4 · 105 · 3,2 ms · 21,4 MB |
-| nuevo media 2 | 3,2 · 129 · 7,3 ms · 16,5 MB | 9,4 · 100 · 4,3 ms · 17,5 MB |
-| nuevo media 3* | 5,1 · 120 · 7,0 ms · 19,9 MB | 7,1 · 109 · 5,4 ms · 15,9 MB |
-| nuevo baja 1 | 6,3 · 122 · 6,8 ms · 13,0 MB | 12,7 · 103 · 5,1 ms · 23,7 MB |
-| nuevo baja 2 | 4,7 · 130 · 7,8 ms · 17,0 MB | 9,7 · 105 · 5,4 ms · 25,4 MB |
-| nuevo baja 3* | 4,2 · 118 · 9,6 ms · 12,9 MB | 8,5 · 106 · 5,3 ms · 17,5 MB |
-| nuevo alta 1 | 4,5 · 127 · 7,2 ms · 13,2 MB | 3,8 · 104 · 7,6 ms · 13,4 MB |
+| original 1 | 14,6 · 104 · 3,7 ms · 11,3 MB | 16,8 · 115 · 4,2 ms · 11,7 MB |
+| media 1 | 11,6 · 91 · 3,8 ms · 15,6 MB | 14,3 · 92 · 3,8 ms · 23,3 MB |
+| baja 1 | 15,0 · 93 · 3,7 ms · 17,2 MB | 17,1 · 90 · 3,6 ms · 14,3 MB |
+| original 2 | 15,1 · 101 · 3,5 ms · 12,6 MB | 17,5 · 96 · 3,7 ms · 11,9 MB |
+| media 2 | 12,3 · 96 · 4,5 ms · 16,8 MB | 13,0 · 105 · 5,0 ms · 24,6 MB |
+| baja 2 | 14,0 · 93 · 4,3 ms · 17,2 MB | 17,4 · 100 · 4,6 ms · 14,8 MB |
+| original 3 | 16,2 · 101 · 3,9 ms · 11,9 MB | 18,4 · 94 · 3,4 ms · 11,8 MB |
+| media 3 | 10,9 · 97 · 3,7 ms · 15,9 MB | 12,9 · 98 · 4,0 ms · 23,4 MB |
+| baja 3 | 14,6 · 90 · 3,8 ms · 17,4 MB | 16,4 · 84 · 4,1 ms · 13,3 MB |
 
-\* después de dejar de dibujar a los guardianes en reposo lejanos.
+Lectura honesta:
 
-Lectura honesta: en Explorar el juego nuevo hace más trabajo (4 jefes, marcas, objetos de misión, minimapa): ~+15–25 draw calls y ~+2 ms de JS por cuadro según estas corridas, y los FPS de Explorar bajaron en headless. En Proteger el costo es parecido al original. Con dpr 1 (headless) baja y media usan el mismo pixel ratio, por eso acá casi no se distinguen; la diferencia real de baja (pixel ratio 1 en celulares de dpr 2–3, sin pasto, menos partículas) no se puede medir en esta máquina. El ruido entre corridas (p. ej. Proteger original 22 vs 8 fps) es mayor que muchas de las diferencias.
+- **Draw calls:** media en Explorar quedó **por debajo** del original (91–97 contra 101–104); baja, 90–93.
+- **JS por cuadro:** media 3,7–4,5 ms contra 3,5–3,9 ms del original. En 2 de 3 corridas queda igual dentro del ruido (3,7–3,8 ms); en la corrida 2 quedó 0,6–1 ms arriba. Baja: 3,7–4,3 ms. No se puede afirmar que media esté siempre por debajo del original.
+- **FPS:** media sigue más baja que el original (10,9–12,3 contra 14,6–16,2). Con dpr 1 el costo extra es de raster (700 briznas de pasto y 160 flores dibujadas por CPU en SwiftShader), no de draw calls ni de JS. Baja (sin pasto ni flores) está a la par del original: 14,0–15,0 fps.
+- **Baja contra media:** baja es más barata en FPS (+2–4 fps), partículas, minimapa y contenido dibujado. Los draw calls son parecidos porque lo que se quita en baja era poco (pasto, flores y niebla: 3 draw calls).
+- **Heap:** más alto que el original (13–25 MB contra 11–12 MB): misiones, jefes, pools de peligros y proyectiles, canvas del mapa y texturas de las marcas.
+
+#### Primera entrega (antes de la pasada, load average 26–30)
+
+Explorar media: 3,2–5,1 fps · 120–129 draw calls · 4,3–7,3 ms. Baja: 4,2–6,3 fps · 118–130 draw calls · 6,8–9,6 ms. Original en la misma sesión: 5,1–9,5 fps · 101–106 draw calls · 2,4–5,6 ms.
 
 ### Pendientes / NO PROBADO
 
 - **No probado en GPU real ni en celular real** (sólo SwiftShader); falta medir la calidad baja con dpr alto.
-- El costo extra de Explorar (JS por cuadro) podría bajarse: `npcMark` y `updatePicks` corren cada cuadro; se podrían limitar a 10 Hz.
+- En media los FPS de Explorar en SwiftShader siguen por debajo del original por el raster del pasto y las flores (en GPU real debería ser barato; falta medirlo). Si molestara, bajar `grass` de media a ~400.
 - Récord único (no por dificultad). El progreso de misiones de los habitantes es por partida; sólo el álbum y las coronas persisten.
 - Los jefes son esquivables pero no hay prueba automática de "esquivar" (la evitación real se verificó sólo con los avisos/hazards en capturas).
 - `games/registry.js` sigue con la descripción vieja (pedir: mencionar misiones, guardianes y el Rey).

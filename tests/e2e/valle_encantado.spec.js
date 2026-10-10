@@ -493,7 +493,7 @@ test.describe('El Valle Encantado — MiniArcade 3.0', () => {
     await set('low');
     await poll(page, () => window.__valle.snap().quality).toBe('low');
     let s = await snap(page);
-    expect([s.grass, s.pCap, s.shadows, s.fogFar, s.camFar]).toEqual([0, 50, false, 150, 420]);
+    expect([s.grass, s.pCap, s.shadows, s.fogFar, s.camFar]).toEqual([0, 40, false, 150, 420]);
     expect(s.pixelRatio).toBeLessThanOrEqual(1);
     await set('high');
     await poll(page, () => window.__valle.snap().quality).toBe('high');
@@ -510,11 +510,11 @@ test.describe('El Valle Encantado — MiniArcade 3.0', () => {
     await page.locator('.mla-pause [data-a="quality"]').click();
     await poll(page, k => window.__valle.snap().qualChanges > k ? 'ok' : 'no', 45_000, n).toBe('ok');
     await page.keyboard.press('Escape');
-    // con 'low' el tope de partículas se respeta en juego
+    // con 'low' el tope de partículas (40) se respeta en juego
     await set('low');
     await page.evaluate(() => window.__valle.goto(0, 4));
     for (let i = 0; i < 6; i++) { await page.keyboard.press('Space'); await wait(page, 120); }
-    expect((await snap(page)).particles).toBeLessThanOrEqual(50);
+    expect((await snap(page)).particles).toBeLessThanOrEqual(40);
     expectNoErrors(errors);
   });
 
@@ -568,7 +568,8 @@ test.describe('El Valle Encantado — MiniArcade 3.0', () => {
       }
       await poll(page, id => window.__valle.snap().quests[id].st, 20_000).toBe('ready').catch(() => {});
       expect((await snap(page)).quests[id].st, id).toBe('ready');
-      expect((await snap(page)).marks[npc]).toBe('?');
+      // las marcas se recalculan a 10 Hz
+      await poll(page, i => window.__valle.snap().marks[i], 20_000, npc).toBe('?');
       await page.evaluate(i => { window.__valle.talkTo(i); window.__valle.finishDlg(); }, npc);
       expect((await snap(page)).quests[id].st, id).toBe('done');
     }
@@ -577,7 +578,7 @@ test.describe('El Valle Encantado — MiniArcade 3.0', () => {
     await poll(page, () => window.__valle.snap().raceOn).toBe(true);
     await page.evaluate(() => window.__valle.skipRace());
     await poll(page, () => { const s = window.__valle.snap(); return [s.raceOn, s.quests.carrera.st, s.quests.carrera.failed]; }).toEqual([false, 'new', true]);
-    expect((await snap(page)).marks[4]).toBe('!');
+    await poll(page, () => window.__valle.snap().marks[4]).toBe('!');
     await page.evaluate(() => { window.__valle.talkTo(4); window.__valle.finishDlg(); });
     await poll(page, () => window.__valle.snap().raceOn).toBe(true);
     const rings = await page.evaluate(() => window.__valle.pickPos('carrera'));

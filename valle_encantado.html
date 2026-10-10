@@ -202,7 +202,7 @@
   #raceT{font-family:'MedievalSharp';color:#9adcff}
   #miniMap{position:absolute;right:16px;bottom:16px;width:150px;height:150px;border-radius:50%;display:none;
        border:2px solid rgba(201,162,75,.6);background:rgba(14,26,19,.55);box-shadow:0 6px 18px rgba(0,0,0,.35)}
-  @media (pointer:fine) and (min-width:760px) and (min-height:520px){body.m-explore #miniMap{display:block}}
+  @media (pointer:fine) and (min-width:760px) and (min-height:520px){body.m-explore:not(.q-low) #miniMap{display:block}}
   #journal{display:flex;align-items:center;justify-content:center;padding:60px 16px 16px;z-index:11;
        background:radial-gradient(80% 70% at 50% 45%,rgba(8,14,10,.55),rgba(6,12,8,.85))}
   .j-plate{position:relative;width:min(96vw,760px);max-height:calc(100vh - 76px);overflow-y:auto;padding:20px 22px;
@@ -462,13 +462,12 @@ const sunDisc=new THREE.Mesh(new THREE.CircleGeometry(20,24),new THREE.MeshBasic
 sunDisc.position.set(-120,66,-240);scene.add(sunDisc);
 const sunGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowWarm,transparent:true,fog:false,depthWrite:false}));
 sunGlow.scale.set(190,190,1);sunGlow.position.copy(sunDisc.position);scene.add(sunGlow);
-const hiStars=[];
-for(let i=0;i<16;i++){
-  const m=new THREE.SpriteMaterial({map:glowWarm,transparent:true,depthWrite:false,opacity:.6});
-  const s=new THREE.Sprite(m);const a=rand(0,6.28),r=rand(140,220);
-  s.position.set(Math.cos(a)*r,rand(90,170),Math.sin(a)*r);
-  s.scale.set(rand(3,6),rand(3,6),1);scene.add(s);hiStars.push({s,ph:rand(0,6)});
-}
+/* destellos del cielo: antes 16 sprites (16 draw calls), ahora una sola nube de puntos */
+const starGeo=new THREE.BufferGeometry(),starPos=new Float32Array(16*3);
+for(let i=0;i<16;i++){const a=rand(0,6.28),r=rand(140,220);starPos[i*3]=Math.cos(a)*r;starPos[i*3+1]=rand(90,170);starPos[i*3+2]=Math.sin(a)*r;}
+starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3));
+const starMat=new THREE.PointsMaterial({map:glowWarm,size:7,transparent:true,depthWrite:false,opacity:.6,sizeAttenuation:true});
+scene.add(new THREE.Points(starGeo,starMat));
 
 /* arcoíris */
 const RB=[];
@@ -792,7 +791,7 @@ let blades;
   const bs=blobShadow(2.8);bs.position.y=.03;g.add(bs);
   g.position.set(x,y,z);g.rotation.y=.6;scene.add(g);
 }
-const crystalGlow=[];
+const crystalGlow=[];let crystalGlowMat=null; /* posiciones de los cristales (los brillos se vuelven puntos al hornear) */
 [[-4,-2],[3,1],[-1,4],[2,-4],[-5,3],[4.5,4.5],[-3,-5]].forEach((o,i)=>{
   const x=-58+o[0],z=-48+o[1],s=rand(.5,1.1);
   const c=new THREE.Mesh(new THREE.OctahedronGeometry(s),
@@ -861,6 +860,24 @@ let boat;
   const list=[];
   for(const c of scene.children.slice(STATIC_FROM))c.traverse(o=>{if(o.isMesh&&!dyn.has(o))list.push(o);});
   mergeMeshes(scene,list);
+  /* brillos fijos (faroles, cristales, hongos, farolitos del muelle): antes un sprite = un draw call
+     cada uno (~20); ahora una nube de puntos por textura y tamaño */
+  const buckets=new Map();
+  scene.updateMatrixWorld(true);
+  const sprites=[];
+  for(const c of scene.children.slice(STATIC_FROM))c.traverse(o=>{if(o.isSprite&&(o.material.map===glowWarm||o.material.map===glowTeal))sprites.push(o);});
+  for(const sp of sprites){
+    const k=(sp.material.map===glowWarm?'w':'t')+Math.round(sp.scale.x);
+    if(!buckets.has(k))buckets.set(k,{map:sp.material.map,size:sp.scale.x,op:sp.material.opacity,pos:[],teal:sp.material.map===glowTeal});
+    const v=new THREE.Vector3();sp.getWorldPosition(v);buckets.get(k).pos.push(v.x,v.y,v.z);
+    sp.parent.remove(sp);sp.material.dispose();
+  }
+  for(const b of buckets.values()){
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(b.pos,3));
+    const mat=new THREE.PointsMaterial({map:b.map,size:b.size*1.73,transparent:true,depthWrite:false,opacity:b.op,sizeAttenuation:true});
+    scene.add(new THREE.Points(geo,mat));
+    if(b.teal&&b.size>3)crystalGlowMat=mat; /* los cristales titilan juntos */
+  }
   /* grupos que quedaron vacíos */
   for(const c of scene.children.slice(STATIC_FROM))if(c.isGroup&&c.children.length===0)scene.remove(c);
 }
@@ -898,19 +915,18 @@ for(let i=0;i<GRASS_MAX;i++){
   grassIM.setColorAt(i,_ic.set(pick([0x6fae6f,0x7fbf6a,0x8fcf7a,0x5aa05a,0x9ad07f])));
 }
 scene.add(grassIM);
-const flowerStemIM=new THREE.InstancedMesh(new THREE.CylinderGeometry(.018,.022,.34,3).translate(0,.17,0),
-  windy(new THREE.MeshLambertMaterial({color:0x3f7a45}),.3),FLOWER_MAX);
-const flowerHeadIM=new THREE.InstancedMesh(new THREE.OctahedronGeometry(.12).translate(0,.36,0),
+/* flores: sólo la cabeza (entre el pasto), así son 1 draw call */
+const flowerHeadIM=new THREE.InstancedMesh(new THREE.OctahedronGeometry(.11).translate(0,.2,0),
   windy(new THREE.MeshBasicMaterial({color:0xffffff}),.3),FLOWER_MAX);
 for(let i=0;i<FLOWER_MAX;i++){
   const [x,z]=freeSpot(95,6);
   _im.position.set(x,groundH(x,z),z);_im.rotation.set(0,rand(0,6),0);_im.scale.setScalar(rand(.8,1.25));_im.updateMatrix();
-  flowerStemIM.setMatrixAt(i,_im.matrix);flowerHeadIM.setMatrixAt(i,_im.matrix);
+  flowerHeadIM.setMatrixAt(i,_im.matrix);
   flowerHeadIM.setColorAt(i,_ic.set(pick([0xff8fb8,0xffd93d,0xfff2c9,0x8fd0e6,0xf0a0b0,0xc9a0f0])));
 }
-scene.add(flowerStemIM,flowerHeadIM);
+scene.add(flowerHeadIM);
 /* las instancias están repartidas por todo el valle: el radio de la geometría base no sirve para descartar */
-grassIM.frustumCulled=flowerStemIM.frustumCulled=flowerHeadIM.frustumCulled=false;
+grassIM.frustumCulled=flowerHeadIM.frustumCulled=false;
 /* Bosque Sombrío: pinos oscuros instanciados (3 draw calls para todo el anillo) */
 const darkTrunkIM=new THREE.InstancedMesh(new THREE.CylinderGeometry(.25,.42,2.6,6).translate(0,1.3,0),
   new THREE.MeshLambertMaterial({color:0x3a2a22}),DARK_PINES.length);
@@ -928,13 +944,16 @@ const darkTopIM=new THREE.InstancedMesh(new THREE.ConeGeometry(1.35,3,7).transla
     darkConeIM.setColorAt(n,_ic.set(c));darkTopIM.setColorAt(n,_ic.set(c).multiplyScalar(1.18));
     n++;
   }
-  for(const im of[darkTrunkIM,darkConeIM,darkTopIM]){im.count=n;im.castShadow=true;im.frustumCulled=false;scene.add(im);}
+  /* esfera envolvente del anillo entero (no la de un pino): así se descartan cuando no están en cámara */
+  const bsph=new THREE.Sphere(new THREE.Vector3(ZONES.bosque.x,groundH(ZONES.bosque.x,ZONES.bosque.z)+4,ZONES.bosque.z),36);
+  for(const im of[darkTrunkIM,darkConeIM,darkTopIM]){im.count=n;im.castShadow=true;im.geometry.boundingSphere=bsph;scene.add(im);}
 }
 /* suelo sombrío y niebla violeta (se aclaran al vencer al Rey) */
+let gloomDecal=null;
 const gloomMat=new THREE.MeshBasicMaterial({color:0x2a1f3a,transparent:true,opacity:.5,depthWrite:false});
 {
   const B=ZONES.bosque;
-  const d=new THREE.Mesh(new THREE.CircleGeometry(24,28),gloomMat);
+  const d=gloomDecal=new THREE.Mesh(new THREE.CircleGeometry(24,28),gloomMat);
   d.rotation.x=-Math.PI/2;d.position.set(B.x,groundH(B.x,B.z)+.08,B.z);scene.add(d);
 }
 const MIST_N=70,mistGeo=new THREE.BufferGeometry(),mistPos=new Float32Array(MIST_N*3),mistBase=[];
@@ -961,7 +980,7 @@ const sealGems={};
   sp.scale.set(4,4,1);g.add(sp);
   const a=i/3*Math.PI*2;
   g.position.set(ZONES.bosque.x+Math.cos(a)*4,barrier.position.y+ZONES.bosque.r+2.5,ZONES.bosque.z+Math.sin(a)*4);
-  scene.add(g);sealGems[k]={g,a};
+  scene.add(g);sealGems[k]={g,a,on:true};
 });
 
 /* ================= SERES ================= */
@@ -973,7 +992,7 @@ function makeHumanoid(o){
   const head=new THREE.Mesh(new THREE.SphereGeometry(.28,8,7),lam(o.skin||'#f2c9a0'));
   head.position.y=1.32;g.add(head);
   for(const sx of[-.1,.1]){
-    const e=new THREE.Mesh(new THREE.SphereGeometry(.035,5,5),new THREE.MeshBasicMaterial({color:0x1a1a1f}));
+    const e=new THREE.Mesh(new THREE.SphereGeometry(.035,5,5),new THREE.MeshLambertMaterial({color:0x121216}) /* lambert: se hornea junto al cuerpo (un draw call menos) */);
     e.position.set(sx,1.36,.24);g.add(e);
   }
   if(o.hat){
@@ -1146,7 +1165,7 @@ for(let i=0;i<5;i++){
   const cap=new THREE.Mesh(new THREE.ConeGeometry(.36,.34,8),new THREE.MeshLambertMaterial({color:0xd43a3a,flatShading:true}));
   cap.position.y=.52;g.add(cap);
   for(const sx of[-.1,.1]){
-    const e=new THREE.Mesh(new THREE.SphereGeometry(.03,5,5),new THREE.MeshBasicMaterial({color:0x1a1a1f}));
+    const e=new THREE.Mesh(new THREE.SphereGeometry(.03,5,5),new THREE.MeshLambertMaterial({color:0x121216}) /* lambert: se hornea junto al cuerpo (un draw call menos) */);
     e.position.set(sx,.3,.17);g.add(e);
   }
   bakeGroup(g);
@@ -1206,7 +1225,7 @@ const PLAYER_R=.5;
   const head=new THREE.Mesh(new THREE.BoxGeometry(.5,.5,.48),lam(0xf2c9a0));
   head.position.y=1.6;playerG.add(head);
   for(const sx of[-.11,.11]){
-    const e=new THREE.Mesh(new THREE.BoxGeometry(.07,.09,.04),new THREE.MeshBasicMaterial({color:0x1a1a1f}));
+    const e=new THREE.Mesh(new THREE.BoxGeometry(.07,.09,.04),new THREE.MeshLambertMaterial({color:0x121216}) /* lambert: se hornea junto al cuerpo (un draw call menos) */);
     e.position.set(sx,1.64,.25);playerG.add(e);
   }
   const brim=new THREE.Mesh(new THREE.CylinderGeometry(.46,.46,.06,10),lam(0x2e5f8a));
@@ -1349,10 +1368,14 @@ function sparkleBurst(x,y,z,c,n){
 /* pétalos que caen */
 const petals=[];
 const PETAL_C=[[18,30],[-30,20],[45,-35]];
+/* antes 26 mallas con material propio (26 draw calls); ahora una malla instanciada.
+   Cada pétalo conserva su Object3D (no se agrega a la escena) y se copia su matriz por cuadro. */
+const petalIM=new THREE.InstancedMesh(new THREE.PlaneGeometry(.16,.16),
+  new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide,transparent:true,opacity:.9}),26);
+petalIM.frustumCulled=false;scene.add(petalIM);
 for(let i=0;i<26;i++){
-  const m=new THREE.Mesh(new THREE.PlaneGeometry(.16,.16),
-    new THREE.MeshBasicMaterial({color:pick([0xf7b8c8,0xfde3ea,0xffd9a0]),side:THREE.DoubleSide,transparent:true,opacity:.9}));
-  scene.add(m);
+  const m=new THREE.Object3D();
+  petalIM.setColorAt(i,new THREE.Color(pick([0xf7b8c8,0xfde3ea,0xffd9a0])));
   petals.push({m,home:pick(PETAL_C),ph:rand(0,6),reset(){
     this.m.position.set(this.home[0]+rand(-7,7),groundH(this.home[0],this.home[1])+rand(4,8),this.home[1]+rand(-7,7));
     this.ph=rand(0,6);
@@ -1397,16 +1420,29 @@ const frags=[];
 let fragsFound=0,valleyLit=false;
 try{valleyLit=localStorage.getItem('valle_lit')==='1';}catch(e){}
 if(valleyLit)$('menuLit').style.display='inline-flex';
+/* antes cada fragmento era malla + sprite (hasta 24 draw calls); ahora 1 malla instanciada + 1 nube de
+   puntos para los brillos. Cada fragmento conserva un Object3D lógico (g) del que se copia la matriz. */
+const fragIM=new THREE.InstancedMesh(new THREE.OctahedronGeometry(.34),new THREE.MeshBasicMaterial({color:0xffe9a8}),FRAG_POS.length);
+fragIM.frustumCulled=false;scene.add(fragIM);
+const fragGlowPos=new Float32Array(FRAG_POS.length*3),fragGlowGeo=new THREE.BufferGeometry();
+fragGlowGeo.setAttribute('position',new THREE.BufferAttribute(fragGlowPos,3));
+const fragGlow=new THREE.Points(fragGlowGeo,new THREE.PointsMaterial({map:glowWarm,size:4.5,transparent:true,depthWrite:false,opacity:.85,sizeAttenuation:true}));
+fragGlow.frustumCulled=false;scene.add(fragGlow);
+const _zeroM=new THREE.Matrix4().makeScale(0,0,0);
 FRAG_POS.forEach(p=>{
-  const g=new THREE.Group();
-  const o=new THREE.Mesh(new THREE.OctahedronGeometry(.34),new THREE.MeshBasicMaterial({color:0xffe9a8}));
-  g.add(o);
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowWarm,transparent:true,depthWrite:false,opacity:.85}));
-  sp.scale.set(2.6,2.6,1);g.add(sp);
+  const g=new THREE.Object3D();
   g.position.set(p[0],groundH(p[0],p[1])+1.3,p[1]);
-  scene.add(g);
   frags.push({g,x:p[0],z:p[1],baseY:g.position.y,taken:false,ph:rand(0,6)});
 });
+function syncFrags(){
+  for(let i=0;i<frags.length;i++){
+    const g=frags[i].g,on=g.visible;
+    if(on){g.updateMatrix();fragIM.setMatrixAt(i,g.matrix);}else fragIM.setMatrixAt(i,_zeroM);
+    fragGlowPos[i*3]=g.position.x;fragGlowPos[i*3+1]=on?g.position.y:-999;fragGlowPos[i*3+2]=g.position.z;
+  }
+  fragIM.instanceMatrix.needsUpdate=true;fragGlowGeo.attributes.position.needsUpdate=true;
+}
+syncFrags();
 
 /* ================= ENEMIGOS ================= */
 /* Cada diablillo creaba ~12 geometrías y materiales nuevos que nunca se liberaban (fuga que crecía
@@ -1778,7 +1814,7 @@ function toMenu(){
   frags.forEach(f=>{f.taken=false;f.g.visible=true;});
   hideBosses();raceOn=false;
   for(const p of PICKS)p.g.visible=false;
-  for(const n of NPCS)n.mark.visible=false;
+  for(const n of NPCS)n.mk='';syncMarks();
   document.body.classList.remove('m-explore','m-mission','boss-on');bossOn=false;
   scene.fog.color.copy(fogBase);scene.fog.near=QL.fogN;scene.fog.far=QL.fogF;
 }
@@ -1950,8 +1986,8 @@ function missionsEnd(won){if(!MM||!runOpen)return;MM.runEnd({won:!!won});runOpen
 
 /* ================= CALIDAD (onQuality del SDK) ================= */
 const QUAL={
-  low:   {pr:1,  shadows:false,smap:0,   fogN:38,fogF:150,far:420, grass:0,   flowers:60, pCap:50, ff:60, du:70, petals:8, stars:6, mist:30,mapHz:1.5,trail:false},
-  medium:{pr:1.5,shadows:false,smap:0,   fogN:55,fogF:250,far:1400,grass:700, flowers:160,pCap:120,ff:150,du:210,petals:18,stars:16,mist:70,mapHz:4,trail:true},
+  low:   {pr:1,  shadows:false,smap:0,   fogN:38,fogF:150,far:420, grass:0,   flowers:0,  pCap:40, ff:40, du:50, petals:6, stars:6, mist:0, mapHz:0,trail:false},
+  medium:{pr:1.5,shadows:false,smap:0,   fogN:55,fogF:250,far:1400,grass:700, flowers:160,pCap:120,ff:150,du:210,petals:18,stars:16,mist:70,mapHz:3,trail:true},
   high:  {pr:2,  shadows:true, smap:1024,fogN:70,fogF:320,far:1400,grass:1600,flowers:320,pCap:150,ff:150,du:210,petals:26,stars:16,mist:70,mapHz:6,trail:true},
 };
 let qualId='medium',QL=QUAL.medium,pCap=150,qualChanges=0;
@@ -1971,11 +2007,12 @@ function applyQuality(q){
     if(sunL.shadow.map){sunL.shadow.map.dispose();sunL.shadow.map=null;}
   }
   grassIM.count=QL.grass;grassIM.visible=QL.grass>0;
-  flowerStemIM.count=flowerHeadIM.count=QL.flowers;
+  flowerHeadIM.count=QL.flowers;flowerHeadIM.visible=QL.flowers>0;
   ffGeo.setDrawRange(0,QL.ff);duGeo.setDrawRange(0,QL.du);mistGeo.setDrawRange(0,QL.mist);
-  petals.forEach((p,i)=>{p.m.visible=i<QL.petals;});
-  hiStars.forEach((s,i)=>{s.s.visible=i<QL.stars;});
+  petalIM.count=QL.petals;
+  starGeo.setDrawRange(0,QL.stars);
   pCap=pCapNow=QL.pCap;
+  document.body.classList.toggle('q-low',qualId==='low'); /* sin minimapa en baja */
   for(let i=pCap;i<P3.length;i++){P3[i].life=0;P3[i].m.visible=false;}
   if(paused)renderer.render(scene,camera);
 }
@@ -2509,7 +2546,7 @@ function updateBoss(b,dt){
   const dpl=Math.hypot(px-b.x,pz-b.z)||.001;
   if(b.state==='idle'){
     /* en reposo y lejos no se dibuja (ahorra ~6 draw calls por guardián) */
-    const far=Math.hypot(camera.position.x-b.x,camera.position.z-b.z)>(qualId==='low'?55:80);
+    const far=Math.hypot(camera.position.x-b.x,camera.position.z-b.z)>(qualId==='low'?42:62);
     if(b.g.visible===far)b.g.visible=!far;
     b.g.position.y=b.y+Math.abs(Math.sin(b.wob*1.4))*.06;
     b.inner.rotation.y=Math.sin(b.wob*.5)*.4;
@@ -2587,7 +2624,7 @@ function bossDie(b){
     albumAdd(b.def.album);
     if(b.type!=='rey'){
       const sb=sealsBroken(),gem=sealGems[b.def.zone];
-      if(gem){gem.g.visible=false;sparkleBurst(gem.g.position.x,gem.g.position.y,gem.g.position.z,'#ffe9a8',16);}
+      if(gem){gem.on=false;gem.g.visible=false;sparkleBurst(gem.g.position.x,gem.g.position.y,gem.g.position.z,'#ffe9a8',16);}
       banner(sb<3?'✦ ¡SELLO ROTO! '+sb+' / 3 ✦':'✦ ¡LA BARRERA CAYÓ! ✦');
       if(sb>=3)openBarrier();
     }else{banner('👑 ¡VENCISTE AL REY SOMBRÍO! 👑');}
@@ -2597,16 +2634,28 @@ function bossDie(b){
     heartHP=Math.min(100,heartHP+20);heartBarEl.style.width=heartHP+'%';
   }
 }
-function openBarrier(){barrierColl.r=0;barrier.visible=false;}
-function closeBarrier(){barrierColl.r=mode==='explore'?ZONES.bosque.r:0;barrier.visible=mode==='explore';
-  for(const k in sealGems)sealGems[k].g.visible=mode==='explore';}
+/* barrierUp/gem.on = estado lógico; lo que se dibuja además depende de la distancia (gateBosque) */
+let barrierUp=true,bosqueNear=true;
+function openBarrier(){barrierColl.r=0;barrierUp=false;barrier.visible=false;}
+function closeBarrier(){barrierColl.r=mode==='explore'?ZONES.bosque.r:0;barrierUp=mode==='explore';
+  for(const k in sealGems)sealGems[k].on=mode==='explore';gateBosque(true);}
+/* el Bosque Sombrío (cúpula, gemas, niebla, suelo) sólo se dibuja con la cámara a menos de BOSQUE_VIS */
+function gateBosque(force){
+  const near=Math.hypot(camera.position.x-ZONES.bosque.x,camera.position.z-ZONES.bosque.z)<(qualId==='low'?85:115);
+  if(!force&&near===bosqueNear)return;
+  bosqueNear=near;
+  barrier.visible=barrierUp&&near;
+  for(const k in sealGems)sealGems[k].g.visible=!!sealGems[k].on&&near;
+  gloomDecal.visible=near;
+}
 let gloomK=1;
 function updateBossesAll(dt){
   for(const t in bosses)updateBoss(bosses[t],dt);
   /* el Bosque Sombrío se aclara cuando cae el Rey */
   const target=mode==='explore'&&reyDead()?0:1;
   gloomK+=(target-gloomK)*Math.min(1,dt*.8);
-  gloomMat.opacity=.5*gloomK;mistMat.opacity=.45*gloomK;mist.visible=gloomK>.02;
+  gateBosque(false);
+  gloomMat.opacity=.5*gloomK;mistMat.opacity=.45*gloomK;mist.visible=gloomK>.02&&bosqueNear&&QL.mist>0;
   barrierMat.opacity=.16+.06*Math.sin(time*1.5);
   for(const k in sealGems){const s=sealGems[k];if(s.g.visible){s.g.rotation.y+=dt*1.2;s.g.position.y=barrier.position.y+ZONES.bosque.r+2.5+Math.sin(time*1.6+s.a)*.3;}}
 }
@@ -2705,9 +2754,29 @@ function markTex(ch,col){
   g.fillStyle=col;g.font='bold 38px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(ch,32,34);
   return new THREE.CanvasTexture(c);
 }
-const markMats={'!':new THREE.SpriteMaterial({map:markTex('!','#ffd93d'),depthWrite:false,transparent:true}),
-  '?':new THREE.SpriteMaterial({map:markTex('?','#7adce6'),depthWrite:false,transparent:true})};
-NPCS.forEach(n=>{const s=new THREE.Sprite(markMats['!']);s.scale.set(.9,.9,1);s.visible=false;scene.add(s);n.mark=s;n.hop=0;});
+/* marcas ¡! / ¿? sobre los habitantes: 2 nubes de puntos (antes un sprite por habitante = hasta 8 draw calls) */
+const markPts={};
+for(const [ch,col] of[['!','#ffd93d'],['?','#7adce6']]){
+  const pos=new Float32Array(NPCS.length*3).fill(-999),geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({map:markTex(ch,col),size:1.6,transparent:true,depthWrite:false,alphaTest:.05,sizeAttenuation:true}));
+  pts.frustumCulled=false;pts.visible=false;scene.add(pts);markPts[ch]={pts,pos,geo};
+}
+NPCS.forEach(n=>{n.mk='';n.hop=0;});
+let markT=0;
+/* posición de las marcas (por cuadro, 8 vértices) */
+function syncMarks(){
+  let any={'!':false,'?':false};
+  for(let i=0;i<NPCS.length;i++){
+    const n=NPCS[i];
+    for(const ch of['!','?']){
+      const P=markPts[ch].pos,on=n.mk===ch;
+      P[i*3]=n.x;P[i*3+1]=on?n.g.position.y+(n.fairy?2.4:n.small?2.1:2.75)+Math.sin(time*3+i)*.1:-999;P[i*3+2]=n.z;
+      if(on)any[ch]=true;
+    }
+  }
+  for(const ch of['!','?']){markPts[ch].pts.visible=any[ch];if(any[ch])markPts[ch].geo.attributes.position.needsUpdate=true;}
+}
 function npcMark(i){
   if(mode!=='explore')return '';
   for(const q of QUESTS){if(q.npc!==i)continue;const s=qs[q.id];if(s.st==='ready')return '?';}
@@ -2734,15 +2803,20 @@ function collectPick(p){
     if(p.kind==='nota')tone(NOTE[p.idx%NOTE.length],.5,'sine',.12);else sFrag();
   }
 }
+let pickT=0;
 function updatePicks(dt){
   const play=state==='play'&&!dlgOpen;
+  /* qué se ve se recalcula a 10 Hz; los objetos de misión lejanos (más de 70 m) no se dibujan */
+  pickT-=dt;const recheck=pickT<=0||questsDirty;if(pickT<=0)pickT=.1;
   for(const p of PICKS){
     if(p.taken){if(p.g.visible)p.g.visible=false;continue;}
-    let vis;
-    if(p.quest==='secret')vis=state!=='menu'&&Math.hypot(p.x-px,p.z-pz)<26;
-    else if(p.quest==='carrera')vis=raceOn;
-    else vis=mode==='explore'&&qs[p.quest].st==='active';
-    if(p.g.visible!==vis)p.g.visible=vis;
+    let vis=p.g.visible;
+    if(recheck){
+      if(p.quest==='secret')vis=state!=='menu'&&Math.hypot(p.x-px,p.z-pz)<26;
+      else if(p.quest==='carrera')vis=raceOn;
+      else vis=mode==='explore'&&qs[p.quest].st==='active'&&Math.hypot(p.x-px,p.z-pz)<70;
+      if(p.g.visible!==vis)p.g.visible=vis;
+    }
     if(!vis)continue;
     if(p.kind==='ring'){
       const on=p.idx===raceIdx,r=p.g.userData.ring;
@@ -2816,7 +2890,7 @@ function update(dt){
   }
   dp.needsUpdate=true;
   duMat.opacity=.28+.16*Math.sin(time*1.3);
-  for(const s of hiStars)s.s.material.opacity=.3+.35*(.5+.5*Math.sin(time*1.7+s.ph));
+  starMat.opacity=.42+.2*Math.sin(time*1.7);
   for(const f of fairies){
     const a=time*f.spd+f.ph;
     const fx=f.cx+Math.cos(a)*f.rx,fz=f.cz+Math.sin(a)*f.rz;
@@ -2869,20 +2943,22 @@ function update(dt){
     s.g.position.set(s.x,groundH(s.x,s.z)+hop,s.z);
     s.g.rotation.y=s.dir;
   }
-  for(const p of petals){
+  for(let i=0;i<petalIM.count;i++){const p=petals[i];
     p.m.position.y-=dt*.7;
     p.m.position.x+=Math.sin(time*1.5+p.ph)*dt*.8;
     p.m.rotation.x+=dt*2;p.m.rotation.z+=dt*1.4;
     if(p.m.position.y<groundH(p.m.position.x,p.m.position.z)+.05)p.reset();
   }
+  for(let i=0;i<petalIM.count;i++){const m=petals[i].m;m.updateMatrix();petalIM.setMatrixAt(i,m.matrix);}
+  petalIM.instanceMatrix.needsUpdate=true;
   blades.rotation.z+=dt*.9;
   boat.position.y=groundH(28,-20)+1.62+Math.sin(time*1.2)*.06;
   boat.rotation.z=Math.sin(time*.9)*.05;
   crystalT-=dt;
   if(crystalT<=0){crystalT=.7;
-    const c=pick(crystalGlow);
+    const c=pick(crystalGlow);/* {position} */
     sparkleBurst(c.position.x,c.position.y,c.position.z,'#9adcff',2);}
-  for(const g of crystalGlow)g.material.opacity=.45+.25*Math.sin(time*2+g.position.x);
+  if(crystalGlowMat)crystalGlowMat.opacity=.45+.25*Math.sin(time*2);
   /* estrella fugaz */
   if(!shootStar.active){
     shootStar.next-=dt;
@@ -2934,6 +3010,7 @@ function update(dt){
   orbGlow.scale.x+=(1.4-orbGlow.scale.x)*Math.min(1,dt*8);
   orbGlow.scale.y=orbGlow.scale.x;
 
+  syncFrags();
   if(state==='menu'){
     camYaw+=dt*.1;
     camera.position.set(Math.sin(camYaw)*Math.cos(.42)*30,3+Math.sin(.42)*30+Math.sin(time*.6)*.8,Math.cos(camYaw)*Math.cos(.42)*30);
@@ -3033,13 +3110,11 @@ function update(dt){
 
   /* NPCs */
   nearNpc=null;
+  markT-=dt;
   for(let ni=0;ni<NPCS.length;ni++){
     const n=NPCS[ni];
-    /* marca de misión (¡! nueva · ¿? para entregar) */
-    const mk=npcMark(ni);
-    if(mk){n.mark.visible=true;if(n.mark.material!==markMats[mk])n.mark.material=markMats[mk];
-      n.mark.position.set(n.x,n.g.position.y+(n.fairy?2.4:n.small?2.1:2.75)+Math.sin(time*3+ni)*.1,n.z);}
-    else n.mark.visible=false;
+    /* marca de misión (¡! nueva · ¿? para entregar): el estado se recalcula a 10 Hz */
+    if(markT<=0)n.mk=npcMark(ni);
     if(dlgOpen&&dlgNpc===n){
       n.g.position.y=n.y+(n.fairy?Math.sin(time*2)*.15:0);
       continue;
@@ -3068,6 +3143,8 @@ function update(dt){
     const dpp=Math.hypot(n.x-px,n.z-pz);
     if(dpp<3.4&&(!nearNpc||dpp<Math.hypot(nearNpc.x-px,nearNpc.z-pz)))nearNpc=n;
   }
+  if(markT<=0)markT=.1;
+  syncMarks();
   /* Maia toca su laúd si estás cerca */
   const maia=NPCS[6];
   if(Math.hypot(maia.x-px,maia.z-pz)<9&&state==='play'){
@@ -3201,7 +3278,7 @@ function update(dt){
     scene.fog.color.copy(fogBase).lerp(fogGloom,gk*.8);
     scene.fog.near=QL.fogN*(1-.6*gk);scene.fog.far=QL.fogF*(1-.5*gk);
   }
-  if(mode==='explore'&&miniMQ.matches&&!journalOpen){mapT-=dt;if(mapT<=0){mapT=1/QL.mapHz;drawMap(miniCtx,150,true);}}
+  if(mode==='explore'&&QL.mapHz>0&&miniMQ.matches&&!journalOpen){mapT-=dt;if(mapT<=0){mapT=1/QL.mapHz;drawMap(miniCtx,150,true);}}
 
   /* cámara: sigue al jugador con un suavizado corto; en las peleas con jefes se aleja un poco y
      mira un poquito hacia el jefe. Sin temblor con prefers-reduced-motion. */
@@ -3334,7 +3411,7 @@ window.__valle={
     album:ALBUM.filter(a=>album[a[0]]).map(a=>a[0]),
     bosses:Object.fromEntries(Object.keys(bosses).map(t=>{const b=bosses[t];return [t,{state:b.state,hp:b.hp,max:b.max,phase:b.phase,act:b.act,x:b.x,z:b.z,mode:b.mode}];})),
     hazards:HZ.filter(h=>h.on).length,shots:PJ.filter(p=>p.on).length,
-    marks:NPCS.map(n=>n.mark.visible?(n.mark.material===markMats['?']?'?':'!'):''),
+    marks:NPCS.map(n=>n.mk),
     secrets:PICKS.filter(p=>p.quest==='secret'&&!p.taken).length,compass:compassG.visible,compassGold,bossOn,
     damageMult:DIFF.bossDmg,windUp:DIFF.wind,enemySpd:DIFF.spd,enemyHp:[DIFF.hpD,DIFF.hpO],
     dropN,e0:enemies.length?{hp:enemies[0].hp,speed:enemies[0].speed,ogre:enemies[0].ogre}:null,waveSize:pending.length+enemies.length}),
@@ -3347,6 +3424,26 @@ if(/[?&]e2e\b/.test(location.search)){
   window.__valle.fragPos=()=>frags.filter(f=>!f.taken).map(f=>[f.x,f.z]);
   /* MiniArcade 3.0: atajos de prueba (usan las funciones reales del juego) */
   window.__valle.god=on=>{god=!!on;};
+  /* diagnóstico de rendimiento: objetos dibujables visibles dentro del frustum, agrupados */
+  window.__valle.diag=()=>{
+    const fr=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+    const out={};
+    scene.traverseVisible(o=>{
+      if(!(o.isMesh||o.isSprite||o.isPoints))return;
+      if(o.frustumCulled&&!o.isSprite&&o.geometry&&!fr.intersectsObject(o))return;
+      if(o.isSprite&&!fr.intersectsSprite(o))return;
+      let k=o.isSprite?'sprite':o.isPoints?'points':o.isInstancedMesh?'instanced':'mesh';
+      let p=o.parent,depth=0;while(p&&p!==scene&&depth<6){if(p===playerG)k+=':player';if(p.userData&&p.userData.wings)k+=':winged';p=p.parent;depth++;}
+      if(o.parent===scene)k+=':root';
+      if(P3.some(q=>q.m===o))k='particle';
+      if(PICKS.some(q=>q.g===o.parent||q.g===o.parent?.parent))k='pick';
+      if(o===markPts['!'].pts||o===markPts['?'].pts)k='npcMark';
+      for(const t in bosses)if(o.parent&&(bosses[t].inner===o.parent||bosses[t].g===o.parent||bosses[t].arm===o.parent))k='boss:'+t;
+      if(petals.some(q=>q.m===o))k='petal';
+      out[k]=(out[k]||0)+1;
+    });
+    return out;
+  };
   window.__valle.setWave=n=>{wave=n;};
   window.__valle.npcPos=i=>[NPCS[i].x,NPCS[i].z];
   /* lleva al jugador al lado del habitante y abre la charla como la tecla E */
