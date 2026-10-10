@@ -17,6 +17,7 @@ const START = {
   academia_dragones: async p => { await p.keyboard.press('Enter'); },
   templo_ecos: async p => { await p.keyboard.press('Enter'); },
   guardianes_estelares: async p => { await p.keyboard.press('Enter'); },
+  granja_runas: async p => { await p.keyboard.press('Enter'); },
 };
 
 /** Cuenta callbacks de rAF por segundo para detectar loops duplicados. */

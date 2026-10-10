@@ -111,6 +111,13 @@ export const GAMES = [
     controls: { pc: 'WASD/mouse pilotear · Espacio/clic pulso · F/clic der. láser · Shift turbo · E escanear · Q objetivo', touch: 'Stick para pilotear · botones FUEGO, LÁSER, TURBO y SCAN', gamepad: 'Stick pilotear · A pulso · X láser · RB turbo · Y escanear · LB objetivo' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'granja_runas', thumb: 'games/thumbs/granja_runas.webp', file: 'granja_runas.html', title: 'GRANJA DE RUNAS', icon: '🌱', accent: '#86efac',
+    category: 'relajado', tags: ['Granja 3D', 'Sin combate'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Plantá, regá y cosechá, vendé en el pueblo, buscá semillas raras en el bosque y rescatá la cosecha en la Estación de Tormentas.',
+    controls: { pc: 'WASD mover · E usar · Q semilla · Z/X cámara · J diario · clic para ir y usar', touch: 'Joystick · USAR · 🌱 · ⟲ · 📖 · tocá objetos para ir y usarlos', gamepad: 'Stick mover · A usar · X semilla · LB/RB cámara · Y diario' },
+    score: 'high', scoreLabel: 'puntos de granja', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

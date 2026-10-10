@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3b2a">
+<title>Granja de Runas — MateLabs</title>
+<meta name="description" content="Granja de Runas: simulador acogedor en 3D. Plantá, regá y cosechá, comerciá en el mercado, buscá semillas raras en el bosque y rescatá la cosecha en la Estación de Tormentas.">
+<link rel="icon" type="image/png" href="matelabs/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"./vendor/three-0.186.1/build/three.module.js","three/addons/":"./vendor/three-0.186.1/addons/"}}</script>
+<script src="matelabs/arcade.js"></script>
+<script src="matelabs/missions.js"></script>
+<style>
+  :root{--acc:#86efac;--ink:#14261b;--plate:rgba(18,34,24,.82);--line:rgba(134,239,172,.35)}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#1f3b2a;color:#fff;font-family:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+    overscroll-behavior:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  .plate{background:var(--plate);border:1.5px solid var(--line);border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.28);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:30}
+  #hud[hidden]{display:none}
+  #stat{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));padding:8px 11px;width:min(250px,calc(100vw - 196px));min-width:190px;font-size:13px}
+  #stat .r1{display:flex;justify-content:space-between;gap:8px;font-weight:900;font-size:13px}
+  #stat .r1 b{color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #stat .r2{display:flex;gap:10px;margin-top:4px;font-weight:800;flex-wrap:wrap}
+  #hSeed{opacity:.92}
+  .ebar{position:relative;height:9px;margin-top:6px;border-radius:6px;background:rgba(0,0,0,.45);overflow:hidden}
+  .ebar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#f6d04d,#86efac);transition:width .3s}
+  .ebar i.low{background:linear-gradient(90deg,#ff6b6b,#ffa94d)}
+  #hEnTx{position:absolute;right:4px;top:-1px;font-size:8px;font-weight:900;line-height:11px;color:#0b1a10}
+  #quest{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 84px);left:max(8px,env(safe-area-inset-left));padding:7px 11px;width:min(250px,calc(100vw - 196px));min-width:190px;font-size:12px;line-height:1.3}
+  #quest[hidden]{display:none}
+  #quest .qk{font-size:9px;font-weight:900;letter-spacing:.2em;color:#ffe066}
+  #quest b{font-size:13px}
+  #quest .qs{opacity:.85;margin-top:2px}
+  .hbtn{position:absolute;pointer-events:auto;top:calc(max(6px,env(safe-area-inset-top)) + 44px);right:max(8px,env(safe-area-inset-right));width:42px;height:42px;border-radius:12px;
+    border:1.5px solid var(--line);background:var(--plate);color:#fff;font-size:20px;cursor:pointer;display:grid;place-items:center}
+  .hbtn:focus-visible,#bSeed:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  #bSeed{position:absolute;pointer-events:auto;left:max(12px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));padding:9px 14px;border-radius:999px;border:1.5px solid var(--line);
+    background:var(--plate);color:#fff;font:800 13px 'Nunito',system-ui,sans-serif;cursor:pointer}
+  #bSeed kbd{font:900 11px 'Nunito',system-ui;background:rgba(255,255,255,.15);padding:1px 6px;border-radius:6px;margin-left:6px}
+  #prompt{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);padding:9px 16px;border-radius:999px;background:rgba(10,22,14,.88);
+    border:1.5px solid var(--acc);font-weight:900;font-size:15px;white-space:nowrap;max-width:calc(100vw - 24px);overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+  #prompt[hidden]{display:none}
+  #prompt .key{background:var(--acc);color:var(--ink);border-radius:7px;padding:1px 8px;font-size:12px}
+  #prompt .hold{display:inline-block;width:60px;height:7px;border-radius:4px;background:rgba(255,255,255,.2);overflow:hidden}
+  #prompt .hold i{display:block;height:100%;background:#a5e3ff}
+  #stormHud{position:absolute;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);padding:8px 14px;width:min(380px,calc(100vw - 480px));min-width:250px;text-align:center;border-color:#ffb4a8}
+  #stormHud[hidden]{display:none}
+  #sTitle{font:400 14px 'Bungee',system-ui,sans-serif;color:#ffe066}
+  #sInfo{font-size:12px;font-weight:800;margin-top:2px}
+  .sbar{height:8px;margin-top:5px;border-radius:5px;background:rgba(0,0,0,.45);overflow:hidden}
+  .sbar i{display:block;height:100%;background:linear-gradient(90deg,#74c0fc,#86efac)}
+  .sbar i.low{background:linear-gradient(90deg,#ff6b6b,#ffa94d)}
+  #coach{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 84px);left:max(8px,env(safe-area-inset-left));width:min(340px,calc(100vw - 16px));padding:10px 12px;pointer-events:auto;
+    border-color:#ffe066;font-size:14px;font-weight:800;line-height:1.35}
+  #coach[hidden]{display:none}
+  #coach .ck{font-size:9px;letter-spacing:.22em;color:#ffe066;font-weight:900}
+  #coach button{margin-top:6px;appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:9px;padding:6px 10px;font:800 12px 'Nunito',system-ui;cursor:pointer}
+  .wm{position:absolute;right:10px;bottom:8px;font:400 10px 'Bungee',system-ui;letter-spacing:.12em;opacity:.55}
+  #pops{position:fixed;inset:0;pointer-events:none;z-index:29;overflow:hidden}
+  .gr-pop{position:absolute;left:0;top:0;font-weight:900;font-size:15px;text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 8px rgba(0,0,0,.4);white-space:nowrap;will-change:transform}
+  #banner{position:fixed;left:50%;top:26%;transform:translate(-50%,-10px);z-index:44;pointer-events:none;opacity:0;text-align:center;transition:opacity .3s,transform .3s;
+    font:400 clamp(22px,5vw,38px)/1.1 'Bungee',system-ui,sans-serif;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 24px rgba(134,239,172,.6);max-width:92vw}
+  #banner small{display:block;font:900 12px 'Nunito',system-ui;letter-spacing:.28em;color:#ffe066;margin-bottom:4px}
+  #banner.on{opacity:1;transform:translate(-50%,0)}
+  #fade{position:fixed;inset:0;z-index:49;background:#0b140e;opacity:0;pointer-events:none;transition:opacity .3s}
+  #fade.on{opacity:1}
+  #flash{position:fixed;inset:0;z-index:43;background:#fff;opacity:0;pointer-events:none}
+  #flash.on{animation:grFlash .35s ease-out}
+  @keyframes grFlash{0%{opacity:.55}100%{opacity:0}}
+  /* paneles */
+  #panel{position:fixed;inset:0;z-index:48;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(5,12,8,.55)}
+  #panel[hidden]{display:none}
+  .gr-card{width:min(470px,100%);max-height:min(86vh,100%);display:flex;flex-direction:column;background:linear-gradient(180deg,#1d3a27,#122418);border:1.5px solid var(--line);border-radius:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden}
+  .gr-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 6px}
+  .gr-head h2{margin:0;font:400 19px 'Bungee',system-ui,sans-serif;color:var(--acc)}
+  .gr-x{appearance:none;border:none;background:rgba(255,255,255,.1);color:#fff;border-radius:10px;width:36px;height:36px;font-size:16px;cursor:pointer}
+  .gr-intro{margin:0 14px 8px;font-size:13px;color:#cfe8d6;line-height:1.4}
+  .gr-rows{overflow:auto;padding:0 10px 10px;display:flex;flex-direction:column;gap:6px}
+  .gr-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.06)}
+  .gr-row.main{border:1px solid rgba(255,224,102,.45)}
+  .gr-row.done{opacity:.7}
+  .gr-ic{font-size:22px;width:28px;text-align:center;flex:none}
+  .gr-tx{flex:1;min-width:0;font-size:14px}
+  .gr-tx small{display:block;font-size:12px;color:#b9d8c2;font-weight:600;margin-top:1px}
+  .gr-row button{flex:none;appearance:none;border:none;border-radius:10px;padding:9px 12px;background:var(--acc);color:var(--ink);font:900 13px 'Nunito',system-ui;cursor:pointer;min-height:38px}
+  .gr-row button[disabled]{background:rgba(255,255,255,.12);color:rgba(255,255,255,.45);cursor:default}
+  .gr-row button:focus-visible,.gr-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .gr-foot{padding:8px 14px 12px;font-size:12px;color:#b9d8c2;border-top:1px solid rgba(255,255,255,.08)}
+  /* menú */
+  #grMenu .k3-panel h1,#grEnd .k3-panel h1{color:#f4fff7}
+  .k3-b.sm{padding:10px 14px;font-size:12px}
+  .gr-small{font-size:12px!important;color:#b9d8c2!important}
+  .gr-score{font-size:18px!important;color:#ffe066!important}
+  .gr-credit{margin-top:6px;font:400 12px 'Bungee',system-ui;letter-spacing:.14em;color:#cfe8d6}
+  #grDiffInfo{max-width:44ch;text-align:center}
+  /* táctil */
+  .k3-btn[aria-label="act"]{width:84px;height:84px;font-size:15px;background:rgba(60,140,90,.6);border-color:var(--acc)}
+  @media (pointer:coarse){
+    #bSeed,#bDiary,.wm{display:none}
+    #prompt{bottom:calc(max(28px,env(safe-area-inset-bottom)) + 182px);font-size:14px}
+    #stat{width:min(232px,calc(100vw - 186px));min-width:0}
+    #quest,#coach{width:min(232px,calc(100vw - 186px));min-width:0}
+    #stormHud{top:auto;bottom:calc(max(28px,env(safe-area-inset-bottom)) + 230px);width:calc(100vw - 24px);min-width:0}
+  }
+  @media (pointer:coarse) and (orientation:landscape){
+    #prompt{bottom:max(18px,env(safe-area-inset-bottom));max-width:calc(100vw - 420px)}
+    #stormHud{top:max(8px,env(safe-area-inset-top));bottom:auto;width:min(340px,calc(100vw - 480px))}
+    #quest{display:none}
+  }
+  @media (max-height:520px){#quest{top:calc(max(8px,env(safe-area-inset-top)) + 80px);font-size:11px}}
+  @media (prefers-reduced-motion:reduce){#banner,#fade,.ebar i{transition:none}}
+</style>
+</head>
+<body>
+<script src="matelabs/intro.js" data-game="GRANJA DE RUNAS" data-accent="#86efac"></script>
+<div id="hud" hidden>
+  <div id="stat" class="plate" aria-live="off">
+    <div class="r1"><b id="hDay">Día 1</b><span id="hClock">06:00</span></div>
+    <div class="r2"><span id="hCoins">🪙 0</span><span id="hWater">💧 0/4</span><span id="hSeed"></span></div>
+    <div class="ebar" aria-label="Energía"><i id="hEnergy"></i><span id="hEnTx"></span></div>
+  </div>
+  <div id="quest" class="plate"></div>
+  <button id="bDiary" class="hbtn" type="button" aria-label="Diario y misiones (J)" title="Diario (J)">📖</button>
+  <button id="bSeed" type="button" aria-label="Cambiar semilla">🌱 Semilla <kbd>Q</kbd></button>
+  <div id="prompt" hidden></div>
+  <div id="stormHud" class="plate" hidden role="status"><div id="sTitle"></div><div id="sInfo"></div><div class="sbar"><i id="sBar"></i></div></div>
+  <div id="coach" class="plate" hidden><div class="ck">TUTORIAL</div><div id="coachTx"></div><button id="coachSkip" type="button">Saltar tutorial</button></div>
+  <div class="wm">CREADO POR MATELABS</div>
+</div>
+<div id="pops"></div>
+<div id="panel" hidden></div>
+<div id="banner" role="status" aria-live="polite"></div>
+<div id="flash"></div>
+<div id="fade"></div>
+<script type="module" src="games/granja_runas/main.js"></script>
+</body>
+</html>
