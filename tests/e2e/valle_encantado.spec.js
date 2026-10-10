@@ -370,3 +370,372 @@ test.describe('El Valle Encantado — personaje Mati Octo', () => {
     expectNoErrors(errors.filter(e => !/ERR_FAILED|Failed to load resource/.test(e)));
   });
 });
+
+// ---------- MiniArcade 3.0: misiones, dificultad, calidad, diario, guardianes y Rey ----------
+const ms = page => page.evaluate(() => window.MLMissions.state());
+const poll = (page, fn, timeout = 45_000, arg = undefined) => expect.poll(() => page.evaluate(fn, arg), { timeout, intervals: [100, 250, 500] });
+/** Perfil inicial: misiones con N partidas previas (fija qué secundarias tocan) y dificultad. */
+const profile = (page, { runs = 0, diff = null } = {}) => page.addInitScript(([runs, diff]) => {
+  try {
+    if (sessionStorage.getItem('va3-once')) return;
+    sessionStorage.setItem('va3-once', '1');
+    localStorage.setItem('ml:missions', JSON.stringify({ valle_encantado: { done: {}, runs } }));
+    if (diff) localStorage.setItem('ml:difficulty', JSON.stringify({ valle_encantado: diff }));
+  } catch (e) {}
+}, [runs, diff]);
+async function startExplore(page) {
+  await page.locator('#modeExplore').click();
+  await until(page, () => window.__valle.snap().state === 'play');
+}
+/** Entra a la arena de un guardián y espera a que empiece la pelea. */
+async function enterArena(page, type) {
+  const z = { ogro: [-40, 36], golem: [-44, -30], brujo: [58, 44], rey: [72, -72] }[type];
+  await page.evaluate(([x, z]) => window.__valle.goto(x + 3, z + 3), z);
+  await poll(page, t => window.__valle.snap().bosses[t].state, 60_000, type).toBe('fight');
+}
+async function killBoss(page, type) {
+  // golpes reales del juego (damageBoss) hasta vaciar la vida; el Rey es inmune un instante al cambiar de fase
+  await poll(page, t => { const v = window.__valle; const b = v.snap().bosses[t]; if (b.state === 'fight') v.dmgBoss(t, 4); return v.snap().bosses[t].state; }, 90_000, type).toBe('dead');
+}
+
+test.describe('El Valle Encantado — MiniArcade 3.0', () => {
+  test('misiones: secundarias y principal cumplidas jugando, persisten al recargar', async ({ page }) => {
+    test.setTimeout(150_000);
+    await profile(page, { runs: 4 }); // rotación → secundarias "Buen vecino" y "Ojo de explorador"
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await startExplore(page);
+    const st = await ms(page);
+    expect(st.current.map(m => m.id)).toEqual(['p_guardian', 's_charla', 's_secreto']);
+    await expect(page.locator('.mlm-hud')).toBeVisible();
+    // tesoro escondido: se recoge caminando hasta él (lógica real de recolección)
+    await page.evaluate(() => window.__valle.goto(17.5, -10.5));
+    await poll(page, () => window.MLMissions.state().current.find(m => m.id === 's_secreto').status).toBe('done');
+    expect((await snap(page)).album).toContain('t_espejo');
+    // hablar con 4 habitantes distintos
+    for (const i of [0, 1, 2, 3]) {
+      await page.evaluate(i => { window.__valle.talkTo(i); window.__valle.finishDlg(); }, i);
+    }
+    await poll(page, () => window.MLMissions.state().current.find(m => m.id === 's_charla').status).toBe('done');
+    // principal: vencer a un guardián (Ogro Jefe)
+    await page.evaluate(() => window.__valle.god(true));
+    await enterArena(page, 'ogro');
+    await killBoss(page, 'ogro');
+    await poll(page, () => window.MLMissions.state().current.find(m => m.id === 'p_guardian').status).toBe('done');
+    // persistencia: logros y álbum siguen tras recargar
+    await page.reload();
+    await ready(page);
+    const after = await ms(page);
+    expect(Object.keys(after.achievements.done)).toEqual(expect.arrayContaining(['p_guardian', 's_charla', 's_secreto']));
+    const alb = await page.evaluate(() => JSON.parse(localStorage.getItem('valle_album')).items);
+    expect(alb).toMatchObject({ t_espejo: 1, g_ogro: 1 });
+    await expect(page.locator('#menuAlbum')).toContainText('ÁLBUM');
+    expectNoErrors(errors);
+  });
+
+  test('misiones: "Sin un rasguño" falla al recibir daño; Reiniciar abre otra partida', async ({ page }) => {
+    await profile(page, { runs: 2 }); // → "Sin un rasguño" y "Luz que cura"
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await page.locator('#modeMission').click();
+    await until(page, () => window.__valle.snap().state === 'play');
+    expect((await ms(page)).current.map(m => m.id)).toEqual(['p_guardian', 's_limpio', 's_curas']);
+    await page.evaluate(() => window.__valle.hurt(1));
+    await poll(page, () => window.MLMissions.state().current.find(m => m.id === 's_limpio').status).toBe('failed');
+    await expect(page.locator('.mlm-hud .mlm-m.failed')).toHaveCount(1);
+    // reiniciar desde la pausa: runEnd + runStart (la partida nueva vuelve a empezar las misiones)
+    await page.keyboard.press('Escape');
+    await page.locator('.mla-pause [data-a="restart"]').click();
+    await until(page, () => window.__valle.snap().state === 'play' && !window.__valle.snap().paused);
+    const s = await ms(page);
+    expect(s.running).toBe(true);
+    expect(s.current.every(m => m.status === 'active')).toBe(true);
+    expect(s.achievements.runs).toBe(4);
+    expectNoErrors(errors);
+  });
+
+  test('dificultad: selector con teclado/tap, persiste y cambia parámetros reales', async ({ page, isMobile }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    const radios = page.locator('#diffPick [role="radio"]');
+    await expect(radios).toHaveCount(4);
+    await expect(page.locator('#diffPick [data-d="normal"]')).toHaveAttribute('aria-checked', 'true');
+    if (isMobile) {
+      await page.locator('#diffPick [data-d="dificil"]').scrollIntoViewIfNeeded();
+      await page.locator('#diffPick [data-d="dificil"]').tap();
+    } else {
+      await page.locator('#diffPick [data-d="normal"]').focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(page.locator('#diffPick [data-d="dificil"]')).toBeFocused();
+    }
+    await expect(page.locator('#diffPick [data-d="dificil"]')).toHaveAttribute('aria-checked', 'true');
+    expect((await snap(page)).state).toBe('menu'); // la flecha no llega al juego
+    await page.reload();
+    await ready(page);
+    await expect(page.locator('#diffPick [data-d="dificil"]')).toHaveAttribute('aria-checked', 'true');
+    await page.locator('#modeMission').click();
+    await until(page, () => window.__valle.snap().state === 'play');
+    await page.evaluate(() => window.__valle.skipWait());
+    await until(page, () => window.__valle.snap().e0 !== null);
+    const s = await snap(page);
+    expect(s.difficulty).toBe('dificil');
+    expect(s.enemyHp).toEqual([3, 14]);
+    expect(s.e0.hp).toBe(3);          // Normal: 2
+    expect(s.windUp).toBe(0.4);        // Normal: 0,45 s de aviso
+    expect(s.waveSize).toBe(5);        // oleada 1 en Normal: 4 diablillos
+    expectNoErrors(errors);
+  });
+
+  test('calidad: baja/media/alta cambian costos reales (pixel ratio, sombras, pasto, partículas, niebla)', async ({ page }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    const set = q => page.evaluate(q => window.MLArcade.settings.set('quality', q), q);
+    await set('low');
+    await poll(page, () => window.__valle.snap().quality).toBe('low');
+    let s = await snap(page);
+    expect([s.grass, s.pCap, s.shadows, s.fogFar, s.camFar]).toEqual([0, 40, false, 150, 420]);
+    expect(s.pixelRatio).toBeLessThanOrEqual(1);
+    await set('high');
+    await poll(page, () => window.__valle.snap().quality).toBe('high');
+    s = await snap(page);
+    expect([s.grass, s.pCap, s.shadows, s.flowers]).toEqual([1600, 150, true, 320]);
+    await set('medium');
+    await poll(page, () => window.__valle.snap().quality).toBe('medium');
+    s = await snap(page);
+    expect([s.grass, s.pCap, s.shadows]).toEqual([700, 120, false]);
+    // el botón del menú de pausa también avisa al juego
+    await startExplore(page);
+    const n = (await snap(page)).qualChanges;
+    await page.keyboard.press('Escape');
+    await page.locator('.mla-pause [data-a="quality"]').click();
+    await poll(page, k => window.__valle.snap().qualChanges > k ? 'ok' : 'no', 45_000, n).toBe('ok');
+    await page.keyboard.press('Escape');
+    // con 'low' el tope de partículas (40) se respeta en juego
+    await set('low');
+    await page.evaluate(() => window.__valle.goto(0, 4));
+    for (let i = 0; i < 6; i++) { await page.keyboard.press('Space'); await wait(page, 120); }
+    expect((await snap(page)).particles).toBeLessThanOrEqual(40);
+    expectNoErrors(errors);
+  });
+
+  test('diario: Q/📜 abre misiones, mapa y álbum; congela el juego; elegir una misión la sigue', async ({ page, isMobile }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await startExplore(page);
+    await page.evaluate(() => { window.__valle.talkTo(1); window.__valle.finishDlg(); });
+    await poll(page, () => window.__valle.snap().quests.lirios.st).toBe('active');
+    if (isMobile) await page.locator('#journalBtn').tap(); else await page.keyboard.press('KeyQ');
+    await expect(page.locator('#journal')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#jQuests [data-q]')).toHaveCount(9);
+    const a = await snap(page);
+    expect(a.journalOpen).toBe(true);
+    await wait(page, 700);
+    expect((await snap(page)).playTime).toBe(a.playTime);
+    await page.locator('#jQuests [data-q="lirios"]').click();
+    await expect(page.locator('#jQuests [data-q="lirios"]')).toHaveClass(/tracked/);
+    expect((await snap(page)).tracked).toBe('lirios');
+    if (isMobile) await page.locator('#jClose').tap(); else await page.keyboard.press('KeyQ');
+    await expect(page.locator('#journal')).toHaveClass(/hidden/);
+    await until(page, t => window.__valle.snap().playTime > t, a.playTime);
+    await expect(page.locator('#exploreHint')).toContainText('Lirios de luna');
+    // la brújula apunta (celeste) al lirio más cercano
+    await poll(page, () => { const s = window.__valle.snap(); return s.compass && !s.compassGold; }).toBe(true);
+    expectNoErrors(errors);
+  });
+
+  test('las 7 misiones de los habitantes se pueden completar (sin bloqueos) y dan su recompensa', async ({ page }) => {
+    test.setTimeout(240_000);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    // alcanzabilidad: todos los objetivos quedan al alcance con la colisión real
+    const reach = await page.evaluate(() => window.__valle.reach());
+    const bad = reach.filter(o => !o.id.startsWith('zone') && o.d > o.r - 0.2);
+    expect(bad, JSON.stringify(bad)).toEqual([]);
+    await startExplore(page);
+    await page.evaluate(() => window.__valle.god(true));
+    const quests = [['lirios', 1], ['lena', 2], ['pelota', 3], ['harina', 5], ['notas', 6], ['corderos', 7]];
+    for (const [id, npc] of quests) {
+      await page.evaluate(i => { window.__valle.talkTo(i); window.__valle.finishDlg(); }, npc);
+      await poll(page, id => window.__valle.snap().quests[id].st, 20_000, id).toBe('active').catch(() => {});
+      expect((await snap(page)).quests[id].st, id).toBe('active');
+      const pts = await page.evaluate(id => window.__valle.pickPos(id), id);
+      expect(pts.length).toBeGreaterThan(0);
+      for (const [x, z] of pts) {
+        const n0 = (await snap(page)).quests[id].n;
+        await page.evaluate(([x, z]) => window.__valle.goto(x + 0.4, z + 0.4), [x, z]);
+        await poll(page, ([id, n0]) => window.__valle.snap().quests[id].n > n0 || window.__valle.snap().quests[id].st === 'ready', 40_000, [id, n0]).toBe(true).catch(() => {});
+        expect(await page.evaluate(([id, n0]) => window.__valle.snap().quests[id].n > n0, [id, n0]), `${id} ${x},${z}`).toBe(true);
+      }
+      await poll(page, id => window.__valle.snap().quests[id].st, 20_000).toBe('ready').catch(() => {});
+      expect((await snap(page)).quests[id].st, id).toBe('ready');
+      // las marcas se recalculan a 10 Hz
+      await poll(page, i => window.__valle.snap().marks[i], 20_000, npc).toBe('?');
+      await page.evaluate(i => { window.__valle.talkTo(i); window.__valle.finishDlg(); }, npc);
+      expect((await snap(page)).quests[id].st, id).toBe('done');
+    }
+    // carrera de Centella: primero se deja apagar (falla → se puede reintentar) y después se gana
+    await page.evaluate(() => { window.__valle.talkTo(4); window.__valle.finishDlg(); });
+    await poll(page, () => window.__valle.snap().raceOn).toBe(true);
+    await page.evaluate(() => window.__valle.skipRace());
+    await poll(page, () => { const s = window.__valle.snap(); return [s.raceOn, s.quests.carrera.st, s.quests.carrera.failed]; }).toEqual([false, 'new', true]);
+    await poll(page, () => window.__valle.snap().marks[4]).toBe('!');
+    await page.evaluate(() => { window.__valle.talkTo(4); window.__valle.finishDlg(); });
+    await poll(page, () => window.__valle.snap().raceOn).toBe(true);
+    const rings = await page.evaluate(() => window.__valle.pickPos('carrera'));
+    expect(rings.length).toBe(6);
+    for (let i = 0; i < rings.length; i++) {
+      await page.evaluate(([x, z]) => window.__valle.goto(x, z + 0.3), rings[i]);
+      await poll(page, i => window.__valle.snap().raceIdx > i || window.__valle.snap().quests.carrera.st === 'ready', 30_000, i).toBe(true).catch(() => {});
+    }
+    await poll(page, () => window.__valle.snap().quests.carrera.st).toBe('ready');
+    await page.evaluate(() => { window.__valle.talkTo(4); window.__valle.finishDlg(); });
+    const s = await snap(page);
+    expect(s.quests.carrera.st).toBe('done');
+    // recompensas reales
+    expect(s.playerPower).toBe(1);        // bastón de roble: +1 contra guardianes
+    expect(s.invulBonus).toBeGreaterThan(0); // pluma de hada
+    expect(s.album).toEqual(expect.arrayContaining(['lirio', 'roble', 'corona_flores', 'pluma', 'rosca', 'melodia', 'lana']));
+    // las marcas se actualizan en el cuadro siguiente
+    await poll(page, () => window.__valle.snap().marks.slice(1)).toEqual(['', '', '', '', '', '', '']);
+    expectNoErrors(errors);
+  });
+
+  test('guardianes: aparecen, atacan con aviso, se curan si te alejás y al caer rompen su sello', async ({ page }) => {
+    test.setTimeout(240_000);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await startExplore(page);
+    await page.evaluate(() => window.__valle.god(true));
+    let s = await snap(page);
+    expect(Object.values(s.bosses).map(b => b.state)).toEqual(['idle', 'idle', 'idle', 'idle']);
+    expect(s.barrier).toBeGreaterThan(10);
+    for (const t of ['ogro', 'golem', 'brujo']) {
+      await enterArena(page, t);
+      await expect(page.locator('#bossBar')).toBeVisible();
+      // se comporta: lanza un ataque telegrafiado (aro/línea en el suelo o proyectiles)
+      await page.evaluate(t => window.__valle.bossTick(t), t);
+      await poll(page, t => { const s = window.__valle.snap(); return !!(s.bosses[t].act || s.hazards || s.shots); }, 45_000, t).toBe(true);
+      if (t === 'golem') {
+        // correa: si te alejás, se cura y vuelve a esperar
+        await page.evaluate(() => window.__valle.dmgBoss('golem', 3));
+        expect((await snap(page)).bosses.golem.hp).toBeLessThan((await snap(page)).bosses.golem.max);
+        await page.evaluate(() => window.__valle.goto(0, 9));
+        await poll(page, () => { const b = window.__valle.snap().bosses.golem; return b.state === 'idle' && b.hp === b.max; }).toBe(true);
+        await enterArena(page, t);
+      }
+      const d0 = (await snap(page)).dropN;
+      await killBoss(page, t);
+      s = await snap(page);
+      expect(s.dropN).toBeGreaterThanOrEqual(d0 + 3);  // recompensa: 3 destellos curativos
+      expect(s.album).toContain({ ogro: 'g_ogro', golem: 'g_golem', brujo: 'g_brujo' }[t]);
+      await page.evaluate(() => window.__valle.goto(0, 9));
+    }
+    s = await snap(page);
+    expect(s.seals).toBe(3);
+    expect(s.barrier).toBe(0);
+    expectNoErrors(errors);
+  });
+
+  test('Rey Sombrío: la barrera bloquea hasta romper los sellos; 3 fases; entregar la misión a Alba', async ({ page }) => {
+    test.setTimeout(240_000);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await startExplore(page);
+    await page.evaluate(() => { window.__valle.god(true); window.__valle.talkTo(0); window.__valle.finishDlg(); });
+    expect((await snap(page)).quests.sombras.st).toBe('active');
+    // barrera: caminando hacia el centro desde la entrada, el jugador queda afuera
+    await page.evaluate(() => { window.__valle.goto(55, -55); window.__valle.walkTo(72, -72); });
+    await poll(page, () => { const s = window.__valle.snap(); return Math.hypot(s.px - 72, s.pz + 72) < 14.2; }, 60_000).toBe(true);
+    await wait(page, 800);
+    let s = await snap(page);
+    expect(Math.hypot(s.px - 72, s.pz + 72)).toBeGreaterThan(13);
+    expect(s.bosses.rey.state).toBe('idle');
+    await page.evaluate(() => window.__valle.stopWalk());
+    for (const t of ['ogro', 'golem', 'brujo']) { await enterArena(page, t); await killBoss(page, t); }
+    expect((await snap(page)).barrier).toBe(0);
+    // ahora se puede entrar caminando y el Rey despierta
+    await page.evaluate(() => { window.__valle.goto(55, -55); window.__valle.walkTo(70, -70); });
+    await poll(page, () => window.__valle.snap().bosses.rey.state, 60_000).toBe('fight');
+    await page.evaluate(() => window.__valle.stopWalk());
+    await expect(page.locator('#bossPh')).toHaveText('FASE 1 / 3');
+    const max = (await snap(page)).bosses.rey.max;
+    // fase 2 y 3 (inmune un instante en cada cambio)
+    await poll(page, m => { const v = window.__valle; if (v.snap().bosses.rey.phase < 2) v.dmgBoss('rey', 2); return v.snap().bosses.rey.phase; }, 60_000, max).toBe(2);
+    await expect(page.locator('#bossPh')).toHaveText('FASE 2 / 3');
+    await poll(page, () => { const v = window.__valle; if (v.snap().bosses.rey.phase < 3) v.dmgBoss('rey', 2); return v.snap().bosses.rey.phase; }, 60_000).toBe(3);
+    await killBoss(page, 'rey');
+    await poll(page, () => window.__valle.snap().quests.sombras.st).toBe('ready');
+    await poll(page, () => window.__valle.snap().marks[0]).toBe('?');
+    expect((await snap(page)).album).toContain('rey');
+    await page.evaluate(() => { window.__valle.talkTo(0); window.__valle.finishDlg(); });
+    expect((await snap(page)).quests.sombras.st).toBe('done');
+    expectNoErrors(errors);
+  });
+
+  test('Proteger: cada 5 oleadas llega un jefe; al vencerlo da recompensas', async ({ page }) => {
+    test.setTimeout(150_000);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await page.locator('#modeMission').click();
+    await until(page, () => window.__valle.snap().state === 'play');
+    await page.evaluate(() => { window.__valle.god(true); window.__valle.setWave(4); window.__valle.skipWait(); });
+    await until(page, () => window.__valle.snap().wave === 5);
+    await poll(page, () => { const b = window.__valle.snap().bosses.ogro; return b && b.mode === 'mission' && b.state === 'fight'; }, 60_000).toBe(true);
+    await expect(page.locator('#foeInfo')).toContainText('JEFE');
+    await expect(page.locator('#bossBar')).toBeVisible();
+    const hp0 = (await snap(page)).heartHP, d0 = (await snap(page)).dropN;
+    await killBoss(page, 'ogro');
+    const s = await snap(page);
+    expect(s.dropN).toBeGreaterThanOrEqual(d0 + 2);
+    expect(s.heartHP).toBeGreaterThanOrEqual(Math.min(100, hp0));
+    await expect(page.locator('#bossBar')).toBeHidden();
+    expectNoErrors(errors);
+  });
+
+  test('Explorar: desmayarse no borra la aventura ("Levantarse" sigue con el progreso)', async ({ page, isMobile }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await startExplore(page);
+    await page.evaluate(() => { window.__valle.talkTo(3); window.__valle.finishDlg(); });
+    const [x, z] = await page.evaluate(() => window.__valle.fragPos()[0]);
+    await page.evaluate(([x, z]) => window.__valle.goto(x + 0.5, z + 0.5), [x, z]);
+    await until(page, () => window.__valle.snap().fragsFound === 1);
+    await page.evaluate(() => window.__valle.hurt(5));
+    await until(page, () => window.__valle.snap().state === 'over', undefined, 60_000);
+    await expect(page.locator('#overKicker')).toHaveText('TE DESMAYASTE');
+    await expect(page.locator('#keepBtn')).toHaveText('✨ LEVANTARSE');
+    await press(page, '#keepBtn', isMobile);
+    await until(page, () => window.__valle.snap().state === 'play');
+    const s = await snap(page);
+    expect([s.hearts, s.fragsFound, s.quests.pelota.st]).toEqual([5, 1, 'active']);
+    expectNoErrors(errors);
+  });
+
+  test('HUD nuevo sin solaparse en celular vertical y apaisado', async ({ page }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    const overlap = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    for (const vp of [{ width: 412, height: 915 }, { width: 915, height: 412 }, { width: 1280, height: 800 }]) {
+      await page.setViewportSize(vp);
+      await page.locator('#diffPick [data-d="extremo"]').scrollIntoViewIfNeeded();
+      await expect(page.locator('#diffPick [data-d="extremo"]')).toBeInViewport();
+    }
+    await page.setViewportSize({ width: 412, height: 915 });
+    await page.locator('#modeExplore').scrollIntoViewIfNeeded();
+    await page.locator('#modeExplore').click();
+    await until(page, () => window.__valle.snap().state === 'play');
+    await page.evaluate(() => { window.__valle.god(true); window.__valle.talkTo(0); window.__valle.finishDlg(); });
+    await enterArena(page, 'ogro');
+    for (const vp of [{ width: 412, height: 915 }, { width: 915, height: 412 }]) {
+      await page.setViewportSize(vp);
+      await wait(page, 400);
+      const ids = ['hearts', 'journalBtn', 'fragWrap', 'bossBar'];
+      const boxes = await page.evaluate(ids => ids.map(id => document.getElementById(id).getBoundingClientRect().toJSON())
+        .concat([document.querySelector('.mla-bar').getBoundingClientRect().toJSON(), document.querySelector('.mlm-hud').getBoundingClientRect().toJSON()]), ids);
+      const names = ids.concat(['mla-bar', 'mlm-hud']);
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlap(boxes[i], boxes[j]), `${vp.width}: ${names[i]} / ${names[j]}`).toBe(false);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    expectNoErrors(errors);
+  });
+});

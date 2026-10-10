@@ -49,7 +49,29 @@
   canvas#particles{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.6;width:100%;height:100%}
 
   /* Header */
-  header{text-align:center;padding:clamp(36px,7vh,72px) 16px 8px}
+  header{padding:clamp(28px,6vh,64px) 16px 8px}
+  .hero{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(16px,4vw,48px);align-items:center}
+  .hero-copy{text-align:left}
+  .hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+  .cta{display:inline-flex;align-items:center;gap:10px;padding:15px 22px;border-radius:14px;font-family:'Bungee',sans-serif;font-size:15px;letter-spacing:.04em;text-decoration:none;cursor:pointer;border:none;transition:transform .15s,box-shadow .15s}
+  .cta.main{background:linear-gradient(135deg,#2ee6e6,#7ff3c8);color:var(--brand-ink);box-shadow:0 10px 30px rgba(46,230,230,.3)}
+  .cta.main:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(46,230,230,.45)}
+  .cta.alt{background:rgba(255,255,255,.06);color:#fff;border:1px solid var(--line2)}
+  .cta.alt:hover{background:rgba(255,255,255,.12)}
+  .cta small{display:block;font-family:'Space Grotesk',system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.04em;opacity:.75;text-transform:none}
+  .hero-art{position:relative;aspect-ratio:1;max-width:420px;width:100%;justify-self:center}
+  .hero-art .halo{position:absolute;inset:6%;border-radius:50%;background:radial-gradient(closest-side,rgba(46,230,230,.35),rgba(46,230,230,.06) 60%,transparent 72%);animation:haloPulse 3.6s ease-in-out infinite}
+  .hero-art .ring{position:absolute;inset:3%;border-radius:50%;border:1px dashed rgba(46,230,230,.25);animation:spin 40s linear infinite}
+  .hero-art img.mascot{position:absolute;inset:18%;width:64%;height:64%;border-radius:50%;box-shadow:0 0 0 2px rgba(46,230,230,.35),0 30px 60px rgba(0,0,0,.6),0 0 60px rgba(46,230,230,.25);animation:brandFloat 4s ease-in-out infinite}
+  .orbit{position:absolute;inset:0;animation:spin 48s linear infinite}
+  .orbit a{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px;border-radius:16px;display:grid;place-items:center;font-size:26px;text-decoration:none;
+    background:rgba(16,16,28,.85);border:1px solid var(--line2);box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 18px var(--glow-soft);
+    transform:rotate(var(--a)) translate(min(190px,42vw)) rotate(calc(-1 * var(--a)));transition:box-shadow .2s}
+  .orbit a span{display:block;animation:spin 48s linear infinite reverse}
+  .orbit a:hover,.orbit a:focus-visible{box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 26px var(--glow)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes haloPulse{50%{opacity:.6;transform:scale(1.06)}}
+  @media (max-width:820px){.hero{grid-template-columns:1fr}.hero-copy{text-align:center}.hero-cta{justify-content:center}.hero-art{max-width:300px;order:-1}.orbit a{width:44px;height:44px;margin:-22px;font-size:21px;transform:rotate(var(--a)) translate(min(138px,36vw)) rotate(calc(-1 * var(--a)))}}
   .brand{display:inline-flex;align-items:center;gap:12px;margin-bottom:20px;padding:6px 18px 6px 6px;border-radius:999px;
     background:rgba(46,230,230,.06);border:1px solid rgba(46,230,230,.22);color:#dffcfc;box-shadow:0 0 30px rgba(46,230,230,.12);backdrop-filter:blur(10px)}
   .brand img{width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(46,230,230,.5),0 0 18px rgba(46,230,230,.45);animation:brandFloat 3s ease-in-out infinite}
@@ -58,11 +80,28 @@
   .brand small{display:block;font-size:10px;letter-spacing:.28em;color:#7fa9ad;font-weight:700;text-align:left}
   @keyframes brandFloat{50%{transform:translateY(-3px) rotate(-3deg)}}
   h1{font-family:'Bungee',sans-serif;font-weight:400;font-size:clamp(42px,10vw,90px);line-height:.95;letter-spacing:-.02em;background:linear-gradient(180deg,#fff 30%,#8b8b9a 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  .subtitle{font-size:clamp(16px,2.5vw,20px);color:var(--muted);margin:14px auto 0;max-width:540px;line-height:1.5;font-weight:500}
+  .subtitle{font-size:clamp(16px,2.5vw,20px);color:var(--muted);margin:14px 0 0;max-width:540px;line-height:1.5;font-weight:500}
+  @media (max-width:820px){.subtitle{margin-left:auto;margin-right:auto}}
+  .picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-bottom:28px}
+  .pick{position:relative;display:flex;gap:14px;align-items:center;padding:14px;border-radius:16px;text-decoration:none;
+    background:linear-gradient(135deg,var(--accent-bg),rgba(255,255,255,.02));border:1px solid var(--line);transition:transform .2s,border-color .2s}
+  .pick:hover{transform:translateY(-3px);border-color:var(--glow)}
+  .pick .icon-wrap{width:52px;height:52px;font-size:26px;flex:0 0 auto}
+  .pick b{font-family:'Bungee',sans-serif;font-weight:400;font-size:15px;display:block}
+  .pick small{color:var(--muted);font-size:12px;line-height:1.4;display:block;margin-top:2px}
+  .pick em{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--accent-text)}
+  .thumb{position:relative;margin:-26px -22px 0;aspect-ratio:16/9;overflow:hidden;border-radius:20px 20px 0 0;background:#0e0e18;border-bottom:1px solid var(--line)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s}
+  .card:hover .thumb img{transform:scale(1.05)}
+  .card.has-thumb .card-top{margin-top:-46px;align-items:flex-end;position:relative}
+  .card.has-thumb .card-top .icon-wrap{background:#16161f;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  .ach{color:#ffd93d}
 
   /* Panel de estadísticas */
   .me{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:22px auto 0;max-width:720px}
   .me[hidden]{display:none}
+  .hero-copy .me{justify-content:flex-start;margin-left:0}
+  @media (max-width:820px){.hero-copy .me{justify-content:center;margin-left:auto}}
   .me div{min-width:120px;padding:10px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);text-align:center}
   .me b{display:block;font-family:'Bungee',sans-serif;font-weight:400;font-size:20px}
   .me span{font-size:10px;letter-spacing:.2em;color:var(--dim);font-weight:700}
@@ -131,7 +170,7 @@
   .d-body h3{font-size:11px;letter-spacing:.24em;color:var(--dim);font-weight:700;margin-bottom:8px}
   .ctrl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;color:#dadae4}
   .ctrl dt{color:var(--dim);font-weight:700}
-  .d-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .d-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   .d-stats div{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
   .d-stats b{display:block;font-family:'Bungee',sans-serif;font-weight:400;font-size:18px}
   .d-stats span{font-size:10px;letter-spacing:.16em;color:var(--dim);font-weight:700}
@@ -146,6 +185,7 @@
   footer .made b{color:var(--brand);font-weight:700}
 
   @media (max-width:640px){
+    .d-stats{grid-template-columns:repeat(2,1fr)}
     .grid{grid-template-columns:1fr;gap:16px}
     .card{padding:20px 16px 16px}
     .tools{flex-direction:column;align-items:stretch}
@@ -167,13 +207,26 @@
 <canvas id="particles" aria-hidden="true"></canvas>
 
 <header>
-  <div class="brand">
-    <img src="matelabs/mascota-128.webp" alt="Mascota de MateLabs" width="44" height="44">
-    <div><small>UNA COLECCIÓN DE</small><b>MATE<span>LABS</span></b></div>
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="brand">
+        <img src="matelabs/mascota-128.webp" alt="" width="44" height="44">
+        <div><small>UNA COLECCIÓN DE</small><b>MATE<span>LABS</span></b></div>
+      </div>
+      <h1>Mini Arcade</h1>
+      <p class="subtitle">Ocho mundos listos para jugar: reflejos, plataformas, hordas, carreras y aventuras en 3D. Sin instalación, en PC y celular.</p>
+      <div class="hero-cta">
+        <a class="cta main" id="playNow" href="clavado.html">▶ JUGAR AHORA<small id="playNowSub">¡CLAVADO!</small></a>
+        <a class="cta alt" href="#catalogo">Ver los 8 juegos</a>
+      </div>
+      <div class="me" id="me" aria-label="Tus estadísticas" hidden></div>
+    </div>
+    <div class="hero-art" aria-hidden="false">
+      <div class="halo" aria-hidden="true"></div><div class="ring" aria-hidden="true"></div>
+      <img class="mascot" src="matelabs/mascota.webp" alt="Mascota de MateLabs: un pulpo robot con un mate" width="270" height="270">
+      <nav class="orbit" id="orbit" aria-label="Acceso rápido a los juegos"></nav>
+    </div>
   </div>
-  <h1>Mini Arcade</h1>
-  <p class="subtitle">Ocho mundos listos para jugar. Sin instalación. En cualquier dispositivo.</p>
-  <div class="me" id="me" aria-label="Tus estadísticas" hidden></div>
 </header>
 
 <main class="container" id="catalogo">
@@ -193,6 +246,11 @@
     </label>
   </div>
   <div class="chips" id="chips" role="group" aria-label="Categorías"></div>
+
+  <section id="picksSec" aria-labelledby="picksTitle">
+    <h2 class="row" id="picksTitle">Selección del equipo</h2>
+    <div class="picks" id="picks"></div>
+  </section>
 
   <section id="continueSec" hidden aria-labelledby="contTitle">
     <h2 class="row" id="contTitle">Seguir jugando</h2>

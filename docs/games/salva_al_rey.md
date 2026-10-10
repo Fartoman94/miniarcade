@@ -147,3 +147,105 @@ Con Mati hay ~13 llamadas de dibujo menos (una malla por pose + la espada contra
 - `characters.js` crea el material con `flatShading`, que `MeshLambertMaterial` de r128 no tiene: avisa por consola (warning, no error) y el sombreado plano no se aplica. El juego ya tenía muchos avisos iguales propios.
 - Los tentáculos pueden asomar dentro de muros al pegarse (ver collider).
 - Repetir la medición de tiempo por cuadro con la máquina libre.
+
+## MiniArcade 3.0
+
+### Estado antes → después
+- **Antes:** 3 monstruos (gollum, espectro, ogro), 10 oleadas sin jefes, sin misiones, sin dificultad, sin niveles de calidad (sólo una auto-calidad de resolución). Cada monstruo era un grupo de ~13 mallas (una llamada de dibujo cada una) y las partículas tenían material propio (hasta 90 llamadas).
+- **Después:** 6 tipos de monstruo + 2 jefes con fases, misiones (MLMissions) con rescate y recolección reales, 4 dificultades, 3 niveles de calidad con costos reales, monstruos/partículas/pasto instanciados, indicadores de vida y de prioridad de amenaza, cámara y táctil mejorados. Se mantienen las 10 oleadas, el modo paseo, el récord (`rey_best`, `rey_wins`, `ml:scores`), Mati Octo, pausa/reinicio/silencio/pantalla completa/gamepad.
+
+### Misiones (MLMissions, HUD abajo a la izquierda, 2 secundarias por partida, sólo en "Defender el reino")
+| id | tipo | misión | evento (lo emite la lógica del juego) | objetivo |
+|---|---|---|---|---|
+| rey_muralla | principal | Muralla firme | `waveClear`, falla con `gateBroken` | 5 oleadas sin perder el portón |
+| rey_salvar | principal | ¡Salvá al Rey! | `waveClear` + `requireWin` | ganar las 10 |
+| rey_rescate | secundaria | Rescatá 2 aldeanos | `rescue` | 2 |
+| rey_madera | secundaria | Juntá 4 fardos de madera | `wood` | 4 |
+| rey_jefe | secundaria | Vencé a un jefe | `bossDefeated` | 1 |
+| rey_ariete | secundaria | Frená 2 arietes | `ramStopped` (troll derrotado antes de golpear) | 2 |
+| rey_intocable | secundaria | Intocable | `waveClear`, falla con `heroHurt` | 3 oleadas |
+| rey_frenesi | secundaria | Frenesí ×4 | `streak` (modo max) | 4 |
+| rey_portonsano | secundaria | Portón intacto | `cleanWave` (oleada sin daño al portón) | 2 |
+
+`runStart()` al empezar la defensa (también al reiniciar desde la pausa); `runEnd({won})` al terminar, al reiniciar y al volver al menú. El cartel final lista las misiones de la partida.
+
+### Dificultad (se elige en el menú; Normal = balance anterior de gollum/espectro/ogro)
+| | Fácil | Normal | Difícil | Extremo |
+|---|---|---|---|---|
+| vida de monstruos | ×0.7 | ×1 | ×1.3 | ×1.6 |
+| velocidad | ×0.85 | ×1 | ×1.12 | ×1.25 |
+| cantidad por oleada | ×0.75 | ×1 | ×1.2 | ×1.4 |
+| daño a portón/rey | ×0.7 | ×1 | ×1.25 | ×1.5 |
+| reparación del portón entre oleadas | +15 | +10 | +8 | +5 |
+| descanso entre oleadas | 8 s | 6.5 s | 6 s | 5 s |
+| corazón entre oleadas | sí | sí | sí | no |
+| vida de jefes | ×0.75 | ×1 | ×1.25 | ×1.5 |
+
+El récord sigue siendo uno solo (no se separa por dificultad).
+
+### Calidad (botón "🎚 Calidad" de la pausa; "Automática" la resuelve el SDK y además baja un nivel si se sostienen <27 fps)
+| | Baja | Media | Alta |
+|---|---|---|---|
+| tope de pixelRatio (PC / táctil) | 1 / 1 | 1.5 / 1.25 | 2 / 1.5 |
+| sombras reales | no (manchas) | no (manchas) | sí, mapa 1024, sigue al héroe |
+| tope de partículas | 40 | 90 | 150 |
+| polvo/luciérnagas | 0 | 70 | 110 |
+| pasto instanciado | 0 | ~220 matas | ~420 matas |
+| estrellas / charcos de luz de faroles | no | sí | sí |
+| luz de contorno (siluetas de noche) | no | sí | sí |
+| distancia de dibujo / niebla | 450 / 32–150 | 700 / 45–200 | 900 / 50–230 |
+
+### Contenido nuevo
+- **Trasgo arquero** (oleada 4+): dispara de lejos. Aviso naranja en el piso que sigue al objetivo y se **fija 0.35 s antes del disparo** (se esquiva moviéndose o saltando). Retrocede si lo apurás, pero tras 2.5 s huyendo queda acorralado 4 s.
+- **Troll del ariete** (oleada 6+): ignora al héroe y embiste el portón (−18). Se echa hacia atrás 0.8 s antes del golpe (aviso). Siempre marcado como amenaza roja, con flecha 🪵 en el borde si está fuera de cuadro.
+- **Chamán** (oleada 7+): se queda detrás de la pelea y da a los aliados cercanos (radio 10) un escudo que absorbe un golpe (aviso verde de 1 s, burbuja celeste).
+- **Jefe Grumak, el Rey Trol** (oleada 5): fase 1 golpe al piso con aviso rojo de 1.2 s (saltá o salí: 2 corazones); fase 2 (≤50 %) ruge, llama 3 gollums, es más rápido y tira rocas con aviso en tu posición.
+- **Jefe Morvath, el Espectro Coronado** (oleada 10): fase 1 orbes en abanico; fase 2 (≤66 %) **velo** invulnerable hasta derrotar a sus 4 espectros; fase 3 (≤33 %) aparece junto al portón y lo **drena** con un rayo; 3 golpes lo interrumpen y lo aturden.
+- Los jefes entran cuando quedan ≤2 monstruos de la oleada (ver balance).
+- **Rescate de aldeanos** (oleadas 2, 4, 7, 9): columna de luz y flecha 🆘; llegar = +50 y portón +5; gollums y arqueros pueden atraparlo (3 golpes); si no llegás en 40 s se esconde.
+- **Fardos de madera** tras cada oleada (2 por descanso, lugares fijos que rotan): portón +4 cada uno (o +15 puntos si está entero).
+- **Indicadores:** barras de vida sobre los monstruos (siempre en los grandes, en los chicos sólo heridos), barra del jefe con fase, contador "⚔N" de atacantes junto a las barras de portón y rey, marcas 3D (rojo: golpea portón/rey o es ariete; ámbar: va por el aldeano), flechas en el borde para jefe/ariete/aldeano/portón atacado fuera de cuadro, puntos que salen sobre el monstruo.
+
+### Cambios visuales y técnicos
+- Modelos nuevos low-poly con color por vértice y oclusión horneada; siluetas distintas por tipo (gollum orejón con púas, ogro con garrote con clavos, espectro con túnica deshilachada, arquero con capucha y arco, troll con ariete zunchado, chamán con máscara de cráneo y cuernos, jefes con corona y rocas / corona de hielo).
+- Animaciones por pieza (piernas, brazos, armas), telegrafiado del golpe (brazos/garrote arriba y tinte naranja), aparición desde el suelo, muerte con caída y encogimiento.
+- **Instancing:** cada pieza de cada tipo de monstruo, sombras de mancha, barras de vida, escudos, marcas, partículas y pasto son `InstancedMesh`.
+- **Colisiones:** grilla espacial (celdas de 6) para los colliders estáticos; desvío automático cuando un monstruo queda trabado (elige el lado libre).
+- **Cámara:** se acerca si una casa o muralla queda entre ella y el héroe, se aleja un poco con un jefe y en táctil se acomoda detrás del héroe al avanzar. Sin sacudidas con `prefers-reduced-motion`.
+- **Táctil:** joystick a fondo = correr (antes no se podía correr en el celular); asistencia de apuntado sólo en táctil (si no hay nadie delante al golpear, gira hacia el más cercano a tiro). En PC el golpe no cambió.
+- `MLArcade.requireWebGL()` antes de crear el renderer.
+
+### Bugs reales encontrados y corregidos
+- Monstruos **trabados para siempre** entre la casa (12,6) y el barril (10.5,9), o entre el farol (3.4,18) y la casa (8,17): la oleada no terminaba nunca. Se agregó el desvío.
+- Con el portón caído los monstruos iban en línea recta al rey y los que venían de costado quedaban **detrás de la muralla**, contra el muro del patio. Ahora rodean por el extremo del muro y entran por el hueco del portón.
+- El **patio del rey tenía huecos** entre los muros laterales y la torre del homenaje: se podía entrar por detrás sin pasar por el portón. Se cerraron con un tramo de muro visible y su collider.
+
+### Balance del +10 al portón entre oleadas (oleadas guionadas)
+`__rey.sim()` + piloto automático `__rey.bot()` (guardia del portón: prioriza aldeano, drenaje, arietes y lo que golpea el portón; pelea a distancia de espada). Normal, 30 pasos por segundo, sin dibujar.
+- Primera corrida: el portón perdía 0–19 por oleada en las oleadas 1–4 y 6–7 (el +10 lo cubre), pero **la oleada 5 lo rompía** (−38 a −100) aun con héroe invulnerable: Grumak acaparaba al defensor mientras 6 gollums golpeaban el portón. Cambiar la reparación casi no cambió el resultado (victorias con héroe invulnerable: +0 → 3/4, +10 → 3/6, +20 → 0/4).
+- Ajuste: el jefe entra cuando quedan ≤2 monstruos, el golpe de Grumak al portón bajó de 12 a 8 y prefiere el duelo con el héroe (radio 12), la oleada 9 trae 1 chamán.
+- Después: héroe invulnerable 6/6 victorias (portón final 76, 38, 22, 0, −3, −14); la oleada más dura pasó a ser la 8 (0 a −114). Héroe mortal (bot): el portón llegó entero a la oleada 9–10 en 4/6; el bot muere por corazones (no esquiva como una persona). Fácil: 3/3 con el portón ≥98. Difícil: 3/3 derrota en la oleada 8.
+- **Conclusión: se mantiene +10.** La reparación no decide las partidas; lo que decidía era la oleada del jefe. No se jugó a mano para afinar.
+
+### Pruebas
+`ML_WORKERS=1 npx playwright test tests/e2e/salva_al_rey.spec.js`. 12 pruebas nuevas: misión principal completa + persistencia tras recargar; secundaria completa (Frenesí) y fallida (Intocable, failOn) con resumen en el cartel final; madera; rescate (salvado y perdido); arquero; troll del ariete; chamán; Grumak (aviso, daño, fase 2, refuerzos, recompensa, barra); Morvath (velo, drenaje, interrupción); dificultad (teclado, tap, persistencia, vida/velocidad/daño/cantidad); calidad (sombras, partículas, pasto, polvo, distancia, resolución, tope real de partículas, botón de la pausa); composición de oleadas + instancing + flecha de amenaza. Lo que depende del tiempo de juego avanza con `__rey.sim()` (lógica real, sin depender de los cuadros de SwiftShader). Las esperas viejas sin timeout pasaron a 30 s.
+
+Resultado real de la última corrida completa: **53 passed, 1 skipped (7.2 min)**. Escritorio: 26 passed y 1 skipped (el táctil es sólo para móvil). Móvil: 27 de 27 passed.
+
+### Mediciones (1280×800, SwiftShader, load average 23–30 por otros agentes)
+12 monstruos (8 gollums, 2 ogros, 2 espectros) a la vista frente al portón, 6 s, dos corridas intercaladas antes/después:
+| | antes | después Media | después Baja |
+|---|---|---|---|
+| llamadas de dibujo | 215–220 | 110 | 103 |
+| triángulos | ~19 000 | ~31 000 | ~21 000–22 000 |
+| geometrías | 124–128 | 120 | 107 |
+| heap JS | 8.9–11.4 MB | 9.6–10.2 MB | 10.9–11.7 MB |
+| tiempo por cuadro (prom.) | 80–142 ms | 137–140 ms | 105–170 ms |
+
+Con los monstruos lejos (aparición normal a ~50 u): 111 → 127 (Media) / 115 (Baja) llamadas, por el pasto, el HUD 3D y las piezas nuevas. **El tiempo por cuadro es ruido** con esta carga (la versión anterior sola varió 80→142 ms entre corridas): no se puede afirmar mejora ni empeoramiento de fps. Hay más triángulos (modelos más detallados y pasto en Media/Alta).
+
+### Pendientes / NO PROBADO
+- No se jugó a mano en un celular real ni con GPU real; fps sin medir con la máquina libre. Las sombras de Alta no se midieron en GPU real.
+- El modo paseo no recibió contenido nuevo (sólo lo visual: pasto, luz de contorno, calidad).
+- El piloto de balance no esquiva como una persona: sus números de supervivencia del héroe no son representativos; los del portón sirven para comparar.
+- Para cuando se actualice three.js (no en esta ronda): `MeshStandardMaterial`, frustum culling por lote en `InstancedMesh`.

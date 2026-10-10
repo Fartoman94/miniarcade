@@ -165,3 +165,134 @@ La diferencia de CPU está dentro del ruido. El clásico son ~15 trazados vector
 - Lo de la vista previa del `picker` compartido: descarga los sprites de Mati aunque no esté elegido.
 - No hay sprite de muerte de Mati: el ragdoll son rectángulos con su paleta, no partes reales del modelo.
 - Mati es casi todo azul. Sobre el cielo celeste del nivel diurno se lee bien gracias al contorno oscuro, pero contrasta menos que el clásico.
+
+## MiniArcade 3.0
+
+### Estado antes → después
+
+| | Antes | Después |
+|---|---|---|
+| Niveles | 6 (un solo «acto») | 10: **Acto 1** = los 6 originales intactos (mismas trampas, mismas posiciones) + **Acto 2: la venganza del nivel** (7–10), que se desbloquea al terminar el Acto 1 |
+| Terreno | piso plano infinito | pozos, plataformas de una vía, piedras que se rompen, plataforma móvil, cintas transportadoras (Acto 2) |
+| Trampas | pinchos, yunque, sierra, TNT, trampolín | + prensa hidráulica (con aviso), sierra en riel vertical, meta que sale corriendo, pozo (la muerte `fall` ahora existe) |
+| Jefes | — | 2 «jefes ambientales» sin combate: **La Grúa Loca** (nivel 8) y **La Aplanadora** (nivel 10) |
+| Progreso dentro del nivel | — | banderas de CONTROL en el Acto 2 (2 por nivel; en Extremo no hay) |
+| Secretos | — | 8 «pollos de goma dorados» opcionales (4 en el Acto 1 sin tocar el recorrido, 1 por nivel del Acto 2) |
+| Desafíos sin morir | — | cada nivel superado sin morir queda marcado (💀0 ✔ en el HUD, «SIN MORIR x/10» en el menú) + misiones |
+| Misiones / dificultad / calidad | — | MLMissions (2 principales + 7 secundarias), selector Fácil/Normal/Difícil/Extremo, `onQuality` |
+| Visual | cielo + colinas, sin sombras | parallax de 3 capas pre-dibujadas por tema, sombras proyectadas, brillos cacheados, viñeta nocturna, partículas en pool, «alma» y onda al morir, aplastamiento al caer, cámara con anticipación |
+
+**Datos guardados nuevos** (no se tocó ninguna clave vieja): `mg_best2` (niveles del Acto 2, 0..4), `mg_secrets` (ids de pollos encontrados), `mg_clean` (niveles superados sin morir). `mg_best` sigue siendo 0..6 (Acto 1) y `MLArcade.scores` recibe el total de niveles superados (hasta 10). Al cargar: `best = min(6, max(mg_best, sdk))` y `best2 = min(4, max(mg_best2, sdk − 6))`. **Un solo récord para todas las dificultades** (guardarlo por dificultad no era trivial con el SDK y la clave vieja).
+
+### Misiones (MLMissions, `hud:'bl'`, 2 secundarias por partida)
+
+Los eventos salen de la lógica (física, trampas, jefes), nunca del dibujo. `runStart()` en cada partida (también al reiniciar desde la pausa) y `runEnd({won})` al terminar el acto, al reiniciar y al salir. Como dos misiones sólo existen en el Acto 2, `MLMissions.setup` se llama con la lista del acto antes de `runStart()` (mismo `gameId`, mismos logros).
+
+| id | Tipo | Título | Evento (origen) | Meta | Acto |
+|---|---|---|---|---|---|
+| p_tres | principal | Superá 3 niveles | `levelClear` (winLevel) | 3 | 1 y 2 |
+| p_limpio | principal | Un nivel sin morir | `cleanClear` (winLevel con 0 muertes en el nivel) | 1 | 1 y 2 |
+| s_intocable | secundaria | Intocable | `levelClear`, **failOn `death`** | 2 | 1 y 2 |
+| s_pollo | secundaria | Pollo de oro | `secret` (tocar un pollo dorado) | 1 | 1 y 2 |
+| s_yunques | secundaria | Esquivayunques | `anvilDodge` (un yunque o la grúa tocan el piso y seguís vivo) | 5 | 1 y 2 |
+| s_creativo | secundaria | Muerte creativa | `deathKinds` (máx. de causas distintas en la partida, `mode:'max'`) | 3 | 1 y 2 |
+| s_volador | secundaria | Pasajero frecuente | `spring` (te lanza un trampolín) | 3 | 1 y 2 |
+| s_jefe | secundaria | Jefe ambiental | `bossDefeated` (apagar la grúa / escapar de la aplanadora) | 1 | 2 |
+| s_control | secundaria | Paso a paso | `checkpoint` | 2 | 2 (no en Extremo) |
+
+### Dificultad (selector del menú, no se puede cambiar en partida)
+
+Nunca cambia controles, salto, colisionadores ni ventanas de golpe: sólo velocidades, tiempos de aviso y banderas. **Normal = el balance original** (el yunque usa la misma gravedad 2600 de siempre).
+
+| Parámetro | Fácil | Normal | Difícil | Extremo |
+|---|---|---|---|---|
+| Gravedad del yunque (px/s²) | 2100 | 2600 | 3000 | 3400 |
+| Prensa: tiempo abierta (s) | 2,4 | 1,8 | 1,5 | 1,3 |
+| Prensa: aviso antes de bajar (s) | 1,2 | 0,9 | 0,75 | 0,6 |
+| Piedra rajada: tiempo hasta caerse (s) | 0,75 | 0,5 | 0,4 | 0,32 |
+| Grúa: aviso del círculo rojo (s) | 1,2 | 0,9 | 0,75 | 0,6 |
+| Grúa: pausa entre yunques (×) | 1,25 | 1 | 0,85 | 0,75 |
+| Sierra en riel: período (×) | 1,15 | 1 | 0,9 | 0,82 |
+| Aplanadora por tramo (px/s; el jugador corre a 260) | 150/170/190 | 175/200/222 | 190/215/238 | 200/228/248 |
+| Banderas de control (Acto 2) | sí | sí | sí | **no** |
+
+### Calidad (`onQuality`; «Automática» la resuelve el SDK)
+
+| | Baja | Media | Alta |
+|---|---|---|---|
+| Tope de `devicePixelRatio` | 1 | 1,5 | 2 |
+| Tope de partículas (pool de 400 preasignado) | 60 | 180 | 400 |
+| Capas de parallax | 1 (lejana) | 2 (+ media) | 3 (+ cercana) |
+| Resolución de las capas pre-dibujadas | ×0,6 | ×0,8 | ×1 |
+| Brillo del sol/faroles, viñeta nocturna, cono de luz de la aplanadora | no | sí | sí |
+| Sombras proyectadas y volumen (barril, árboles, torso) | no | sí | sí |
+| Partículas ambientales (polvo, luciérnagas) | 0 | 0 | 22 |
+
+### Contenido nuevo (Acto 2)
+
+- **Nivel 7 · EL PISO ES OPCIONAL** (pradera): presenta los pozos y la piedra rajada (tiembla antes de caerse). Ruta de arriba opcional por dos plataformas con el pollo; abajo, pozo + pinchos. Final troll: la META tiene ojitos y, cuando te acercás, **le salen patitas y se escapa** 550 px (con trampolín y pinchos en el medio).
+- **Nivel 8 · LA GRÚA LOCA** (obra): presenta la prensa. Jefe ambiental: una grúa en un riel te sigue; en cada ciclo marca un **círculo rojo** en el piso (aviso + alarma) y suelta un yunque. 3 fases según tu avance: fase 1 y 2 apuntan donde estás (seguí corriendo), fase 3 apunta **adonde vas a estar** (frená). Se «vence» tocando el botón **APAGAR** del final: la grúa se desarma. Pollo: soltando ▶ en el aire sobre el trampolín.
+- **Nivel 9 · LA FÁBRICA DE PRENSAS** (tema nuevo «fábrica»): cinta que te empuja para atrás con pinchos encima, plataforma móvil sobre un pozo, dos prensas en «tuc-tuc» (hay un hueco seguro entre las dos), sierra en riel vertical y una **ruta alternativa por escalera y pasarela** (con el pollo) que evita la segunda cinta.
+- **Nivel 10 · LA APLANADORA** (noche): persecución. La aplanadora sale a los 1,5 s y acelera por tramos (siempre más lenta que vos corriendo). Indicador «🚜 x m» en el borde izquierdo y en el HUD. Puente de piedras rajadas, dos trampolines (el segundo te cruza el pozo final). Al pasar el pozo final el conductor entra en pánico, acelera y se cae al pozo. El pollo está detrás del punto de partida (vas hacia la aplanadora…).
+- **Acto 1:** sólo se agregaron 4 pollos opcionales que no cambian el recorrido (niveles 1 y 4: detrás del inicio; 2 y 6: arriba del trampolín, se agarran soltando ▶ en el aire).
+- Muertes nuevas con cartel y chistes propios: `crusher` (prensa), `crane` (grúa), `roller` (aplanadora); `fall` (pozo) ahora es alcanzable.
+- «Coyote time» de 80 ms para saltar justo después del borde de un pozo (el salto en sí no cambió: mismo impulso, misma gravedad, respuesta en el mismo cuadro).
+- Todos los niveles nuevos se completan con un recorrido guionado (autopiloto de `?debug`, ver Pruebas). Antes de escribir los tests se corrió ese guion en las 4 dificultades: **16/16 niveles completados sin morir** (y también a 1× de simulación en Normal).
+
+### Cambios visuales
+
+- Parallax de 3 capas por tema (montañas/cerros/arbustos, skyline/grúas/cerco, montañas/pinos/setos, chimeneas/tanques/cajones) pre-dibujadas una vez en canvas fuera de pantalla (con semilla fija) y repetidas en mosaico; las colinas translúcidas originales se mantienen.
+- Gradiente del cielo, brillo del sol y de los faroles y viñeta: cacheados (antes se creaban gradientes en cada cuadro).
+- Partículas en un pool preasignado (sin objetos nuevos por cuadro); las chispas del TNT pasaron del dibujo a la lógica.
+- Sombras proyectadas del personaje (sobre la superficie real de abajo, achicándose con la altura), del yunque que cae, de barriles, plataformas, sierra del riel, aplanadora y meta.
+- Muerte: además del ragdoll, un «alma» con aureola sube despacito y una onda blanca se expande (sin destellos ni flashes). Aplastamiento leve al aterrizar (sólo visual, también en Mati).
+- Cámara: anticipa unos 90 px hacia donde corrés, suavizada; no toca la física. Con `prefers-reduced-motion` no hay sacudón de cámara ni temblor de la prensa.
+
+### Pruebas
+
+`tests/e2e/muerte_gloriosa.spec.js` pasó de 13 a 27 tests. Nuevos:
+
+1. **Misiones (principal + secundaria):** partida nueva → misiones `p_tres`, `s_intocable`, `s_pollo` (rotación determinista). Se agarra el pollo del nivel 1 (gancho de prueba: se ubica al personaje en el salto) → `s_pollo` cumplida; se superan 3 niveles sin morir → `p_tres` y `s_intocable` cumplidas, niveles 1–3 marcados «sin morir». Tras recargar: logros en `ml:missions`, menú «POLLOS 1/8» y «SIN MORIR 3/10».
+2. **failOn:** morir en los pinchos → `s_intocable` queda `failed`, la principal sigue activa, `runKinds = ['spikes']`.
+3. **Dificultad:** teclado (escritorio, flechas) o toque (celular) → Extremo; no arranca la partida; persiste tras recargar; `diffCfg` cambia (`anvilG 2600 → 3400`, `crushOpen 1.3`, `cps:false`) y el nivel 7 en Extremo no tiene banderas.
+4. **Calidad:** baja/media/alta cambian `partCap` (60/180/400), capas de parallax (1/2/3, y se dibujan), brillos y el DPR efectivo (en Pixel 7, DPR 2,625 → 1 / 1,5 / 2).
+5–10. **Niveles 7, 8, 9 y 10 completables en Normal** y **8 y 10 en Extremo** (estos dos sólo en escritorio) con el recorrido guionado del autopiloto (`?debug`), **0 muertes**; además el guion pasa por el pollo (7 y 9) y vence al jefe (8 y 10).
+11. **Acto 2:** botón oculto hasta tener 6/6; arranca en el nivel 7 con «ACTO 2: 0/4».
+12. **Mecánicas (1):** pozo → muerte `fall`; piedra rajada: se activa, se cae y reaparece; bandera de control: se guarda y al morir se reaparece en x=1300; la meta del nivel 7 huye de 2700 a 3250.
+13. **Mecánicas (2):** la cinta te lleva para atrás; la plataforma móvil te lleva (sube y baja con ella); la prensa primero avisa (`warn`) y después aplasta (`crusher`); la sierra en riel mata.
+14. **Jefes:** la grúa se activa, marca el objetivo donde estás parado y el yunque te aplasta (`crane`); tocando APAGAR queda `dead`, el jefe cuenta como vencido y se oculta su barra; la aplanadora alcanza al que no corre (`roller`).
+
+Robustez (pedido del coordinador y fallas propias del entorno):
+- **«muerte → cartel → tecla nueva»** falló en CI (2 núcleos) porque caminaba desde x=120 con un tope de 8 s. Ahora el gancho deja al personaje en x=360 (antes de los pinchos de x=430) y el tope es de 30 s. Lo mismo en «reiniciar desde la pausa», «táctil» y «Mati: poses».
+- En esta máquina hay joysticks reales conectados que inyectaban teclas fantasma (R, Espacio) a través del SDK: el spec anula `navigator.getGamepads` en `beforeEach` (además del arreglo del SDK con `navigator.webdriver`).
+- «Mati: poses» fallaba antes de este trabajo en mobile (1 de 26): un `blur` suelta las entradas a propósito (bug #9). Ahora se vuelve a apretar ▶ en cada sondeo.
+- Tiempos de espera más amplios en los tests que dependen del tiempo de juego (6 festejos, cartel que ignora toques antes de 0,3 s).
+
+Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/muerte_gloriosa.spec.js`): **47 passed, 7 skipped (17,4 min)**. Desktop: 26 passed, 1 skipped (el táctil). Mobile (Pixel 7): 21 passed, 6 skipped (los de teclado físico y los dos de Extremo).
+Antes de empezar, el mismo spec daba 20 passed, 1 failed (Mati mobile, ver arriba), 5 skipped.
+
+### Mediciones
+
+Partida real: el personaje corre a la derecha 4 s (invulnerable sólo para medir), 2 corridas por fila, Chromium headless 1280×800, DPR 1, SwiftShader (CPU). Script propio en el scratchpad (`perf.mjs`), sirviendo el archivo original y el nuevo desde el mismo servidor. «CPU/cuadro» = media móvil de `__mg.frameMs` (sólo JS del cuadro, no raster).
+
+| Versión · calidad · nivel | FPS | p95 entre cuadros | CPU/cuadro | Heap JS | Partículas (máx.) |
+|---|---|---|---|---|---|
+| Antes · (sin calidad) · 1 | 58,0 / 57,8 | 16,8 ms | 0,73 / 0,55 ms | 3,85 / 3,54 MB | — |
+| Después · media · 1 | 54,8 / 52,5 | 33,3 ms | 0,65 / 0,69 ms | 4,42 / 3,54 MB | 14 |
+| Después · baja · 1 | 55,3 / 60,0 | 33,3 / 16,7 ms | 0,64 / 0,63 ms | 4,47 / 3,66 MB | 14 |
+| Después · alta · 1 | 55,8 / 57,3 | 33,3 ms | 1,24 / 0,61 ms | 4,78 / 3,51 MB | 14 |
+| Después · media · 10 (aplanadora) | 49,8 / 51,0 | 33,4 ms | 0,90 / 0,64 ms | 4,73 / 4,23 MB | 8 |
+| Después · baja · 10 (aplanadora) | 60,0 / 59,5 | 16,8 ms | 0,59 / 0,58 ms | 4,14 / 3,81 MB | 8 |
+| Después · media · 9 (fábrica) | 51,8 / 51,5 | 33,3 ms | 0,87 / 0,64 ms | 4,09 / 3,58 MB | 26 |
+
+Lectura honesta: el JS por cuadro quedó igual (≈0,6–0,9 ms). En media/alta bajan unos FPS en este headless porque el raster por software tiene que pintar 2–3 capas de parallax de pantalla completa; en baja (1 capa, sin brillos ni sombras) vuelve a 60 FPS, incluso en el nivel de la aplanadora. El heap sube ≈0,5 MB (capas en canvas, pool de partículas). En 2D no hay «draw calls» de WebGL; el gancho expone `counts` (partículas, tope, capas dibujadas, trampas, plataformas). Había otros agentes usando la CPU: los números sirven para comparar, no son FPS de un dispositivo real.
+
+### Pendientes / NO PROBADO
+
+- **NO PROBADO en dispositivos reales** (sólo Chromium headless con emulación de Pixel 7): la sensación de los saltos sobre plataformas móviles y la legibilidad del círculo rojo de la grúa en pantallas chicas.
+- Los niveles nuevos los completó el autopiloto (que salta en posiciones fijas y espera prensas/sierras); no hubo una partida humana completa del Acto 2.
+- Los pollos de los niveles 2, 6 y 8 (soltar ▶ en el aire sobre el trampolín) se verificaron por cálculo de la trayectoria, no con un test; sí hay test del pollo del nivel 1 y de los de las rutas del 7 y el 9.
+- Con `prefers-reduced-motion` se apagan sacudón y temblor, pero no hay test automático de eso.
+- Récord único para todas las dificultades (no por dificultad).
+- En celular apaisado las misiones (abajo a la izquierda) tapan un poco del piso del borde izquierdo.
+- Sigue sin sprite de muerte propio para Mati (ragdoll con su paleta).

@@ -1,0 +1,38 @@
+{
+  "Salva_al_rey": {
+    "fps": 27.7,
+    "worstFrameMs": 133.3,
+    "dcl": 446,
+    "load": 456,
+    "heapMB": 8.1,
+    "longTasks": 3,
+    "domNodes": 199,
+    "requests": 13,
+    "kb": 944,
+    "errors": []
+  },
+  "turbo_furia": {
+    "fps": 45.1,
+    "worstFrameMs": 50.1,
+    "dcl": 393,
+    "load": 393,
+    "heapMB": 8.9,
+    "longTasks": 2,
+    "domNodes": 192,
+    "requests": 10,
+    "kb": 813,
+    "errors": []
+  },
+  "valle_encantado": {
+    "fps": 25.4,
+    "worstFrameMs": 166.7,
+    "dcl": 576,
+    "load": 584,
+    "heapMB": 12.1,
+    "longTasks": 2,
+    "domNodes": 202,
+    "requests": 13,
+    "kb": 983,
+    "errors": []
+  }
+}

@@ -165,3 +165,144 @@ Por construcción, el clásico son 10 draw calls (malla horneada, ojos, capa, 2 
 - El selector compartido baja los WebP de la vista previa aunque no se elija a Mati (cambio a pedir en `characters.js`, no en el juego).
 - Mati es más ancho que el mago con la misma altura: puede rozar visualmente postes finos de cerca.
 - No hay medición en GPU/celular real.
+
+## MiniArcade 3.0
+
+### Estado antes → después
+
+- **Antes:** Explorar = 12 fragmentos + charlar con 8 habitantes; Proteger = oleadas infinitas de diablillos/ogros. Sin misiones, sin dificultad, sin niveles de calidad, sin jefes, sin mapa.
+- **Después:** la campaña original sigue intacta (8 habitantes, 12 fragmentos con la flecha, final "¡El valle brilla!", oleadas y récord). Encima se agregaron: 2 misiones principales de la Anciana Alba + 7 misiones de los habitantes, diario con mapa y álbum, brújula al objetivo seguido, minimapa (escritorio), 4 tesoros escondidos, 4 zonas especiales, 3 guardianes con patrones telegrafiados, el Rey Sombrío con 3 fases, jefes cada 5 oleadas en Proteger, misiones compartidas (MLMissions), dificultad y calidad.
+- Las fallas de `cambiar a viewport de celular` (canvas con el tamaño viejo si el `resize` llegaba tarde) se arreglaron: el canvas ahora sigue al viewport por CSS (`setSize(W,H,false)` + `#c{width:100%;height:100%}`).
+
+### Misiones (MLMissions, HUD abajo a la izquierda, 2 secundarias por partida)
+
+| id | tipo | título | evento | meta | notas |
+|---|---|---|---|---|---|
+| p_guardian | principal | Vencé a un guardián | bossDefeated | 1 | Aventura: 3 guardianes · Proteger: jefe en la oleada 5 |
+| p_rey | principal | Vencé al Rey Sombrío | regionBoss | 1 | Aventura (tras los 3 sellos) o Proteger oleada 20 |
+| s_golpes | secundaria | Asestá 20 golpes | hit | 20 | criaturas y jefes |
+| s_doble | secundaria | Doble bastonazo | multiHit (max) | 2 | 2 blancos en un mismo golpe |
+| s_limpio | secundaria | Sin un rasguño | kill | 6 | failOn: hurt |
+| s_curas | secundaria | Luz que cura | heal | 2 | destellos dorados |
+| s_charla | secundaria | Buen vecino | talk | 4 | habitantes distintos, cualquier modo |
+| s_secreto | secundaria | Ojo de explorador | secret | 1 | 4 tesoros, en los dos modos |
+
+`runStart()` en cada `startMode` (también "Otra vez" y Reiniciar desde la pausa, que primero cierra la partida anterior); `runEnd()` en el game over de Proteger, al volver al menú y al salir. Desmayarse en Explorar **no** cierra la partida (se puede "Levantarse").
+
+### Dificultad (selector en el menú, no durante la partida)
+
+| parámetro | Fácil | Normal (= original) | Difícil | Extremo |
+|---|---|---|---|---|
+| velocidad de criaturas | ×0,8 | ×1 | ×1,15 | ×1,3 |
+| vida diablillo / ogro | 1 / 8 | 2 / 11 | 3 / 14 | 3 / 18 |
+| drenaje al Corazón (diablillo / ogro) | 3 / 6 | 4 / 9 | 5 / 11 | 6 / 13 |
+| diablillos por oleada | 2n+1 (tope 12) | 2n+2 (tope 14) | 2n+3 (tope 16) | 2n+4 (tope 18) |
+| aviso antes del golpe de criatura | 0,6 s | 0,45 s | 0,4 s | 0,34 s |
+| aviso de ataques de jefe (×) | 1,3 | 1 | 0,9 | 0,8 |
+| vida de jefes (×) | 0,7 | 1 | 1,3 | 1,6 |
+| daño de ataques pesados de jefe | 1 | 1 | 1 | 2 |
+| prob. de destello curativo | 35 % | 22 % | 17 % | 12 % |
+| tiempo de la carrera de hadas | 55 s | 40 s | 34 s | 28 s |
+
+Los controles no cambian. El récord sigue siendo **uno solo** (mejor oleada, sin separar por dificultad).
+
+### Calidad (`onQuality`)
+
+| | baja | media | alta |
+|---|---|---|---|
+| tope de pixel ratio | 1 | 1,5 | 2 |
+| sombras reales (PCF suave, mapa 1024, siguen al jugador) | no | no | sí |
+| pasto instanciado con viento | 0 | 700 | 1600 |
+| flores instanciadas | 0 | 160 | 320 |
+| tope de partículas | 40 | 120 | 150 |
+| luciérnagas / polen | 40 / 50 | 150 / 210 | 150 / 210 |
+| pétalos / destellos del cielo | 6 / 6 | 18 / 16 | 26 / 16 |
+| niebla (cerca / lejos) | 38 / 150 | 55 / 250 | 70 / 320 |
+| distancia de dibujo (camera.far) | 420 | 1400 | 1400 |
+| estelas de proyectiles y embestidas | no | sí | sí |
+| guardianes en reposo se dejan de dibujar a | 42 m | 62 m | 62 m |
+| Bosque Sombrío (cúpula, gemas, niebla) se dibuja a menos de | 85 m | 115 m | 115 m |
+| niebla violeta del bosque | no | sí | sí |
+| minimapa (redibujos/s) | apagado | 3 | 6 |
+
+`MLArcade.requireWebGL()` se llama antes de crear el renderer.
+
+### Contenido nuevo
+
+- **Misiones de los habitantes** (marca ¡! amarilla = nueva, ¿? celeste = para entregar): Lirio (5 lirios de luna en la orilla → cura total), Bruno (4 atados de leña → bastón de roble, +1 de daño contra jefes), Pipa (pelota → corona de flores, cosmética permanente), Centella (carrera por 6 aros con tiempo → pluma de hada, +0,5 s de invulnerabilidad; si fallás, revancha), Otto (harina del Molino Viejo, junto al ogro → rosca, cura total), Maia (4 notas doradas), Simón (3 corderitos perdidos). Alba da las 2 principales: "La estrella rota" (los 12 fragmentos, como siempre) y "Los sellos sombríos" (3 guardianes → Rey → volver con Alba → corona de estrellas). El progreso sale del estado del mundo, así que hacer las cosas "fuera de orden" no traba nada.
+- **Diario** (Q / M / botón 📜 / Y del gamepad): misiones con estado, tocar una la sigue (brújula y rastreador arriba), mapa con zonas, fragmentos, habitantes y objetivo, y álbum persistente (`valle_album`, 15 hallazgos). El mundo queda quieto mientras está abierto.
+- **Zonas:** Molino Viejo, Jardín de Cristales, Claro Hechizado (arenas marcadas con piedras rúnicas) y el Bosque Sombrío (anillo de pinos oscuros, suelo y niebla violeta, cúpula con 3 gemas-sello que bloquea la entrada hasta romper los sellos).
+- **Guardianes** (aviso en el suelo antes de cada ataque; si te alejás 12 m de la arena se curan y vuelven):
+  - Ogro Jefe: embestida con línea roja de aviso (queda aturdido al terminar), pisotón en área, llama 2 diablillos.
+  - Gólem de Cristal: pisotón de área grande, abanico de 6–8 esquirlas (se esquivan entre ellas).
+  - Diablillo Hechicero: mantiene distancia, bolas de fuego (3 en abanico con poca vida), teletransporte marcado, invoca diablillos.
+  - Rey Sombrío: fase 1 andanada + pisotón; fase 2 invoca corte + embestida; fase 3 más rápido, nova de 12 proyectiles y charcos de sombra alrededor del jugador. Inmune 1,2 s en cada cambio de fase.
+  - Recompensas: 3 destellos curativos, sello/álbum; el Rey aclara el bosque.
+- **Proteger:** cada 5 oleadas se suma un jefe (Ogro → Gólem → Hechicero → Rey, con +15 % de vida por ciclo); la oleada no termina hasta vencerlo; al caer suma 20 al Corazón y deja 2 destellos.
+- **Desmayo en Explorar:** perder los corazones muestra "TE DESMAYASTE" con "✨ LEVANTARSE" (vuelve a la plaza con todo el progreso); los jefes en pelea se reinician.
+
+### Cambios visuales
+
+Pasto y flores instanciados con viento en el vértice, pinos oscuros instanciados (3 draw calls para todo el anillo), sombras reales en alta, niebla que se tiñe de violeta cerca del Bosque Sombrío, luz que sigue al jugador, valle más luminoso al completarlo, criaturas que rebotan al caminar y se agachan/ensanchan antes de pegar (aviso legible), habitantes que miran al jugador y saltan al entregar, cámara con suavizado corto que se aleja un poco y mira hacia el jefe durante las peleas, sin temblor con `prefers-reduced-motion`, carteles largos más chicos.
+
+### Pruebas
+
+`tests/e2e/valle_encantado.spec.js`: 11 casos existentes (+ Mati) y 11 nuevos (misiones completadas y persistencia; falla de "Sin un rasguño" y reinicio; dificultad con teclado/tap que persiste y cambia vida/aviso/tamaño de oleada; calidad baja/media/alta y botón de la pausa; diario; las 7 misiones de habitantes completables + alcanzabilidad de todos los objetivos con la colisión real + carrera fallida y revancha; guardianes que atacan, se curan al alejarte y rompen sellos; barrera, 3 fases del Rey y entrega a Alba; jefe en Proteger; desmayo; HUD sin solaparse en 412×915 y 915×412).
+
+Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/valle_encantado.spec.js`), última corrida completa: **42 passed, 2 skipped, 0 failed** — desktop 21/21, mobile 21/21 (los 2 salteados son los casos sólo-escritorio/sólo-móvil de siempre), 9,2 min. Después de la pasada de rendimiento: **42 passed, 2 skipped, 0 failed** otra vez (desktop 21/21, mobile 21/21, 6,4 min); se ajustaron 3 aserciones a los nuevos valores de baja (tope de partículas 40) y a las marcas recalculadas a 10 Hz (se esperan con `expect.poll`). Una corrida intermedia dio 38 passed, 4 failed, 2 skipped; los 4 eran errores de las pruebas nuevas (argumento faltante en un `poll` y una marca que se actualiza al cuadro siguiente), corregidos y verificados (4/4 passed).
+
+Nota: durante el trabajo había 2 joysticks físicos conectados a la máquina que inyectaban teclas (abrían el diario o golpeaban solos) y hacían fallar al azar "partida con Mati"; el SDK ahora ignora los gamepads reales bajo automatización.
+
+### Mediciones
+
+#### Pasada de rendimiento (después de la primera entrega)
+
+La primera versión de 3.0 dejaba Explorar más pesado (+15–25 draw calls, ~+2 ms de JS). Cambios:
+
+- Destellos del cielo: 16 sprites → 1 nube de puntos.
+- Fragmentos: 12 mallas + 12 sprites → 1 malla instanciada + 1 nube de puntos (cada fragmento conserva un `Object3D` lógico; las pruebas no cambian).
+- Pétalos: 26 mallas con material propio → 1 `InstancedMesh` con color por instancia.
+- Brillos fijos (faroles, cristales, hongos, farolitos del muelle, ~20 sprites) → 1 nube de puntos por textura y tamaño, armada al hornear.
+- Ojos de habitantes, honguitos y jugador: `MeshLambertMaterial` casi negro en vez de `MeshBasic`, así se hornean con el cuerpo (un draw call menos cada uno).
+- Marcas ¡!/¿? de los habitantes: 8 sprites → 2 nubes de puntos; el estado se recalcula a 10 Hz.
+- Objetos de misión: la visibilidad se recalcula a 10 Hz y no se dibujan a más de 70 m.
+- Flores instanciadas sin tallo (1 draw call en vez de 2).
+- Pinos del Bosque Sombrío con esfera envolvente real (se descartan fuera de cámara). Cúpula, gemas, suelo y niebla del bosque sólo se dibujan con la cámara a menos de 115 m (85 en baja).
+- Guardianes en reposo: no se dibujan a más de 62 m (42 en baja).
+- Minimapa a 3 Hz en media; apagado en baja.
+- Baja: sin pasto ni flores ni niebla del bosque, luciérnagas 40, polen 50, pétalos 6, partículas 40.
+
+Método: `perf.cjs` (scratchpad). Headless Chromium + SwiftShader, 1280×800, dpr 1. Explorar caminando 4 s y Proteger con la oleada 1 en pantalla; mediana por cuadro. El original se sirve desde una copia en otro puerto y las corridas se intercalan (original → media → baja, ×3). Load average de la máquina: 6–12.
+
+| corrida | Explorar: fps · draw calls · JS update+render · heap | Proteger: fps · draw calls · JS · heap |
+|---|---|---|
+| original 1 | 14,6 · 104 · 3,7 ms · 11,3 MB | 16,8 · 115 · 4,2 ms · 11,7 MB |
+| media 1 | 11,6 · 91 · 3,8 ms · 15,6 MB | 14,3 · 92 · 3,8 ms · 23,3 MB |
+| baja 1 | 15,0 · 93 · 3,7 ms · 17,2 MB | 17,1 · 90 · 3,6 ms · 14,3 MB |
+| original 2 | 15,1 · 101 · 3,5 ms · 12,6 MB | 17,5 · 96 · 3,7 ms · 11,9 MB |
+| media 2 | 12,3 · 96 · 4,5 ms · 16,8 MB | 13,0 · 105 · 5,0 ms · 24,6 MB |
+| baja 2 | 14,0 · 93 · 4,3 ms · 17,2 MB | 17,4 · 100 · 4,6 ms · 14,8 MB |
+| original 3 | 16,2 · 101 · 3,9 ms · 11,9 MB | 18,4 · 94 · 3,4 ms · 11,8 MB |
+| media 3 | 10,9 · 97 · 3,7 ms · 15,9 MB | 12,9 · 98 · 4,0 ms · 23,4 MB |
+| baja 3 | 14,6 · 90 · 3,8 ms · 17,4 MB | 16,4 · 84 · 4,1 ms · 13,3 MB |
+
+Lectura honesta:
+
+- **Draw calls:** media en Explorar quedó **por debajo** del original (91–97 contra 101–104); baja, 90–93.
+- **JS por cuadro:** media 3,7–4,5 ms contra 3,5–3,9 ms del original. En 2 de 3 corridas queda igual dentro del ruido (3,7–3,8 ms); en la corrida 2 quedó 0,6–1 ms arriba. Baja: 3,7–4,3 ms. No se puede afirmar que media esté siempre por debajo del original.
+- **FPS:** media sigue más baja que el original (10,9–12,3 contra 14,6–16,2). Con dpr 1 el costo extra es de raster (700 briznas de pasto y 160 flores dibujadas por CPU en SwiftShader), no de draw calls ni de JS. Baja (sin pasto ni flores) está a la par del original: 14,0–15,0 fps.
+- **Baja contra media:** baja es más barata en FPS (+2–4 fps), partículas, minimapa y contenido dibujado. Los draw calls son parecidos porque lo que se quita en baja era poco (pasto, flores y niebla: 3 draw calls).
+- **Heap:** más alto que el original (13–25 MB contra 11–12 MB): misiones, jefes, pools de peligros y proyectiles, canvas del mapa y texturas de las marcas.
+
+#### Primera entrega (antes de la pasada, load average 26–30)
+
+Explorar media: 3,2–5,1 fps · 120–129 draw calls · 4,3–7,3 ms. Baja: 4,2–6,3 fps · 118–130 draw calls · 6,8–9,6 ms. Original en la misma sesión: 5,1–9,5 fps · 101–106 draw calls · 2,4–5,6 ms.
+
+### Pendientes / NO PROBADO
+
+- **No probado en GPU real ni en celular real** (sólo SwiftShader); falta medir la calidad baja con dpr alto.
+- En media los FPS de Explorar en SwiftShader siguen por debajo del original por el raster del pasto y las flores (en GPU real debería ser barato; falta medirlo). Si molestara, bajar `grass` de media a ~400.
+- Récord único (no por dificultad). El progreso de misiones de los habitantes es por partida; sólo el álbum y las coronas persisten.
+- Los jefes son esquivables pero no hay prueba automática de "esquivar" (la evitación real se verificó sólo con los avisos/hazards en capturas).
+- `games/registry.js` sigue con la descripción vieja (pedir: mencionar misiones, guardianes y el Rey).
+- Ideas para un three.js nuevo: sombras con `shadowMap.autoUpdate` por zonas, `MeshStandardMaterial` para cristales; no se hizo en esta ronda.

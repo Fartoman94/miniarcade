@@ -14,6 +14,7 @@ beforeAll(() => {
     id: 'clavado', isActive: () => game.active,
     onPause: () => game.paused++, onResume: () => game.resumed++, onRestart: () => game.restarted++,
     onMute: m => { game.muted = m; },
+    onQuality: q => { game.quality = q; },
   });
   window.addEventListener('keydown', e => game.keys.push(e.code));
 });
@@ -110,5 +111,60 @@ describe('legacyBestKey en init (antes de que cargue el registro)', () => {
     // clavado ya tiene récord en ml:scores en este archivo; probamos la rama de respaldo con otro id ficticio
     localStorage.setItem('viejo_best', '77');
     expect(window.MLArcade.scores.best('id_sin_registro')).toBe(0);
+  });
+});
+
+describe('calidad gráfica', () => {
+  it('auto se resuelve a un nivel concreto y avisa al juego', async () => {
+    await Promise.resolve();
+    expect(['low', 'medium', 'high']).toContain(window.MLArcade.quality());
+    expect(game.quality).toBe(window.MLArcade.quality());
+  });
+  it('cambiar la calidad persiste, avisa y rechaza valores inválidos', () => {
+    window.MLArcade.settings.set('quality', 'low');
+    expect(game.quality).toBe('low');
+    expect(JSON.parse(localStorage.getItem('ml:settings')).quality).toBe('low');
+    window.MLArcade.settings.set('quality', 'ultra');
+    expect(window.MLArcade.settings.get('quality')).toBe('low');
+    window.MLArcade.settings.set('quality', 'auto');
+  });
+  it('el menú de pausa muestra el botón de calidad y secciones propias', () => {
+    const sec = document.createElement('div'); sec.id = 'sec-prueba';
+    window.MLArcade.addPauseSection(sec);
+    expect(document.querySelector('.mla-pause .mla-sections #sec-prueba')).not.toBeNull();
+    expect(document.querySelector('.mla-pause [data-a="quality"]').textContent).toMatch(/Calidad/);
+  });
+  it('requireWebGL sin Three.js muestra el respaldo y devuelve false', () => {
+    expect(window.MLArcade.requireWebGL()).toBe(false);
+    expect(document.querySelector('.mla-nogl')).not.toBeNull();
+  });
+});
+
+describe('opciones fuera de partida', () => {
+  it('sin partida activa, el botón abre OPCIONES sin pausar ni reanudar el juego', () => {
+    const ML = window.MLArcade;
+    if (ML.isPaused()) ML.resume();
+    game.active = false;
+    const p0 = game.paused, r0 = game.resumed;
+    const btn = document.querySelector('.mla-bar button[aria-label="Opciones"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+    expect(ML.isPaused()).toBe(true);
+    expect(document.querySelector('#mla-ptitle').textContent).toBe('OPCIONES');
+    expect(document.querySelector('.mla-pause').classList.contains('mla-optmode')).toBe(true);
+    expect(game.paused).toBe(p0);
+    // mientras está abierto, la entrada no llega al juego
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+    expect(game.keys).not.toContain('Space');
+    // Escape cierra sin llamar onResume
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', bubbles: true }));
+    expect(ML.isPaused()).toBe(false);
+    expect(game.resumed).toBe(r0);
+    expect(document.querySelector('#mla-ptitle').textContent).toBe('PAUSA');
+  });
+  it('en partida el mismo botón es ⏸ Pausa', () => {
+    game.active = true; window.MLArcade.refresh();
+    expect(document.querySelector('.mla-bar button[aria-label="Pausa"]').textContent).toBe('⏸');
+    game.active = false; window.MLArcade.refresh();
   });
 });

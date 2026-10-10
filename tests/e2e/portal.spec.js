@@ -58,8 +58,15 @@ test.describe('portal', () => {
     await page.mouse.click(10, 10);
     // el salteo es síncrono: en el mismo pointerdown la intro pasa a 'ml-out' (antes de los 3,4 s automáticos).
     // La remoción del nodo usa un setTimeout y headless a veces demora los timers, por eso se espera con margen.
-    await expect(page.locator('#ml-intro')).toHaveClass(/ml-out/, { timeout: 1000 });
-    await expect(page.locator('#ml-intro')).toHaveCount(0, { timeout: 10_000 });
+    // saliendo (ml-out, sin capturar toques) o ya eliminada: las dos cosas prueban el salteo inmediato
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.getElementById('ml-intro');
+      return !el || (el.classList.contains('ml-out') && getComputedStyle(el).pointerEvents === 'none');
+    }), { timeout: 1000 }).toBe(true);
+    // la entrada se libera al terminar el gesto (sin depender de timers): una tecla nueva ya llega a la página
+    await page.evaluate(() => { window.__keys = 0; document.addEventListener('keydown', () => window.__keys++); });
+    await page.keyboard.press('KeyA');
+    expect(await page.evaluate(() => window.__keys)).toBe(1);
     await page.reload();
     await page.waitForTimeout(200);
     await expect(page.locator('#ml-intro')).toHaveCount(0);
@@ -86,4 +93,34 @@ test('service worker: el portal abre sin conexión tras la primera visita', asyn
   await page.waitForSelector('html[data-portal=ready]', { timeout: 10_000 });
   await expect(page.locator('#grid article.card')).toHaveCount(8);
   await context.setOffline(false);
+});
+
+test.describe('portada 3.0', () => {
+  test('hero: "Jugar ahora" va a una selección del equipo y, tras jugar, al último juego', async ({ page }) => {
+    const { errors } = await openGame(page, 'index.html?nosw');
+    await page.waitForSelector('html[data-portal=ready]');
+    const href = await page.locator('#playNow').getAttribute('href');
+    expect(['muerte_gloriosa.html', 'Salva_al_rey.html', 'torre_infinita.html']).toContain(href);
+    await expect(page.locator('#orbit a')).toHaveCount(8);
+    await expect(page.locator('#picks .pick')).toHaveCount(3);
+    await page.evaluate(() => localStorage.setItem('ml:stats', JSON.stringify({ turbo_furia: { plays: 2, timeMs: 1000, last: Date.now() } })));
+    await page.reload();
+    await page.waitForSelector('html[data-portal=ready]');
+    await expect(page.locator('#playNow')).toHaveAttribute('href', 'turbo_furia.html');
+    await expect(page.locator('#playNowSub')).toContainText('Seguir con TURBO FURIA');
+    expectNoErrors(errors);
+  });
+
+  test('logros de misiones aparecen en la tarjeta y la ficha', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('ml:stats', JSON.stringify({ clavado: { plays: 1, timeMs: 1000, last: 1 } }));
+      localStorage.setItem('ml:missions', JSON.stringify({ clavado: { done: { a: 1, b: 2 }, runs: 3 } }));
+    });
+    await openGame(page, 'index.html?nosw#/juego/clavado');
+    await page.waitForSelector('html[data-portal=ready]');
+    await expect(page.locator('dialog#detail .d-stats')).toContainText('LOGROS');
+    await expect(page.locator('dialog#detail .d-stats')).toContainText('2');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('article[data-id=clavado] .ach')).toContainText('2');
+  });
 });

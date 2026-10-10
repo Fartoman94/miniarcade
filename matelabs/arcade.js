@@ -48,15 +48,28 @@
 
   /* ---------- ajustes globales ---------- */
   const SET_KEY = 'ml:settings';
-  /** @type {{muted:boolean, showFps:boolean}} */
-  const settings = Object.assign({ muted: false, showFps: false }, store.get(SET_KEY, {}));
+  /** @typedef {'auto'|'low'|'medium'|'high'} Quality */
+  /** @type {{muted:boolean, showFps:boolean, quality:Quality}} */
+  const settings = Object.assign({ muted: false, showFps: false, quality: 'auto' }, store.get(SET_KEY, {}));
+  if (!['auto', 'low', 'medium', 'high'].includes(settings.quality)) settings.quality = 'auto';
+  const Q_LABEL = { auto: 'Automática', low: 'Baja', medium: 'Media', high: 'Alta' };
+  /** Calidad efectiva: 'auto' se resuelve con señales baratas del dispositivo (sin benchmark). */
+  function resolvedQuality() {
+    if (settings.quality !== 'auto') return settings.quality;
+    const nav = /** @type {any} */ (navigator);
+    const mem = nav.deviceMemory || 4, cores = nav.hardwareConcurrency || 4;
+    const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    if (mem <= 2 || cores <= 2) return 'low';
+    if (touch || mem <= 4 || cores <= 4) return 'medium';
+    return 'high';
+  }
   /** @type {Set<(s: typeof settings) => void>} */
   const settingsListeners = new Set();
 
   /* ---------- estado ---------- */
   const qs = new URLSearchParams(location.search);
   const state = {
-    id: '', title: '', paused: false, started: false, playStart: 0,
+    id: '', title: '', paused: false, menuOnly: false, started: false, playStart: 0,
     debug: qs.has('debug'),
     /** @type {any} */ meta: null,
     /** @type {Omit<Required<InitOpts>,'onRestart'> & {onRestart: (()=>void)|null}} */ opts: /** @type {any} */ (null),
@@ -66,7 +79,7 @@
    *  isActive?:()=>boolean, onPause?:()=>void, onResume?:()=>void, onRestart?:()=>void, onExit?:()=>void,
    *  onMute?:(muted:boolean)=>void, toolbar?:'tl'|'tr'|'bl'|'br'|'none',
    *  gamepad?:Record<string,string>|false, pauseKeys?:string[], pauseOnBlur?:boolean, legacyBestKey?:string,
-   *  actions?:{label:string, fn:()=>void}[]}} InitOpts */
+   *  actions?:{label:string, fn:()=>void}[], onQuality?:(q:'low'|'medium'|'high')=>void}} InitOpts */
 
   /* ---------- estilos ---------- */
   const css = document.createElement('style');
@@ -88,6 +101,7 @@
     background:rgba(2,8,12,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
     font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#fff;padding:16px}
   .mla-pause[hidden]{display:none}
+  .mla-optmode [data-a="restart"],.mla-optmode [data-a="custom"]{display:none}
   .mla-card{width:min(360px,100%);max-height:100%;overflow:auto;background:linear-gradient(180deg,#0e2430,#08141c);
     border:1px solid rgba(46,230,230,.3);border-radius:18px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 40px rgba(46,230,230,.12);
     display:flex;flex-direction:column;gap:10px;text-align:center}
@@ -155,7 +169,9 @@
         ${state.opts.actions.map((a, i) => `<button type="button" data-a="custom" data-i="${i}">${escapeHTML(a.label)}</button>`).join('')}
         <button type="button" data-a="help" aria-expanded="false">? Cómo jugar</button>
         <ul class="mla-help" hidden>${help}</ul>
+        <div class="mla-sections"></div>
         <button type="button" data-a="mute"></button>
+        <button type="button" data-a="quality"></button>
         <a href="${PORTAL}" data-a="exit">⌂ Volver al arcade</a>
       </div>`);
     pauseEl.addEventListener('click', e => {
@@ -172,6 +188,10 @@
       }
       else if (a === 'help') { const u = /** @type {HTMLElement} */ (pauseEl && pauseEl.querySelector('.mla-help')); u.hidden = !u.hidden; t.setAttribute('aria-expanded', String(!u.hidden)); }
       else if (a === 'mute') setSetting('muted', !settings.muted);
+      else if (a === 'quality') {
+        const order = /** @type {Quality[]} */ (['auto', 'low', 'medium', 'high']);
+        setSetting('quality', order[(order.indexOf(settings.quality) + 1) % order.length]);
+      }
       else if (a === 'exit') track('exit', { via: 'pause' });
     });
     document.body.appendChild(pauseEl);
@@ -186,9 +206,21 @@
 
   function refreshButtons() {
     if (btnMute) { btnMute.textContent = settings.muted ? '🔇' : '🔊'; btnMute.title = settings.muted ? 'Activar sonido' : 'Silenciar'; btnMute.setAttribute('aria-pressed', String(settings.muted)); }
-    if (btnPause) { btnPause.hidden = !isActive() && !state.paused; }
+    if (btnPause) {
+      // en partida: ⏸ pausa; fuera de partida (menús del juego): ⚙ opciones (sonido, calidad, ayuda)
+      const opts = !isActive() && !(state.paused && !state.menuOnly);
+      btnPause.hidden = false;
+      btnPause.textContent = opts ? '⚙' : '⏸';
+      btnPause.title = opts ? 'Opciones' : 'Pausa (Esc / P)';
+      btnPause.setAttribute('aria-label', opts ? 'Opciones' : 'Pausa');
+    }
     const m = pauseEl && pauseEl.querySelector('[data-a="mute"]');
     if (m) m.textContent = settings.muted ? '🔇 Sonido: NO' : '🔊 Sonido: SÍ';
+    const qb = pauseEl && pauseEl.querySelector('[data-a="quality"]');
+    if (qb) {
+      qb.textContent = `🎚 Calidad: ${Q_LABEL[settings.quality]}` + (settings.quality === 'auto' ? ` (${Q_LABEL[resolvedQuality()].toLowerCase()})` : '');
+      /** @type {HTMLElement} */ (qb).hidden = !state.opts.onQuality;
+    }
   }
 
   /** @param {string} s */
@@ -207,16 +239,38 @@
     refreshButtons();
     return true;
   }
-  /** @param {boolean} [silent] no llamar onResume (p. ej. porque se va a reiniciar) */
-  function resume(silent = false) {
-    if (!state.paused) return false;
-    state.paused = false;
-    if (pauseEl) pauseEl.hidden = true;
-    if (!silent) { try { state.opts.onResume(); } catch (e) { reportError(e); } }
+  /** Opciones fuera de partida: mismo panel, sin tocar el juego (no hay simulación que congelar). */
+  function openOptions() {
+    if (state.paused || !state.opts || !pauseEl) return false;
+    state.paused = true; state.menuOnly = true;
+    pauseEl.classList.add('mla-optmode');
+    const h = pauseEl.querySelector('#mla-ptitle'), b = /** @type {HTMLElement|null} */ (pauseEl.querySelector('.mla-primary'));
+    if (h) h.textContent = 'OPCIONES';
+    if (b) { b.textContent = '✓ Cerrar'; b.focus({ preventScroll: true }); }
+    pauseEl.hidden = false;
+    track('options');
     refreshButtons();
     return true;
   }
-  function togglePause() { return state.paused ? resume() : pause(); }
+  /** @param {boolean} [silent] no llamar onResume (p. ej. porque se va a reiniciar) */
+  function resume(silent = false) {
+    if (!state.paused) return false;
+    const wasMenu = state.menuOnly;
+    state.paused = false; state.menuOnly = false;
+    if (pauseEl) {
+      pauseEl.hidden = true;
+      if (wasMenu) {
+        pauseEl.classList.remove('mla-optmode');
+        const h = pauseEl.querySelector('#mla-ptitle'), b = pauseEl.querySelector('.mla-primary');
+        if (h) h.textContent = 'PAUSA';
+        if (b) b.textContent = '▶ Reanudar';
+      }
+    }
+    if (!silent && !wasMenu) { try { state.opts.onResume(); } catch (e) { reportError(e); } }
+    refreshButtons();
+    return true;
+  }
+  function togglePause() { return state.paused ? resume() : isActive() ? pause() : openOptions(); }
 
   // Mientras está en pausa, la entrada no llega al juego (salvo al menú de pausa y la barra).
   const BLOCK = ['keydown', 'keyup', 'pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'click', 'wheel', 'contextmenu'];
@@ -247,11 +301,13 @@
   addEventListener('blur', () => { if (state.opts && state.opts.pauseOnBlur) pause('blur'); });
 
   /* ---------- ajustes ---------- */
-  /** @param {'muted'|'showFps'} k @param {boolean} v */
+  /** @param {'muted'|'showFps'|'quality'} k @param {any} v */
   function setSetting(k, v) {
-    settings[k] = v;
+    if (k === 'quality' && !['auto', 'low', 'medium', 'high'].includes(v)) return;
+    /** @type {any} */ (settings)[k] = v;
     store.set(SET_KEY, settings);
     if (k === 'muted' && state.opts) { try { state.opts.onMute(v); } catch (e) { reportError(e); } }
+    if (k === 'quality' && state.opts && state.opts.onQuality) { try { state.opts.onQuality(/** @type {any} */ (resolvedQuality())); } catch (e) { reportError(e); } }
     if (k === 'showFps') fps.toggle(v);
     refreshButtons();
     settingsListeners.forEach(fn => fn(settings));
@@ -292,7 +348,7 @@
   function pollPad() {
     padRAF = 0;
     const map = state.opts && state.opts.gamepad;
-    if (!map) return;
+    if (!map || !padAllowed) return;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     /** @type {Record<string, boolean>} */
     const now = {};
@@ -319,7 +375,11 @@
     if (Object.keys(now).length || anyPad()) padRAF = requestAnimationFrame(pollPad);
   }
   function anyPad() { return navigator.getGamepads && [...navigator.getGamepads()].some(Boolean); }
-  addEventListener('gamepadconnected', e => { track('gamepad', { id: /** @type {GamepadEvent} */ (e).gamepad.id }); if (!padRAF) padRAF = requestAnimationFrame(pollPad); });
+  // En navegadores automatizados (Playwright, CI) se ignoran los mandos físicos de la máquina: si hay
+  // joysticks conectados, sus ejes/botones generaban teclas fantasma durante las pruebas. ?gamepad lo reactiva.
+  const padAllowed = !(/** @type {any} */ (navigator).webdriver) || qs.has('gamepad');
+  addEventListener('gamepadconnected', e => {
+    if (!padAllowed) return; track('gamepad', { id: /** @type {GamepadEvent} */ (e).gamepad.id }); if (!padRAF) padRAF = requestAnimationFrame(pollPad); });
 
   /* ---------- puntajes y estadísticas ---------- */
   /** @param {string} [id] */
@@ -445,6 +505,7 @@
         onPause: o.onPause || noop, onResume: o.onResume || noop, onRestart: o.onRestart || null, onExit: o.onExit || noop,
         onMute: o.onMute || noop, toolbar: o.toolbar || 'tr', gamepad: o.gamepad === false ? false : Object.assign({}, DEFAULT_PAD, o.gamepad || {}),
         pauseKeys: o.pauseKeys || ['Escape', 'KeyP'], pauseOnBlur: !!o.pauseOnBlur, legacyBestKey: o.legacyBestKey || '', actions: o.actions || [],
+        onQuality: o.onQuality || null,
       });
       const ready = () => {
         buildUI();
@@ -461,10 +522,12 @@
       });
       // estado inicial del sonido
       if (settings.muted) queueMicrotask(() => { try { state.opts.onMute(true); } catch (e) { reportError(e); } });
+      // calidad inicial
+      if (state.opts.onQuality) queueMicrotask(() => { try { state.opts.onQuality && state.opts.onQuality(/** @type {any} */ (resolvedQuality())); } catch (e) { reportError(e); } });
       track('open');
       return API;
     },
-    pause, resume, togglePause,
+    pause, resume, togglePause, openOptions,
     isPaused: () => state.paused,
     /** Llamar cuando el jugador arranca una partida. */
     started: gameStarted,
@@ -474,9 +537,44 @@
     scores: { best: getBest, submit: submitScore },
     stats: getStats,
     settings: {
-      /** @param {'muted'|'showFps'} k */ get: k => settings[k],
+      /** @param {'muted'|'showFps'|'quality'} k */ get: k => settings[k],
       set: setSetting,
       /** @param {(s: typeof settings) => void} fn */ on: fn => { settingsListeners.add(fn); return () => settingsListeners.delete(fn); },
+    },
+    /** Calidad efectiva actual ('low'|'medium'|'high'). */
+    quality: resolvedQuality,
+    /** Agrega un bloque propio al menú de pausa (p. ej. misiones). Devuelve el contenedor. @param {HTMLElement} node */
+    addPauseSection(node) {
+      const put = () => { const c = pauseEl && pauseEl.querySelector('.mla-sections'); if (c) c.appendChild(node); };
+      if (pauseEl) put(); else addEventListener('DOMContentLoaded', put, { once: true });
+      return node;
+    },
+    /** Verifica WebGL y que Three.js haya cargado; si no, muestra una pantalla de respaldo y devuelve false.
+     *  @param {{needsThree?:boolean}} [o] */
+    requireWebGL(o = {}) {
+      let reason = '';
+      if (o.needsThree !== false && typeof (/** @type {any} */ (window).THREE) === 'undefined') reason = 'three';
+      else {
+        try {
+          const c = document.createElement('canvas');
+          const gl = c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl');
+          if (!gl) reason = 'webgl';
+        } catch (e) { reason = 'webgl'; }
+      }
+      if (!reason) return true;
+      track('webgl-fallback', { reason });
+      const show = () => {
+        const box = el('div', { class: 'mla-pause mla-nogl', role: 'alert' }, `<div class="mla-card"><small>${escapeHTML(state.title || 'MINIARCADE')}</small>
+          <h2>${reason === 'three' ? 'No se pudo cargar el motor 3D' : 'Tu navegador no tiene WebGL'}</h2>
+          <p style="margin:0;color:#cfe9ec;line-height:1.5;font-size:14px">${reason === 'three'
+            ? 'Revisá la conexión y probá de nuevo. Si estás sin internet, abrí el juego una vez con conexión para que quede guardado.'
+            : 'Este juego es 3D y necesita WebGL. Probá con Chrome, Edge o Firefox actualizados, o activá la aceleración por hardware.'}</p>
+          ${reason === 'three' ? '<button type="button" class="mla-primary" onclick="location.reload()">↻ Reintentar</button>' : ''}
+          <a href="${PORTAL}">⌂ Elegir otro juego</a></div>`);
+        document.body.appendChild(box);
+      };
+      if (document.body) show(); else addEventListener('DOMContentLoaded', show, { once: true });
+      return false;
     },
     track, reportError, toggleFullscreen,
     registry: () => registryReady,

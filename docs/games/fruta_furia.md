@@ -82,3 +82,117 @@ Además se verificó aparte (script Playwright, no en la spec) la ruta de la bom
 - El fondo del menú y de la pantalla de fin sigue animándose a 60 fps (es parte de la presentación); no se limitó.
 - Accesibilidad: el juego es de deslizar, no hay alternativa por teclado ni gamepad para cortar.
 - Sin prueba en dispositivo real (sólo emulación Pixel 7 en headless).
+
+## MiniArcade 3.0
+
+### Estado antes → después
+
+| Antes | Después |
+|---|---|
+| 6 frutas (dorada como única especial), 1 tipo de bomba sin aviso | + **Helada ❄** (hexágono de hielo, cámara lenta 3,5 s), **Ananá gigante 🍍** (óvalo con corona, 3 tajos distintos), **Petardo 🧨** (cilindro rojo con franjas, −1 vida). La bomba clásica ahora lleva una calavera y **todas las bombas se avisan 0,6 s antes** con un ⚠ en el borde inferior, en la columna por donde van a salir |
+| Oleadas iguales (6 frutas al azar) cada 16→10 s | Oleadas numeradas (HUD «OLEADA n») con patrones que rotan: abanico, cítricos, lluvia de los costados; 6→10 frutas según la oleada |
+| Sin jefe | **Sandía Gigante** cada 4 oleadas: 3 fases (quieta → se balancea → se balancea rápido y escupe fruta), barra de vida y de tiempo; si se acaba el tiempo se va **sin penalizar** |
+| Un solo puntero | **Multitáctil**: hasta 3 dedos, cada uno con su rastro y su combo |
+| Rastro de dos trazos por segmento | Cinta afinada (cola fina, punta ancha), rosa con combo ≥ 3 |
+| Partículas `{}` nuevas por cada gota, gradientes por fruta por frame | Pool fijo de 520 partículas (tope por calidad), sprites de fruta cacheados por tamaño/DPR, fondo cacheado, brillo de faroles cacheado; manchas de jugo en pool |
+| Sin misiones, sin dificultad, sin calidad | MLMissions (2 principales + 8 secundarias), 4 dificultades, 3 calidades |
+
+Colisión del tajo **sin cambios**: segmento del trazo contra círculo de radio `r + 4` (mismos radios de las frutas originales). Penalizaciones originales **sin cambios**: fruta común escapada = −1 vida, bomba = fin, 3 vidas en todas las dificultades. Lo nuevo es igual o menos castigador: las especiales (dorada, helada, ananá) y la fruta que escupe el jefe **no** quitan vida si se escapan; el petardo reemplaza al 35 % de las bombas desde la oleada indicada (quita una vida en lugar de terminar la partida).
+
+### Misiones
+
+Se eligen la principal pendiente + 2 secundarias por partida (rotación de MLMissions). Chips abajo a la derecha (`hud: 'br'`): no tapan puntos (arriba-izq.), vidas (arriba-der.), oleada/jefe (arriba-centro) ni la barra del arcade (abajo-izq.).
+
+| id | Tipo | Título | Evento (emitido desde la lógica) | Meta |
+|---|---|---|---|---|
+| p_boss | principal | Partí la Sandía Gigante | `bossDefeated` | 1 |
+| p_wave | principal | Llegá a la oleada 6 | `wave` (max) | 6 |
+| s_intact | secundaria | Intacto | `wave` (max), **failOn `lifeLost`** | oleada 3 |
+| s_combo | secundaria | Combo ×4 | `combo` (max, por tajo) | 4 |
+| s_prec | secundaria | Pulso firme | `precision` (racha de tajos que cortan; un tajo de > 60 px en el aire la corta) | 8 |
+| s_citrus | secundaria | Cítricos | `citrus` (naranja o limón) | 12 |
+| s_golden | secundaria | Oro puro | `golden` | 2 |
+| s_frozen | secundaria | Cámara lenta | `frozen` | 1 |
+| s_giant | secundaria | Ananá gigante | `giantSplit` | 1 |
+| s_bombs | secundaria | Sangre fría | `bombDodged` (bomba o petardo que cae sin tocarse) | 4 |
+
+`runStart()` al empezar cada partida (también «Reiniciar» y «Otra vez»); `runEnd()` al terminar, al reiniciar desde la pausa, al volver al menú (botón «MENÚ · DIFICULTAD» del fin de partida o «☰ Menú del juego» de la pausa) y al salir al arcade.
+
+### Dificultad
+
+Se elige en el menú de inicio (no durante la partida). Nunca cambia los controles, la colisión ni las vidas.
+
+| Parámetro | Fácil | Normal (= balance anterior) | Difícil | Extremo |
+|---|---|---|---|---|
+| Velocidad del vuelo (escala de tiempo; misma altura) | ×0,85 | ×1 | ×1,12 | ×1,25 |
+| Intervalo entre lanzamientos | ×1,25 | ×1 | ×0,85 | ×0,72 |
+| Probabilidad de bomba (tope 30 %) | ×0,6 | ×1 (6 %→20 %) | ×1,3 | ×1,6 |
+| Sin bombas los primeros | 12 s | 8 s | 6 s | 4 s |
+| Petardos desde la oleada | 4 | 3 | 2 | 1 |
+| Sandía Gigante: tajos / segundos | 12 / 18 | 16 / 15 | 20 / 13 | 26 / 12 |
+| Frecuencia de especiales (helada, ananá) | ×1,3 | ×1 | ×0,85 | ×0,7 |
+| Petardo en la fase 3 del jefe | no | no | 50 % | 50 % |
+
+Récord: **uno solo** para todas las dificultades (`fruta_best` + `ml:scores`, sin cambio de estructura).
+
+### Calidad (🎚 del menú de pausa)
+
+| | Baja | Media | Alta |
+|---|---|---|---|
+| Tope de DPR del canvas | 1 | 1,5 | 2 |
+| Tope de partículas (pool) | 120 (cuadradas) | 260 | 520 |
+| Manchas de jugo | 0 | 10 | 22 |
+| Luciérnagas | 0 | 8 | 14 |
+| Brillo de faroles, sombras de fruta | no | sí | sí |
+| Estrellas titilantes | no (horneadas en el fondo) | sí | sí |
+| Capas de colinas con paralaje | no (horneadas) | no (horneadas) | sí (3 capas, siguen al filo) |
+| Rastro | un trazo | con halo | con halo |
+
+### Cambios visuales
+
+Sprites cacheados con sombreado volumétrico (terminador en la sandía), sombra proyectada 2,5D detrás de cada fruta, manchas de jugo que se desvanecen, cinta del filo afinada, tinte celeste suave durante la cámara lenta (sin parpadeos), cara temática de la Sandía Gigante (cejas y boca; grietas rojas según el daño, aplastamiento suave al recibir tajos). `prefers-reduced-motion`: sin sacudón de cámara, destello de la bomba al 25 % (antes 85 %; ahora 60 % sin la preferencia), sin animación del título/fruta del menú. Menú compacto en pantallas de ≤ 560 px de alto (celular apaisado): dos columnas.
+
+### Pruebas (`tests/e2e/fruta_furia.spec.js`)
+
+Las 5 pruebas anteriores siguen y pasan. Cambiaron tres esperas fijas: ahora esperan con `expect.poll`. Son el tiempo después de «Reiniciar», el resize a 390 px y la ventana de muestreo de la altura del vuelo (de 30 a 60 s). Con la máquina cargada fallaban aunque el juego estuviera bien. Pruebas nuevas (`describe('Fruta Furia 3.0')`, con `?debug=1` para poner fruta quieta y frenar los lanzamientos; los cortes son siempre gestos reales, mouse o toques CDP):
+
+1. **Misiones:** combo ×4 con un tajo real → `s_combo` cumplida; petardo cortado → −1 vida y `s_intact` (failOn) fallida; Sandía Gigante con 2 de vida y tajos reales → `p_boss` cumplida; tras recargar, los logros siguen en `ml:missions`.
+2. **Dificultad:** 4 radios; flecha → desde Normal pasa a Difícil (no arranca la partida); toque/clic en Fácil; `D.speed`, `D.spawn` y `D.bossHp` cambian; persiste tras recargar.
+3. **Calidad:** baja → DPR 1, canvas = ancho CSS, tope de 120 partículas que no se supera tras cortar 12 sandías, 0 manchas; alta → 520/22/14 + paralaje; media → 260/10, DPR ≤ 1,5.
+4. **Especiales:** helada → cámara lenta (`ts < 0,8`) que se termina sola; ananá → 3 tajos (vida 3→2→1→partido), 5+5+40 pts; dorada 50.
+5. **Bombas:** aviso previo (está en `warns` y no en `fruits` hasta que termina); si se deja pasar no penaliza; petardo → 1 vida perdida y se sigue jugando; bomba → fin; botón «MENÚ · DIFICULTAD» vuelve al menú y cierra la partida de misiones.
+6. **Jefe:** aparece en la oleada 4 con 16 de vida (Normal); un tajo real resta 1 y suma 5; con el tiempo agotado se va sin quitar vidas.
+7. **Multitáctil** (sólo proyecto mobile): dos dedos a la vez → 2 tajos activos, 2 frutas cortadas.
+
+Los gestos que dependen del estado se repiten hasta 4 veces con `swipeUntil`. Con la carga en 70–87, un toque CDP a veces llegaba tarde y la prueba fallaba sin que el juego tuviera la culpa.
+
+**Resultado final:** `ML_WORKERS=1 npx playwright test tests/e2e/fruta_furia.spec.js` → **23 passed, 1 skipped (8.6 min)**: desktop 11/11 (multitáctil se saltea a propósito), mobile 12/12. Load average entre 30 y 45 durante la corrida. Corridas anteriores con la máquina más cargada (load 41–87) tuvieron fallas de 1 a 4 pruebas por espera. Todas pasaron al repetirlas solas, y después se reemplazaron esas esperas por `poll`/reintentos.
+
+Un **bug real** que encontraron las pruebas: la dificultad guardada no se leía al cargar, porque se leía antes de `MLMissions.setup`, que es lo que fija el `gameId`. Quedó corregido.
+
+### Mediciones (antes → después)
+
+Script de Playwright propio (no forma parte de la spec): 1280×800, Chromium headless. Primero 8 s en el menú (el bot corta fruta) y después 8 s de partida con tajos reales cada ~0,3 s. «Antes» es el archivo original servido por intercepción de ruta. El original ignora la calidad, así que sus dos filas sólo muestran el ruido de la medición. Durante la medición la máquina estaba **muy cargada (load ≈ 60–70)**: hay que comparar las cifras entre sí y no tomarlas como valores absolutos.
+
+| Versión / calidad | Fase | Frame medio | p95 | Tarea principal por frame | Script+layout por frame | Heap JS |
+|---|---|---|---|---|---|---|
+| antes (fila "medium") | menú | 33,3 ms | 66,7 | 27,3 ms | 1,61 ms | 1,41 MB |
+| antes (fila "medium") | juego | 24,8 ms | 50,0 | 23,2 ms | 2,55 ms | 1,37 MB |
+| antes (fila "low") | menú | 31,4 ms | 66,7 | 25,3 ms | 1,53 ms | 2,03 MB |
+| antes (fila "low") | juego | 27,5 ms | 66,6 | 26,1 ms | 2,20 ms | 1,66 MB |
+| después media | menú | 24,9 ms | 50,0 | 13,6 ms | 1,34 ms | 1,95 MB |
+| después media | juego | 24,1 ms | 50,0 | 19,2 ms | 1,66 ms | 1,76 MB |
+| después baja | menú | 22,9 ms | 50,0 | 10,5 ms | 1,05 ms | 1,24 MB |
+| después baja | juego | 20,4 ms | 33,4 | 14,7 ms | 1,38 ms | 1,93 MB |
+
+Máximo de entidades vivas en la versión nueva (fruta + partículas, muestreo cada ~0,3 s): 17–26. El original no expone las partículas, así que no hay comparación. El canvas 2D no tiene «draw calls» medibles como WebGL.
+
+### Pendientes / NO PROBADO
+
+- Sin prueba en un dispositivo real (sólo emulación de Pixel 7 en headless). El multitáctil se probó con toques CDP, no con dedos reales.
+- El silencio sigue sin prueba automática.
+- Misiones `p_wave`, `s_prec`, `s_citrus`, `s_golden`, `s_frozen`, `s_giant` y `s_bombs`: los eventos se emiten desde la lógica, pero en la spec sólo se completan `p_boss` y `s_combo`, y sólo falla `s_intact`. La helada, el ananá y el paso de una bomba sin tocarla se prueban como mecánica, no como misión.
+- La fase 3 del jefe (escupe fruta y, en Difícil/Extremo, petardos) no tiene prueba propia.
+- `prefers-reduced-motion` (sin sacudón, destello al 25 %) se verificó sólo leyendo el código.
+- Mediciones tomadas con la máquina muy cargada; conviene repetirlas en reposo.
+- Récord único para las 4 dificultades (no es por dificultad).
