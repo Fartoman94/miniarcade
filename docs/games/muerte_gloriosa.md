@@ -97,3 +97,71 @@ Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/muerte_gloriosa.spec
 - El cambio del yunque (colgado arriba en vez de apoyado en el piso) modifica un poco la dificultad: corriendo a toda velocidad se lo esquiva y, si te quedás debajo, te aplasta. Antes había que saltarlo como un obstáculo y caía mientras estabas en el aire.
 - El fallback de `roundRect` no se probó en un Safari viejo real.
 - No se midió el rendimiento durante la partida (`measure.mjs` mide el menú).
+
+## Personaje Mati Octo
+
+### Qué se integró
+
+- `matelabs/characters.js` se carga en el `<head>` después de `arcade.js`. El selector compartido (`MLChars.picker`) está en el menú inicial, entre los botones y las estadísticas, con el título «ELEGÍ TU VÍCTIMA». Las opciones son «Clásico» (🤕, el personaje original, que sigue siendo el predeterminado) y «Mati Octo». Se maneja con flechas, Tab o toque, y la elección se guarda en `ml:character` (sobrevive a la recarga).
+- Mati se dibuja con los 3 sprites 2D pre-renderizados (`MLChars.loadSprites()`, 128×128 WebP mirando a la derecha). Cuando camina a la izquierda el sprite se espeja (`scale(-1,1)`).
+- En el lienzo, las tarjetas del selector se oscurecieron con CSS propio del juego para que el texto blanco se lea sobre el cielo celeste del menú.
+- En pantallas bajas (`max-height:430px`, celular apaisado) el selector va en una sola fila, y el texto del menú y las tarjetas de estadísticas son más compactos. Con eso el menú entra completo en 915×412 sin scroll; antes del cambio ya desbordaba 10 px. Se revisó con capturas en 1280×800, Pixel 7 vertical y 915×412.
+
+### Poses (sprites estáticos, no animación)
+
+Son 3 imágenes **fijas**: no hay esqueleto ni animación. Se elige una según el estado del jugador:
+
+| Estado del juego | Pose |
+|---|---|
+| En el piso y `|vx| ≤ 30` | `idle` (quieto) |
+| En el piso y `|vx| > 30` | `run`, alternando con `idle` cada ~1,9 unidades de `P.walk` (≈0,15 s a velocidad máxima) para simular el paso |
+| En el aire | `jump` |
+
+Además hay movimiento procedural barato, anclado en los pies: una «respiración» leve (±1,5 % de alto) cuando está quieto, una inclinación hacia adelante de hasta 0,08 rad al correr con un pequeño rebote en el cuadro `idle` del paso, y un estiramiento/aplastamiento según `vy` en el aire.
+
+### Escala y colisionador
+
+- El colisionador **no cambió**: `P.w=26`, `P.h=54` y todas las pruebas de trampas usan `P.x`/`P.y` igual que antes, sin importar el personaje.
+- Escala: el recuadro opaco de cada pose se mide una sola vez al cargar (con `getImageData`; si falla, se usan valores fijos). La escala es común y sale de la pose quieta: Mati mide 80 unidades de alto, como el clásico (de los pies a la punta del gorro, ≈81). El centro horizontal también es común, así que cambiar de pose no corre al personaje. Cada pose apoya su borde inferior real en `P.y`: los pies quedan sobre el piso, sin hundirse.
+- Muerte: el «ragdoll» (pedazos rectangulares, cabeza con ojos en X) es el mismo efecto que antes, pero con Mati usa su paleta (azul, azul oscuro, cian) y suma un pedazo marrón que vuela: el mate. No hay destello de golpe en este juego (`P.inv` sólo existe para el reinicio).
+
+### Carga diferida y fallback
+
+- El juego sólo pide los sprites si el personaje elegido es Mati (al cargar la página) o cuando se lo elige en el selector.
+- **Ojo:** el `picker` compartido igual pide los sprites para su vista previa giratoria apenas se crea, aunque esté elegido el Clásico. Eso está en `characters.js`, no en el juego.
+- Si los sprites no cargan, el juego dibuja al clásico (`charDrawn: 'clasico'`) y muestra un aviso breve que no bloquea: «No se pudo cargar a Mati Octo: seguís con el personaje clásico.». El selector muestra además su propio mensaje. Al empezar una partida nueva se reintenta la carga en silencio.
+- Mientras se cargan, se ve el clásico (en local tarda unos pocos ms).
+
+### Gancho de pruebas
+
+`window.__mg` suma: `char` (elegido), `charDrawn` (el que realmente se dibuja), `charLoad` (`idle|loading|ready|failed`), `pose` (`classic|idle|run|jump`: la imagen visible), `poseState` (estado lógico), `collider` (`{w,h}`), `frameMs` (media móvil del tiempo de CPU por cuadro) y `frameN`.
+
+### Pruebas
+
+Se agregaron 3 tests a `tests/e2e/muerte_gloriosa.spec.js`:
+
+1. Selector: se ve el radiogroup. En escritorio se elige con flechas (→ Mati, ← Clásico) y en mobile con toque. La elección no arranca la partida y persiste tras recargar.
+2. Partida con Mati: se dibuja Mati, el colisionador es igual al del clásico (`{w:26,h:54}`) y las poses pasan por `idle` → `run` (corriendo) → `jump` (en el aire). Sigue muriendo en los pinchos.
+3. Fallback: con `page.route` se abortan todas las peticiones a `matelabs/characters/`. Aparece el aviso, la partida se juega con el clásico (avanza más de 60 px) y no hay `pageerror`. Sólo se ignoran los «Failed to load resource» de los pedidos abortados a propósito.
+
+Además, el test existente «jugar: el personaje avanza…» medía 600 ms fijos de caminata y falló una vez bajo carga (177 px contra los 180 pedidos). Ahora usa `expect.poll`, con el mismo umbral.
+
+Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/muerte_gloriosa.spec.js`): **21 passed, 5 skipped (3.1m)**. Desktop: 12 passed y 1 skipped. Mobile (Pixel 7): 9 passed y 4 skipped.
+
+### Rendimiento (medido en partida real)
+
+Escritorio 1280×800, Chromium headless. El personaje corre a la derecha durante 4 s (invulnerable, sólo para la medición), 241 cuadros por corrida, 2 corridas por personaje:
+
+| | Clásico | Mati |
+|---|---|---|
+| CPU por cuadro (media, corrida 1 / 2) | 0,50 / 0,25 ms | 0,34 / 0,25 ms |
+| FPS / p95 entre cuadros | 60 / 16,8 ms | 60 / 16,8 ms |
+| Heap JS usado | 3,22–3,30 MB | 3,38–3,39 MB |
+
+La diferencia de CPU está dentro del ruido. El clásico son ~15 trazados vectoriales por cuadro y Mati es un solo `drawImage`. El heap sube ~0,1 MB por los sprites y los recuadros (las imágenes decodificadas no cuentan en el heap JS). En 2D no hay «draw calls» de WebGL para comparar.
+
+### Pendientes
+
+- Lo de la vista previa del `picker` compartido: descarga los sprites de Mati aunque no esté elegido.
+- No hay sprite de muerte de Mati: el ragdoll son rectángulos con su paleta, no partes reales del modelo.
+- Mati es casi todo azul. Sobre el cielo celeste del nivel diurno se lee bien gracias al contorno oscuro, pero contrasta menos que el clásico.

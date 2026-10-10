@@ -7,6 +7,7 @@
 <title>MUERTE GLORIOSA — creado por MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%95%3C/text%3E%3C/svg%3E">
 <script src="matelabs/arcade.js"></script>
+<script src="matelabs/characters.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
@@ -131,6 +132,31 @@
     .btn{padding:10px 24px;font-size:18px}
   }
 
+  /* selector de personaje (matelabs/characters.js): sobre el cielo claro del menú las tarjetas
+     van oscuras para que el texto blanco se lea */
+  #charPick{display:flex;justify-content:center}
+  #charPick .mlc{align-items:center}
+  #charPick .mlc-title{color:#20344a;opacity:1;font-weight:900}
+  #charPick .mlc-card{background:rgba(32,52,74,.82);border-color:rgba(32,52,74,.9)}
+  #charPick .mlc-card:hover{background:rgba(32,52,74,.95)}
+  #charPick .mlc-card[aria-checked="true"]{border-color:#ffd93d;background:#20344a;box-shadow:0 0 0 2px #ffd93d,0 4px 0 rgba(30,50,70,.35)}
+  #charPick .mlc-card:focus-visible{outline-color:#e04a3a}
+  #charPick .mlc-anim{color:#20344a;opacity:.85;align-self:center}
+  #charPick .mlc-err{color:#a83226;font-weight:700}
+  #charMsg{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;pointer-events:none;
+       background:rgba(32,52,74,.92);color:#fff;font-weight:800;font-size:13px;padding:8px 16px;border-radius:12px;
+       max-width:90vw;text-align:center;opacity:0;transition:opacity .3s}
+  #charMsg.show{opacity:1}
+  @media (max-height:430px){
+    #charPick .mlc{flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 10px}
+    #charPick .mlc-prev{width:34px;height:34px}#charPick .mlc-prev canvas{width:34px;height:34px}
+    #charPick .mlc-card{padding:3px 10px 3px 3px;font-size:12px}
+    /* con el selector el menú apaisado no entraba: texto más ancho y tarjetas más bajas */
+    .mWrap{max-width:900px}.mTag{max-width:none;line-height:1.35;font-size:12px}
+    .mStat{padding:3px 12px}.mStat b{font-size:15px}
+    .mCredit{padding:5px 18px;margin-top:2px}
+  }
+
   #nogl{position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;
        padding:30px;text-align:center;font-size:15px;line-height:1.8;background:#87ceeb;font-weight:700}
 </style>
@@ -164,6 +190,7 @@
       <button class="btn" id="contBtn" type="button" hidden>⏩ SEGUIR</button>
       <button class="btn b" id="muteBtn" type="button">🔊 SONIDO: SÍ</button>
     </div>
+    <div id="charPick"></div>
     <div class="mStats">
       <div class="mStat">RÉCORD<b id="mBest">0/6</b></div>
       <div class="mStat">MUERTES TOTALES<b id="mDeaths">0</b></div>
@@ -192,6 +219,7 @@
     <div class="creditFoot">CREADO POR MATELABS</div>
   </div>
 </div>
+<div id="charMsg" role="status" aria-live="polite"></div>
 <div id="nogl">🤕 <b>MUERTE GLORIOSA</b> no pudo iniciar el lienzo 2D en este navegador.<br>Probá con Chrome, Edge o Firefox actualizados.</div>
 
 <script>
@@ -400,6 +428,50 @@ function resetPlayer(){
   P.dead=false;P.mode='alive';P.parts=[];P.deadT=0;P.won=false;P.inv=0;
 }
 
+/* ---------- personaje: Clásico (dibujado a mano) o Mati Octo (sprites) ----------
+   Mati son 3 sprites ESTÁTICOS pre-renderizados (quieto / correr / saltar), no una animación:
+   se elige uno según el estado y se le suma un movimiento procedural barato. El colisionador
+   (P.w × P.h, y todas las pruebas de trampas) es el mismo para los dos personajes. */
+const CH=window.MLChars||null,GID='muerte_gloriosa';
+let charSel=CH?CH.get(GID):'clasico';
+let mati=null,matiState='idle'; // 'idle' | 'loading' | 'ready' | 'failed'
+let pose='classic',poseState='idle';
+const MATI_H=80; // alto visual del clásico: de los pies (y=0) a la punta del gorro (y≈-81)
+function charMsg(txt){
+  const m=$('charMsg');m.textContent=txt;m.classList.add('show');
+  clearTimeout(charMsg.t);charMsg.t=setTimeout(()=>m.classList.remove('show'),4200);
+}
+/* recuadro opaco de cada pose (una sola vez, al cargar): pies y centro reales del dibujo */
+function spriteBox(img,fb){
+  try{
+    const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
+    const x=c.getContext('2d');x.drawImage(img,0,0);
+    const d=x.getImageData(0,0,c.width,c.height).data;
+    let x0=c.width,y0=c.height,x1=-1,y1=-1;
+    for(let y=0;y<c.height;y++)for(let i=0;i<c.width;i++)if(d[(y*c.width+i)*4+3]>40){
+      if(i<x0)x0=i;if(i>x1)x1=i;if(y<y0)y0=y;if(y>y1)y1=y;}
+    if(x1<0)return fb;
+    return {x0,y0,x1:x1+1,y1:y1+1};
+  }catch(e){return fb;}
+}
+function loadMati(){
+  if(!CH||matiState==='ready'||matiState==='loading')return;
+  matiState='loading';
+  CH.loadSprites().then(sp=>{
+    const fb={x0:43,y0:29,x1:88,y1:112};
+    const box={idle:spriteBox(sp.idle,fb),run:spriteBox(sp.run,fb),jump:spriteBox(sp.jump,fb)};
+    const S=MATI_H/(box.idle.y1-box.idle.y0); // escala común (tomada de la pose quieta)
+    const cx=(box.idle.x0+box.idle.x1)/2;     // centro común: cambiar de pose no corre al personaje
+    mati={img:{idle:sp.idle,run:sp.run,jump:sp.jump},box,S,cx};
+    matiState='ready';
+  }).catch(()=>{
+    matiState='failed';
+    if(charSel==='mati')charMsg('No se pudo cargar a Mati Octo: seguís con el personaje clásico.');
+  });
+}
+if(charSel==='mati')loadMati();
+const useMati=()=>charSel==='mati'&&matiState==='ready';
+
 /* ---------- partículas ---------- */
 function burst(x,y,n,cols,sp,grav){
   for(let i=0;i<n;i++){
@@ -440,6 +512,7 @@ function endRun(){
 }
 function startRun(fromIdx){
   audio();
+  if(charSel==='mati'&&matiState==='failed'){matiState='idle';loadMati();} // reintento silencioso
   endRun();
   lvlIdx=fromIdx||0;deaths=0;runStart=performance.now();runCleared=lvlIdx;
   clearInput();hideCard();
@@ -465,7 +538,9 @@ function updateNarr(){
 /* ---------- muerte ---------- */
 function makeRagdoll(cause){
   const x=P.x,y=P.y-P.h/2;
-  const cols={skin:'#f2c9a0',shirt:'#3a7ac9',pants:'#2c4a66',shoe:'#e04a3a'};
+  /* con Mati los pedazos usan su paleta (cabeza/cuerpo azul, tentáculos azul oscuro, mate) */
+  const cols=useMati()?{skin:'#2a92f0',shirt:'#1e74d0',pants:'#0c3466',shoe:'#2ee6e6',mate:'#9a6a34'}
+    :{skin:'#f2c9a0',shirt:'#3a7ac9',pants:'#2c4a66',shoe:'#e04a3a'};
   const mk=(w,h,c)=>({w,h,c,x:0,y:0,vx:0,vy:0,rot:rand(-.4,.4),vr:rand(-6,6),grounded:false});
   let ps;
   if(cause==='anvil'){
@@ -485,6 +560,7 @@ function makeRagdoll(cause){
         {w:8,h:20,c:cols.shirt,x:-14,y:-4,vx:rand(-240,-100),vy:-200,vr:rand(-9,-3)},
         {w:8,h:20,c:cols.shirt,x:14,y:-4,vx:rand(100,240),vy:-200,vr:rand(3,9)}];
   }
+  if(cols.mate)ps.push({w:12,h:14,c:cols.mate,x:P.face*16,y:-4,vx:P.face*rand(120,240),vy:-300,vr:rand(-10,10)});
   ps.forEach(p=>{p.x+=x;p.y+=y;p.vr=p.vr||rand(-8,8);});
   return ps;
 }
@@ -866,6 +942,8 @@ function drawPlayer(){
     return;
   }
   if(P.dead)return;
+  if(useMati()){drawMati();return;}
+  pose='classic';poseState=!P.onGround?'jump':Math.abs(P.vx)>30?'run':'idle';
   const x=P.x-camX,y=P.y;
   const wk=Math.sin(P.walk*2),wk2=Math.cos(P.walk*2);
   const air=!P.onGround;
@@ -912,6 +990,24 @@ function drawPlayer(){
   /* boca */
   ctx.strokeStyle='#a85a3a';ctx.lineWidth=1.6;
   ctx.beginPath();ctx.arc(hx+P.face*2,-59+hy,3,0,Math.PI);ctx.stroke();
+  ctx.restore();
+}
+function drawMati(){
+  /* estado → pose estática; al correr se alterna correr ↔ quieto según la distancia recorrida
+     para simular el paso (no hay animación esquelética) */
+  const air=!P.onGround,moving=Math.abs(P.vx)>30;
+  poseState=air?'jump':moving?'run':'idle';
+  pose=poseState==='run'&&(Math.floor(P.walk/1.9)&1)?'idle':poseState;
+  const img=mati.img[pose],b=mati.box[pose],S=mati.S;
+  /* movimiento procedural: respiración quieto, estirón según la velocidad vertical en el aire,
+     inclinación hacia adelante al correr (todo anclado en los pies) */
+  let sy=1,sx=1,rot=0,lift=0;
+  if(air){const k=clamp(-P.vy/4000,-.06,.1);sy=1+k;sx=1-k*.6;}
+  else if(moving){rot=.08*P.face*Math.min(1,Math.abs(P.vx)/260);lift=pose==='idle'?2:0;}
+  else sy=1+Math.sin(time*3)*.015;
+  ctx.save();
+  ctx.translate(P.x-camX,P.y-lift);ctx.rotate(rot);ctx.scale(sx*S*P.face,sy*S);
+  ctx.drawImage(img,-mati.cx,-b.y1);
   ctx.restore();
 }
 function drawParts(){
@@ -969,11 +1065,12 @@ function updateHUD(){
 }
 
 /* ---------- loop ---------- */
-let last=performance.now(),raf=0;
+let last=performance.now(),raf=0,frameMs=0,frameN=0;
 function frame(now){
   raf=0;
   if(exited)return;
   if(paused){last=now;return;} // en pausa no se agenda otro cuadro: onResume relanza el loop
+  const tw=performance.now();
   let dt=Math.max(0,Math.min(.033,(now-last)/1000));last=now;
   time+=dt;
   if(slowT>0){slowT-=dt;if(slowT<=0)slow=1;}
@@ -1020,6 +1117,8 @@ function frame(now){
   }else if(state==='over'){
     drawMenuBG();
   }
+  /* tiempo de CPU del cuadro (media móvil), para medir el costo del personaje */
+  frameMs+=(performance.now()-tw-frameMs)*.05;frameN++;
   loop();
 }
 function loop(){if(!raf&&!exited)raf=requestAnimationFrame(frame);}
@@ -1105,6 +1204,11 @@ function refreshMenu(){
 }
 refreshMenu();
 
+if(CH){
+  CH.picker($('charPick'),{gameId:GID,classicIcon:'🤕',classicName:'Clásico',title:'ELEGÍ TU VÍCTIMA',
+    onChange(id){charSel=id;if(id==='mati'){if(matiState==='failed')matiState='idle';loadMati();}}});
+}
+
 /* ---------- MateLabs Arcade SDK ---------- */
 function pauseGame(){
   if(paused)return;paused=true;pauseAt=performance.now();clearInput();
@@ -1143,7 +1247,11 @@ if(ML){
 addEventListener('pageshow',e=>{if(e.persisted&&exited){exited=false;last=performance.now();loop();}});
 window.__mg={get state(){return state;},get lvl(){return lvlIdx;},get deaths(){return deaths;},
   get best(){return best;},get paused(){return paused;},get muted(){return muted;},P,
-  get goal(){return LEVELS[lvlIdx].goal;},get traps(){return traps;},get view(){return {VS,W,H,OFFY,DPR};},get time(){return time;}};
+  get goal(){return LEVELS[lvlIdx].goal;},get traps(){return traps;},get view(){return {VS,W,H,OFFY,DPR};},get time(){return time;},
+  /* personaje (sólo lectura): elegido, el que realmente se dibuja, pose visible y estado lógico */
+  get char(){return charSel;},get charDrawn(){return useMati()?'mati':'clasico';},get charLoad(){return matiState;},
+  get pose(){return pose;},get poseState(){return poseState;},get collider(){return {w:P.w,h:P.h};},
+  get frameMs(){return frameMs;},get frameN(){return frameN;}};
 })();
 </script>
 </body>

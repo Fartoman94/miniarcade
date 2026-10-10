@@ -34,10 +34,9 @@ test.describe('MUERTE GLORIOSA', () => {
     const goal0 = await page.textContent('#goalD');
     const a = await mg(page);
     await page.keyboard.down('ArrowRight');
-    await wait(page, 600);
+    // headless puede frenar los cuadros bajo carga: se espera el avance en vez de medir 600 ms fijos
+    await expect.poll(async () => (await mg(page)).x, { timeout: 10000 }).toBeGreaterThan(a.x + 60);
     await page.keyboard.up('ArrowRight');
-    const b = await mg(page);
-    expect(b.x).toBeGreaterThan(a.x + 60);
     expect(await page.textContent('#goalD')).not.toBe(goal0);
     // salto con Espacio
     await page.keyboard.press('Space');
@@ -200,5 +199,93 @@ test.describe('MUERTE GLORIOSA', () => {
     await page.reload();
     await expect(page.locator('#muteBtn')).toContainText('SÍ');
     expectNoErrors(errors);
+  });
+
+  /* ---------- personaje Mati Octo (matelabs/characters.js) ---------- */
+  /** @param {import('@playwright/test').Page} page */
+  const ch = page => page.evaluate(() => {
+    const g = /** @type {any} */ (window).__mg;
+    return { char: g.char, drawn: g.charDrawn, load: g.charLoad, pose: g.pose, poseState: g.poseState, collider: g.collider, state: g.state };
+  });
+  const card = (page, id) => page.locator(`#charPick [role="radio"][data-char="${id}"]`);
+
+  test('Mati: el selector se opera con flechas o toque y la elección persiste', async ({ page, isMobile }) => {
+    const { errors } = await openGame(page, FILE);
+    await expect(page.locator('#charPick [role="radiogroup"]')).toBeVisible();
+    await expect(card(page, 'clasico')).toHaveAttribute('aria-checked', 'true');
+    expect((await ch(page)).char).toBe('clasico');
+    if (isMobile) {
+      await card(page, 'mati').tap();
+    } else {
+      await card(page, 'clasico').focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(card(page, 'mati')).toBeFocused();
+    }
+    await expect(card(page, 'mati')).toHaveAttribute('aria-checked', 'true');
+    // las flechas/toques del selector no arrancan la partida
+    expect((await ch(page)).state).toBe('menu');
+    await page.reload();
+    await expect(card(page, 'mati')).toHaveAttribute('aria-checked', 'true');
+    expect((await ch(page)).char).toBe('mati');
+    if (!isMobile) {
+      await card(page, 'mati').focus();
+      await page.keyboard.press('ArrowLeft');
+      await expect(card(page, 'clasico')).toHaveAttribute('aria-checked', 'true');
+      expect((await ch(page)).char).toBe('clasico');
+    }
+    expectNoErrors(errors);
+  });
+
+  test('Mati: la partida usa sus poses según el estado y el colisionador no cambia', async ({ page, isMobile }) => {
+    const { errors } = await openGame(page, FILE);
+    await start(page, !!isMobile);
+    const classic = await ch(page);
+    expect(classic.drawn).toBe('clasico');
+    // volver al menú con otro personaje
+    await page.evaluate(() => { localStorage.setItem('ml:character', JSON.stringify({ muerte_gloriosa: 'mati' })); });
+    await page.reload();
+    await start(page, !!isMobile);
+    await expect.poll(async () => (await ch(page)).drawn, { timeout: 15000 }).toBe('mati');
+    const m = await ch(page);
+    expect(m.collider).toEqual(classic.collider);
+    expect(m.collider).toEqual({ w: 26, h: 54 });
+    await expect.poll(async () => (await ch(page)).pose, { timeout: 10000 }).toBe('idle');
+    // correr: estado lógico 'run' y se ve la pose de correr (alterna con quieto para simular el paso)
+    const right = isMobile ? '#tcR' : null;
+    if (right) await page.dispatchEvent(right, 'pointerdown', { pointerId: 21, pointerType: 'touch', isPrimary: true, bubbles: true });
+    else await page.keyboard.down('ArrowRight');
+    await expect.poll(async () => (await ch(page)).poseState, { timeout: 10000 }).toBe('run');
+    await expect.poll(async () => (await ch(page)).pose, { timeout: 10000 }).toBe('run');
+    // saltar: pose de salto en el aire
+    await page.evaluate(() => { const g = /** @type {any} */ (window).__mg; g.P.vy = -720; g.P.y = 460; g.P.onGround = false; });
+    await expect.poll(async () => (await ch(page)).pose, { timeout: 10000 }).toBe('jump');
+    // sigue muriendo en los pinchos del nivel 1 (mismas trampas, mismo colisionador)
+    await expect.poll(async () => (await mg(page)).deaths, { timeout: 15000 }).toBeGreaterThanOrEqual(1);
+    if (right) await page.dispatchEvent(right, 'pointerup', { pointerId: 21, pointerType: 'touch', bubbles: true });
+    else await page.keyboard.up('ArrowRight');
+    expectNoErrors(errors);
+  });
+
+  test('Mati: si fallan los sprites, se juega con el clásico y se avisa', async ({ page, isMobile }) => {
+    await page.route(/matelabs\/characters\//, r => r.abort());
+    await page.addInitScript(() => { localStorage.setItem('ml:character', JSON.stringify({ muerte_gloriosa: 'mati' })); });
+    const { errors } = await openGame(page, FILE);
+    await expect(page.locator('#charMsg')).toContainText('clásico');
+    await expect(page.locator('#charPick .mlc-err')).toBeVisible();
+    await start(page, !!isMobile);
+    await expect.poll(async () => (await ch(page)).load, { timeout: 15000 }).toBe('failed');
+    const c = await ch(page);
+    expect(c.char).toBe('mati');
+    expect(c.drawn).toBe('clasico');
+    expect(c.pose).toBe('classic');
+    const x0 = (await mg(page)).x;
+    if (isMobile) await page.dispatchEvent('#tcR', 'pointerdown', { pointerId: 31, pointerType: 'touch', isPrimary: true, bubbles: true });
+    else await page.keyboard.down('ArrowRight');
+    await expect.poll(async () => (await mg(page)).x, { timeout: 10000 }).toBeGreaterThan(x0 + 60);
+    if (isMobile) await page.dispatchEvent('#tcR', 'pointerup', { pointerId: 31, pointerType: 'touch', bubbles: true });
+    else await page.keyboard.up('ArrowRight');
+    // los únicos errores aceptables son los de los recursos abortados a propósito
+    expectNoErrors(errors.filter(e => !/Failed to load resource|ERR_FAILED/.test(e)));
+    expect(errors.filter(e => e.startsWith('pageerror'))).toEqual([]);
   });
 });
