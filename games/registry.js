@@ -153,6 +153,13 @@ export const GAMES = [
     controls: { pc: 'W/S avanzar · A/D girar · Espacio/Shift subir-bajar · E usar/escanear · Q sonar · C foto · L luz', touch: 'Joystick + botones SUBIR/BAJAR/SONAR/USAR/FOTO/LUZ · arrastrar para mirar', gamepad: 'Stick mover · A usar · B sonar · X foto · Y luz · RB/LB subir/bajar' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'cocina_caos', thumb: 'games/thumbs/cocina_caos.webp', file: 'cocina_caos.html', title: 'COCINA DEL CAOS', icon: '🍳', accent: '#ff5c7a',
+    category: 'accion', tags: ['Cocina 3D', 'Contra reloj'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Picá, horneá y serví pedidos contra reloj en 3 cocinas 3D con fuego, derrames y roedores, hasta superar el Gran Banquete.',
+    controls: { pc: 'WASD mover · E acción (mantener: picar/lavar/apagar) · Q ayudante · Shift impulso', touch: 'Joystick · ACCIÓN contextual grande · ⚡ impulso · 🧑‍🍳 encargo del ayudante', gamepad: 'Stick mover · A acción · X ayudante · B impulso · LB/RB encargos' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */
