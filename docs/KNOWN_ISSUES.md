@@ -1,6 +1,7 @@
 # Problemas conocidos y pendientes — MiniArcade
 
 ## Generales
+- **CI:** `.github/workflows/ci.yml` corre tipos, Vitest y Playwright (escritorio) en cada push. Las pruebas de móvil se corren localmente.
 - **Sin pruebas en dispositivos reales.** Todo se probó en Chromium headless: escritorio 1280×800 y emulación de Pixel 7. Faltan iOS Safari, Firefox, un Android real y un gamepad físico.
 - **FPS reales.** Las mediciones usan SwiftShader (render por CPU) y sirven para comparar, no como FPS de un dispositivo. Ver [PERFORMANCE_REPORT.md](PERFORMANCE_REPORT.md).
 - **Audio:** se verificó por su estado (corriendo, suspendido o silenciado), no escuchándolo.
