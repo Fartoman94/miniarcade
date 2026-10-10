@@ -8,7 +8,7 @@ Estados: `pending` · `in_progress` · `test_failed` · `ready_for_review` · `r
 | 02 | FRUTA FURIA | fruta_furia.html | Canvas 2D | released | main | 3.0 |
 | 03 | MUERTE GLORIOSA | muerte_gloriosa.html | Canvas 2D | released | main | 3.0: 10 niveles |
 | 04 | NEON SURVIVOR | NEON_SURVIVOR.html | Canvas 2D | released | main | 3.0 |
-| 05 | ¡SALVA AL REY! | Salva_al_rey.html | Three.js r128 | released (reino: in_progress) | main | reino explorable en reino_alba.html (Three 0.186) |
+| 05 | ¡SALVA AL REY! | Salva_al_rey.html | Three.js r128 | released (reino: ready_for_review) | main | modo «Reino del Alba» en reino_alba.html (Three 0.186): 4 zonas, 8 interiores, 12 NPC, 9 misiones, 2 jefes · 38 tests ok |
 | 06 | TORRE INFINITA | torre_infinita.html | Canvas 2D | released | main | 3.0 |
 | 07 | TURBO FURIA | turbo_furia.html | Three.js r128 | released | main | 3.0 |
 | 08 | EL VALLE ENCANTADO | valle_encantado.html | Three.js r128 | released (reino: pending) | main | reino explorable pendiente |

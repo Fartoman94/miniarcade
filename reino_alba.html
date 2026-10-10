@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1208">
+<title>Reino del Alba — MateLabs</title>
+<meta name="description" content="Explorá el Reino del Alba en 3D: aldea, castillo, bosque y campos, 6 interiores con puertas reales, 12 vecinos con agenda, 3 misiones principales, 6 secundarias y dos jefes con fases. Creado por MateLabs.">
+<link rel="icon" type="image/png" href="matelabs/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"./vendor/three-0.186.1/build/three.module.js","three/addons/":"./vendor/three-0.186.1/addons/"}}</script>
+<script src="matelabs/arcade.js"></script>
+<script src="matelabs/missions.js"></script>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#1a1208}</style>
+</head>
+<body>
+<script src="matelabs/intro.js" data-game="REINO DEL ALBA" data-accent="#f2b544"></script>
+<div id="ra-loading" style="position:fixed;inset:0;display:grid;place-items:center;color:#f2b544;font:700 13px system-ui;letter-spacing:.2em">CARGANDO EL REINO…</div>
+<script type="module">
+import './games/reino_alba/main.js';
+document.getElementById('ra-loading')?.remove();
+</script>
+<noscript><p style="color:#fff;font-family:system-ui;padding:24px">Reino del Alba necesita JavaScript y WebGL.</p></noscript>
+</body>
+</html>
