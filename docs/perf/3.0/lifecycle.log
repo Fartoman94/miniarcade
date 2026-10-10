@@ -1,0 +1,23 @@
+
+Running 9 tests using 1 worker
+
+heap portal MB base 2.23 por vuelta 2.39 2.40 2.40 2.37 2.37 2.40 2.37 2.39 2.39 2.37
+  ✓  1 [desktop] › tests/e2e/lifecycle.spec.js:43:3 › ciclo de vida › portal ↔ juego 10 veces por juego: el portal no acumula memoria (2.5m)
+clavado rAF/s 60.8 → 24.3 | heap MB 1.72 → 1.82
+  ✓  2 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › clavado: 10 reinicios sin loops duplicados ni memoria creciente (12.4s)
+fruta_furia rAF/s 59.9 → 28.9 | heap MB 1.78 → 1.82
+  ✓  3 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › fruta_furia: 10 reinicios sin loops duplicados ni memoria creciente (18.7s)
+muerte_gloriosa rAF/s 120.3 → 43.2 | heap MB 1.98 → 2.08
+  ✓  4 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › muerte_gloriosa: 10 reinicios sin loops duplicados ni memoria creciente (16.9s)
+neon_survivor rAF/s 119.8 → 55.1 | heap MB 1.83 → 1.92
+  ✓  5 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › neon_survivor: 10 reinicios sin loops duplicados ni memoria creciente (19.4s)
+salva_al_rey rAF/s 6.1 → 32.8 | heap MB 5.80 → 5.98
+  ✓  6 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › salva_al_rey: 10 reinicios sin loops duplicados ni memoria creciente (18.9s)
+torre_infinita rAF/s 60.1 → 35.5 | heap MB 1.65 → 1.76
+  ✓  7 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › torre_infinita: 10 reinicios sin loops duplicados ni memoria creciente (11.8s)
+turbo_furia rAF/s 9.2 → 13.8 | heap MB 4.69 → 4.83
+  ✓  8 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › turbo_furia: 10 reinicios sin loops duplicados ni memoria creciente (16.9s)
+valle_encantado rAF/s 14.5 → 19.7 | heap MB 6.63 → 6.54
+  ✓  9 [desktop] › tests/e2e/lifecycle.spec.js:68:5 › ciclo de vida › valle_encantado: 10 reinicios sin loops duplicados ni memoria creciente (14.4s)
+
+  9 passed (4.7m)

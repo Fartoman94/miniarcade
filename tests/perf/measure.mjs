@@ -17,7 +17,11 @@ const results = {};
 for (const p of PAGES) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   // saltear la intro de marca para medir sólo el juego
-  await ctx.addInitScript(() => { try { sessionStorage.setItem('ml-intro:' + location.pathname, '1'); } catch (e) {} });
+  await ctx.addInitScript(q => {
+    try { sessionStorage.setItem('ml-intro:' + location.pathname, '1'); } catch (e) {}
+    // ML_QUALITY=low|medium|high fija la calidad gráfica del SDK (por defecto, la automática)
+    if (q) try { localStorage.setItem('ml:settings', JSON.stringify({ quality: q })); } catch (e) {}
+  }, process.env.ML_QUALITY || '');
   const page = await ctx.newPage();
   const errors = [];
   let bytes = 0, requests = 0;
