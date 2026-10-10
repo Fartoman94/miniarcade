@@ -110,12 +110,15 @@
 
   /* Bloquear la entrada al juego mientras dura la intro */
   const t0 = performance.now();
-  let done = false;
+  let done = false, released = true;
+  const release = () => { if (released) return; released = true; evs.forEach(t => removeEventListener(t, block, { capture: true })); };
   const evs = ['keydown', 'keyup', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click'];
   const block = e => {
     e.stopImmediatePropagation();
     if (e.cancelable) e.preventDefault();
     if (!done && (e.type === 'pointerdown' || e.type === 'keydown') && performance.now() - t0 > 350) finish();
+    // fin del gesto que saltó la intro: liberar la entrada cuando termine este evento
+    else if (done && (e.type === 'click' || e.type === 'keyup' || e.type === 'touchend')) queueMicrotask(release);
   };
   evs.forEach(t => addEventListener(t, block, { capture: true, passive: false }));
   const timer = setTimeout(finish, dur);
@@ -125,8 +128,15 @@
     done = true;
     clearTimeout(timer);
     el.classList.add('ml-out');
-    /* seguir bloqueando un instante: el pointerup/click/keyup del toque que saltó la intro no debe llegar al juego */
-    setTimeout(() => evs.forEach(t => removeEventListener(t, block, { capture: true })), 450);
-    setTimeout(() => { el.remove(); dispatchEvent(new Event('matelabs:intro-done')); }, 560);
+    el.style.pointerEvents = 'none';
+    /* Seguir bloqueando hasta que se suelte el toque/tecla que saltó la intro (así su pointerup/click/keyup
+       no llega al juego). Se libera por evento y, como respaldo, por tiempo: algunos navegadores headless
+       demoran los timers varios segundos después de un clic. */
+    released = false;
+    setTimeout(release, 450);
+    let gone = false;
+    const remove = () => { if (gone) return; gone = true; el.remove(); dispatchEvent(new Event('matelabs:intro-done')); };
+    el.addEventListener('transitionend', e => { if (e.target === el && e.propertyName === 'opacity') remove(); });
+    setTimeout(remove, 700);
   }
 })();
