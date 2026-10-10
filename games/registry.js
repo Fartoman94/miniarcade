@@ -167,6 +167,13 @@ export const GAMES = [
     controls: { pc: 'W/S velas · A/D timón · Q/E andanadas babor/estribor · Espacio acción · R kit', touch: 'Timón virtual (velas y giro) + botones BABOR, ESTRIB., ACCIÓN y KIT', gamepad: 'Stick timón y velas · LB/RB andanadas · A acción · X kit' },
     score: 'high', scoreLabel: 'botín', orientation: 'any', heavy: true,
   },
+  {
+    id: 'portales_imposibles', thumb: 'games/thumbs/portales_imposibles.webp', file: 'portales_imposibles.html', title: 'PORTALES IMPOSIBLES', icon: '🌀', accent: '#9b7bff',
+    category: 'puzles', tags: ['Puzles de portales', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Abrí dos portales, lanzate a toda velocidad, mové cubos, desviá láseres y desarmá el Núcleo Fractal en tres fases.',
+    controls: { pc: 'WASD mover · mouse mirar · clic izq./Q azul · clic der./F naranja · E usar · Espacio saltar · H pista · R sala', touch: 'Joystick · arrastrar para mirar · AZUL/NARANJA o tocá un punto · USAR · SALTO', gamepad: 'Stick mover · LB/RB girar · LT/RT mirar · X azul · Y naranja · B usar · A saltar' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

@@ -1,7 +1,7 @@
 {
   "name": "Mini Arcade — MateLabs",
   "short_name": "Mini Arcade",
-  "description": "8 juegos HTML5 de MateLabs para jugar en el navegador.",
+  "description": "20 juegos HTML5 de MateLabs para jugar en el navegador.",
   "lang": "es",
   "start_url": "./index.html",
   "scope": "./",
