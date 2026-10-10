@@ -1,12 +1,13 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { openGame, expectNoErrors } from './helpers.js';
+import { GAMES } from '../../games/registry.js';
 
 test.describe('portal', () => {
   test('carga el catálogo completo sin errores', async ({ page }) => {
     const { errors } = await openGame(page, 'index.html?nosw');
     await page.waitForSelector('html[data-portal=ready]');
-    await expect(page.locator('#grid article.card')).toHaveCount(8);
+    await expect(page.locator('#grid article.card')).toHaveCount(GAMES.length);
     await expect(page).toHaveTitle(/MateLabs/);
     expectNoErrors(errors);
   });
@@ -23,7 +24,7 @@ test.describe('portal', () => {
     await expect(page.locator('#grid article.card h3')).toHaveText(['TURBO FURIA']);
     await page.click('[data-cat=todos]');
     await page.selectOption('#sort', 'az');
-    await expect(page.locator('#grid article.card h3').first()).toHaveText('¡CLAVADO!');
+    await expect(page.locator('#grid article.card h3').first()).toHaveText(/ACADEMIA|CLAVADO/);
   });
 
   test('favoritos persisten tras recargar', async ({ page }) => {
@@ -91,7 +92,7 @@ test('service worker: el portal abre sin conexión tras la primera visita', asyn
   await context.setOffline(true);
   await page.reload();
   await page.waitForSelector('html[data-portal=ready]', { timeout: 10_000 });
-  await expect(page.locator('#grid article.card')).toHaveCount(8);
+  await expect(page.locator('#grid article.card')).toHaveCount(GAMES.length);
   await context.setOffline(false);
 });
 
@@ -101,7 +102,7 @@ test.describe('portada 3.0', () => {
     await page.waitForSelector('html[data-portal=ready]');
     const href = await page.locator('#playNow').getAttribute('href');
     expect(['muerte_gloriosa.html', 'Salva_al_rey.html', 'torre_infinita.html']).toContain(href);
-    await expect(page.locator('#orbit a')).toHaveCount(8);
+    await expect(page.locator('#orbit a')).toHaveCount(Math.min(10, GAMES.length));
     await expect(page.locator('#picks .pick')).toHaveCount(3);
     await page.evaluate(() => localStorage.setItem('ml:stats', JSON.stringify({ turbo_furia: { plays: 2, timeMs: 1000, last: Date.now() } })));
     await page.reload();

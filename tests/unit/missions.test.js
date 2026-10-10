@@ -102,3 +102,25 @@ describe('MLMissions', () => {
     expect(M.progressOf('otro', 3)).toEqual({ done: 0, total: 3 });
   });
 });
+
+describe('varias principales por partida', () => {
+  it('primaryPerRun incluye todas las principales pendientes en orden', () => {
+    localStorage.removeItem('ml:missions');
+    window.MLMissions.setup({ gameId: 'camp', primaryPerRun: 3, secondaryPerRun: 1, missions: [
+      { id: 'm1', kind: 'primary', title: 'a', event: 'a', target: 1 },
+      { id: 'm2', kind: 'primary', title: 'b', event: 'b', target: 1 },
+      { id: 'm3', kind: 'primary', title: 'c', event: 'c', target: 1 },
+      { id: 's1', title: 's', event: 's', target: 1 },
+    ] });
+    window.MLMissions.runStart();
+    const cur = window.MLMissions.state().current;
+    expect(cur.filter(c => c.kind === 'primary').map(c => c.id)).toEqual(['m1', 'm2', 'm3']);
+    window.MLMissions.emit('b');
+    expect(cur.length).toBe(4);
+    expect(window.MLMissions.state().current.find(c => c.id === 'm2').status).toBe('done');
+    window.MLMissions.runEnd();
+    window.MLMissions.runStart();
+    expect(window.MLMissions.state().current.filter(c => c.kind === 'primary').map(c => c.id)).toEqual(['m1', 'm3', 'm2']);
+    window.MLMissions.runEnd();
+  });
+});

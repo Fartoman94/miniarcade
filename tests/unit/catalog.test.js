@@ -43,7 +43,7 @@ describe('catálogo', () => {
   });
   it('búsqueda sin tildes, por varias palabras y por tecnología', () => {
     expect(filterGames(GAMES, { ...base, query: 'VALLE encantádo' }).list.map(g => g.id)).toEqual(['valle_encantado']);
-    expect(filterGames(GAMES, { ...base, query: 'three' }).list.length).toBe(3);
+    expect(filterGames(GAMES, { ...base, query: 'three' }).list.length).toBe(GAMES.filter(g => /three/i.test(g.tech)).length);
     expect(filterGames(GAMES, { ...base, query: 'zzzz' }).list).toEqual([]);
   });
   it('ordena por más jugados y por recientes', () => {
@@ -52,8 +52,9 @@ describe('catálogo', () => {
     expect(filterGames(GAMES, { ...base, info, sort: 'recent' }).list[0].id).toBe('turbo_furia');
   });
   it('A→Z ignora signos de exclamación', () => {
-    const ids = filterGames(GAMES, { ...base, sort: 'az' }).list.map(g => g.id);
-    expect(ids[0]).toBe('clavado');
+    const titles = filterGames(GAMES, { ...base, sort: 'az' }).list.map(g => sortKey(g.title));
+    expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
+    expect(titles.indexOf('clavado')).toBeGreaterThanOrEqual(0);
     expect(sortKey('¡SALVA AL REY!')).toBe('salva al rey');
   });
   it('recomienda la misma categoría primero y nunca el mismo juego', () => {

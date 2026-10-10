@@ -90,6 +90,27 @@ export const GAMES = [
     controls: { pc: 'WASD mover · clic der. + arrastrar cámara · clic/Espacio golpear · E hablar · Shift correr', touch: 'Joystick · deslizá cámara · botón ⚔️ · 💬 hablar', gamepad: 'Stick izq. mover · stick der. cámara · A golpear · X/B hablar · Y diario · RB correr' },
     score: 'level', scoreLabel: 'oleada', legacyBestKey: 'valle_best', orientation: 'landscape', heavy: true,
   },
+  {
+    id: 'academia_dragones', thumb: 'games/thumbs/academia_dragones.webp', file: 'academia_dragones.html', title: 'ACADEMIA DE DRAGONES', icon: '🐉', accent: '#ff9f43',
+    category: 'aventura', tags: ['3D', 'Vuelo'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Volá un dragón por picos, un lago espejo y un volcán: aros, carreras, rescates y la Serpiente de Tormenta en 3 fases.',
+    controls: { pc: 'A/D girar · W/S morro · Espacio/C subir/bajar · Shift turbo · F o clic aliento', touch: 'Joystick dirección · botones ▲ ▼ altitud · 🔥 aliento · ⚡ turbo', gamepad: 'Stick dirección · A subir · B bajar · X/RT aliento · RB/LT turbo · Start pausa' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
+  {
+    id: 'templo_ecos', thumb: 'games/thumbs/templo_ecos.webp', file: 'templo_ecos.html', title: 'TEMPLO DE LOS ECOS', icon: '🏛️', accent: '#f5b84a',
+    category: 'puzles', tags: ['Puzles de luz', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Guiá la luz con espejos, repetí melodías de cristal, cruzá plataformas que se desvanecen y devolvé los rayos del Guardián Eco.',
+    controls: { pc: 'WASD mover · Espacio saltar · E usar · F eco · mouse/Q-R cámara', touch: 'Joystick + botones SALTO/USAR/ECO · arrastrar para girar la cámara', gamepad: 'Stick mover · A saltar · X usar · B eco · LB/RB cámara' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
+  {
+    id: 'guardianes_estelares', thumb: 'games/thumbs/guardianes_estelares.webp', file: 'guardianes_estelares.html', title: 'GUARDIANES ESTELARES', icon: '🚀', accent: '#ffb13b',
+    category: 'accion', tags: ['Shooter 3D', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Shooter espacial 3D: escoltá convoyes entre asteroides, derribá transmisores y destruí al Destructor Némesis en 3 fases.',
+    controls: { pc: 'WASD/mouse pilotear · Espacio/clic pulso · F/clic der. láser · Shift turbo · E escanear · Q objetivo', touch: 'Stick para pilotear · botones FUEGO, LÁSER, TURBO y SCAN', gamepad: 'Stick pilotear · A pulso · X láser · RB turbo · Y escanear · LB objetivo' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

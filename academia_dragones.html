@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b2a4a">
+<title>Academia de Dragones — MateLabs</title>
+<meta name="description" content="Aventura aérea 3D: volá un dragón por Picos Nubosos, el Lago de Espejos y el Volcán Dormido, superá pruebas, rescatá crías y vencé a la Serpiente de Tormenta.">
+<link rel="icon" type="image/png" href="matelabs/favicon.png">
+<script type="importmap">{"imports":{"three":"./vendor/three-0.186.1/build/three.module.js","three/addons/":"./vendor/three-0.186.1/addons/"}}</script>
+<script src="matelabs/arcade.js"></script>
+<script src="matelabs/missions.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#1b2a4a;color:#fff;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
+    overscroll-behavior:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  :root{--ad-accent:#ff9f43;--ad-top:max(8px,env(safe-area-inset-top))}
+  .ad-hud{position:fixed;inset:0;pointer-events:none;z-index:30}
+  .ad-hud[hidden],.ad-tip[hidden],.ad-banner[hidden],.ad-boss[hidden],.ad-warn[hidden],.ad-carry[hidden],.ad-obj[hidden]{display:none}
+  .ad-stats{position:absolute;top:var(--ad-top);left:max(10px,env(safe-area-inset-left));width:min(210px,44vw);padding:8px 10px;border-radius:14px;
+    background:rgba(10,18,36,.62);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  .ad-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .ad-score b{font:400 22px/1 'Bungee',system-ui,sans-serif;font-variant-numeric:tabular-nums;display:inline-block}
+  .ad-score b.pop{animation:adpop .3s}
+  @keyframes adpop{40%{transform:scale(1.2)}}
+  .ad-score small,.ad-bar span,.ad-boss small,.ad-obj small{font-size:9px;font-weight:800;letter-spacing:.2em;opacity:.8}
+  .ad-lives{font-size:14px;letter-spacing:1px;white-space:nowrap}
+  .ad-bar{position:relative;height:10px;border-radius:6px;background:rgba(255,255,255,.14);overflow:hidden;margin-top:6px}
+  .ad-bar i{position:absolute;inset:0;right:auto;width:100%;background:linear-gradient(90deg,#4fe08a,#b8f36b);border-radius:6px;transition:width .15s}
+  .ad-bar.low i{background:linear-gradient(90deg,#ff5a4a,#ffb04a)}
+  .ad-bar span{position:absolute;right:6px;top:-1px;font-size:8px;line-height:12px;text-shadow:0 1px 2px #000}
+  .ad-bar.boss{height:12px}.ad-bar.boss i{background:linear-gradient(90deg,#7fa6ff,#c9b2ff)}
+  .ad-bar.acad i{background:linear-gradient(90deg,#ffcf5a,#ff9f43)}
+  .ad-obj,.ad-boss{position:absolute;top:var(--ad-top);left:50%;transform:translateX(-50%);width:min(440px,calc(100vw - 2*230px));min-width:240px;
+    padding:7px 12px;border-radius:14px;background:rgba(10,18,36,.62);border:1px solid rgba(255,255,255,.14);text-align:center;
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  .ad-obj b{display:block;font-size:13px;line-height:1.3;margin-top:2px}
+  .ad-mis{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:5px}
+  .ad-mis span{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+    white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .ad-mis span.p{border-color:rgba(255,217,61,.6)}.ad-mis span.done{background:rgba(40,120,60,.7);border-color:#6be38a}.ad-mis span.failed{opacity:.45;text-decoration:line-through}
+  .ad-boss small{display:block;margin-top:4px}
+  .ad-warn{position:absolute;left:50%;top:36%;transform:translateX(-50%);font:400 20px 'Bungee',system-ui;color:#ffd0c0;
+    text-shadow:0 0 12px rgba(255,60,40,.8);letter-spacing:.06em}
+  .ad-carry{display:inline-block;margin-top:4px;font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px;
+    background:rgba(255,140,40,.25);border:1px solid rgba(255,190,120,.6);white-space:nowrap}
+  .ad-tip{position:fixed;z-index:35;left:50%;transform:translateX(-50%);bottom:max(24px,env(safe-area-inset-bottom));width:min(480px,calc(100vw - 24px));
+    display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:14px;background:rgba(8,14,30,.86);border:1.5px solid var(--ad-accent);
+    font-size:14px;line-height:1.35;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .ad-tip span{flex:1}
+  .ad-tip button{flex:none;appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;border-radius:10px;padding:8px 10px;
+    font:700 12px system-ui;cursor:pointer;touch-action:manipulation}
+  .ad-banner{position:fixed;z-index:36;left:50%;top:30%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;
+    font:400 clamp(22px,5vw,44px)/1.1 'Bungee',system-ui;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 24px var(--ad-accent);width:92vw}
+  .ad-banner small{display:block;font:800 12px system-ui;letter-spacing:.3em;margin-top:8px;color:#ffe0b8;text-shadow:0 2px 4px #000}
+  .ad-fade{position:fixed;inset:0;z-index:44;background:#060a14;opacity:0;pointer-events:none}
+  .ad-hurt{position:fixed;inset:0;z-index:29;pointer-events:none;opacity:0;background:radial-gradient(120% 100% at 50% 50%,transparent 55%,rgba(255,40,30,.55))}
+  /* táctil: en vertical el tutorial va arriba (abajo están el joystick y los botones) */
+  @media (pointer:coarse){
+    .ad-tip{bottom:max(200px,calc(env(safe-area-inset-bottom) + 200px))}
+    .k3-toast{top:34%!important}
+  }
+  @media (max-width:640px){
+    .ad-obj,.ad-boss{top:calc(var(--ad-top) + 84px);width:calc(100vw - 20px);min-width:0}
+    .k3-toast{top:34%!important}
+  }
+  @media (pointer:coarse) and (max-height:500px){
+    .ad-tip{top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:min(420px,calc(100vw - 2*190px));min-width:220px;font-size:12px;padding:7px 9px}
+    .ad-obj,.ad-boss{width:min(420px,calc(100vw - 2*220px));min-width:220px;padding:5px 10px}
+    .ad-obj b{font-size:12px}
+    .k3-toast{top:26%!important}
+  }
+  /* menú */
+  .ad-dragons{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+  .ad-drag{appearance:none;cursor:pointer;border-radius:14px;padding:8px 6px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;
+    font:600 12px system-ui;display:flex;flex-direction:column;gap:3px;align-items:center;text-align:center;touch-action:manipulation}
+  .ad-drag[aria-pressed="true"]{border-color:var(--ad-accent);background:rgba(255,159,67,.18);box-shadow:0 0 18px rgba(255,159,67,.25)}
+  .ad-drag[disabled]{opacity:.5;cursor:not-allowed}
+  .ad-drag .i{font-size:22px}.ad-drag b{font:400 14px 'Bungee',system-ui}
+  .ad-drag .st{display:grid;grid-template-columns:auto 1fr;gap:2px 5px;width:100%;font-size:9px;align-items:center;text-align:left;opacity:.9}
+  .ad-drag .st i{display:block;height:5px;border-radius:3px;background:var(--ad-accent)}
+  .ad-drag small{font-size:10px;opacity:.8;line-height:1.25}
+  .ad-diffinfo{font-size:11px;color:#cfe2ea;opacity:.85;margin-top:2px}
+  .ad-prog{font-size:12px;color:#dbe8ee;opacity:.9}
+  .ad-credit{font:400 12px 'Bungee',system-ui;letter-spacing:.12em;color:#fff;opacity:.85;display:flex;align-items:center;gap:6px}
+  .ad-credit img{width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(46,230,230,.55)}
+  .ad-form{display:grid;gap:10px;width:100%;text-align:left;font-size:14px}
+  .ad-form label{display:flex;gap:10px;align-items:center;justify-content:space-between;background:rgba(255,255,255,.06);padding:8px 10px;border-radius:10px}
+  .ad-form select,.ad-form input[type=range]{max-width:55%}
+  .ad-map{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+  .ad-map td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.1);vertical-align:top}
+  .ad-map td:first-child{font-weight:700;white-space:nowrap}
+  .ad-regs{display:grid;gap:8px;width:100%}
+  .ad-reg{appearance:none;cursor:pointer;text-align:left;border-radius:12px;padding:10px 12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#fff;font:600 14px system-ui}
+  .ad-reg[disabled]{opacity:.45;cursor:not-allowed}
+  .ad-reg small{display:block;font-weight:400;font-size:12px;opacity:.8}
+  .ad-endstats{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:14px;text-align:left}
+  .ad-endstats b{text-align:right;font-variant-numeric:tabular-nums}
+  @media (max-height:520px){
+    .k3-panel{gap:8px!important}
+    .k3-panel h1{font-size:30px!important}
+    .ad-hide-short{display:none}
+    .ad-drag small{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){.ad-score b.pop{animation:none}.ad-bar i{transition:none}}
+</style>
+</head>
+<body>
+<script src="matelabs/intro.js" data-game="ACADEMIA DE DRAGONES" data-accent="#ff9f43"></script>
+<div id="adHud" class="ad-hud" hidden>
+  <div class="ad-stats">
+    <div class="ad-row"><div class="ad-score"><b id="adScore">0</b> <small>PTS</small></div><div id="adLives" class="ad-lives" aria-label="vidas"></div></div>
+    <div class="ad-bar" id="adEnergyBar"><i id="adEnergy"></i><span>ENERGÍA</span></div>
+  </div>
+  <div id="adObj" class="ad-obj"><small id="adRegion"></small><b id="adObjText"></b><div id="adCarry" class="ad-carry" hidden></div><div id="adMis" class="ad-mis"></div></div>
+  <div id="adBoss" class="ad-boss" hidden>
+    <small>SERPIENTE DE TORMENTA · <span id="adPhase">FASE 1</span></small>
+    <div class="ad-bar boss"><i id="adBossHp"></i></div>
+    <small>ACADEMIA</small>
+    <div class="ad-bar acad"><i id="adAcad"></i></div>
+  </div>
+  <div id="adWarn" class="ad-warn" hidden>¡SUBÍ!</div>
+</div>
+<div id="adTip" class="ad-tip" role="status" aria-live="polite" hidden><span id="adTipText"></span><button type="button" id="adTipSkip">Saltar tutorial</button></div>
+<div id="adBanner" class="ad-banner" aria-live="polite" hidden></div>
+<div id="adHurt" class="ad-hurt"></div>
+<div id="adFade" class="ad-fade"></div>
+<script type="module" src="games/academia_dragones/main.js"></script>
+</body>
+</html>
