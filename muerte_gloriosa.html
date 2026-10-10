@@ -1832,12 +1832,15 @@ function frame(now){
   if(state==='menu'){
     /* el menú es opaco: no hace falta dibujar el lienzo detrás */
   }else if(state==='play'){
+    /* sólo debug (speed>1): pasos fijos de 1/60 s, así los recorridos guionados dan el mismo resultado
+       a cualquier FPS (en máquinas lentas los cuadros de 33 ms cambiaban el resultado en Extremo) */
+    const sdt=simSteps>1?slow/60:gdt;
     for(let k=0;k<simSteps&&state==='play';k++){
-      updateWorld(gdt);
-      updatePlayer(gdt);
+      updateWorld(sdt);
+      updatePlayer(sdt);
       if(state!=='play')break;
-      updateTraps(gdt);
-      updateBoss(gdt);
+      updateTraps(sdt);
+      updateBoss(sdt);
     }
     updateParts(gdt);
     updateCam(gdt);

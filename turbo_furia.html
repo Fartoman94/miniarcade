@@ -1001,7 +1001,7 @@ const rim=new THREE.DirectionalLight(0x2ec4b6,0.7);rim.position.set(-6,4,-7);gSc
 {
   const fl=new THREE.Mesh(new THREE.CircleGeometry(26,32),new THREE.MeshLambertMaterial({color:0x161d27}));
   fl.rotation.x=-Math.PI/2;gScene.add(fl);
-  const ped=new THREE.Mesh(new THREE.CylinderGeometry(4.6,4.9,0.35,28),new THREE.MeshPhongMaterial({color:0x232d3a,shininess:60,specular:0x333333}));
+  const ped=new THREE.Mesh(new THREE.CylinderGeometry(4.6,4.9,0.35,28),new THREE.MeshLambertMaterial({color:0x232d3a}));
   ped.position.y=0.175;gScene.add(ped);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(4.62,0.06,8,40),new THREE.MeshBasicMaterial({color:0xd8a53f}));
   ring.rotation.x=Math.PI/2;ring.position.y=0.36;gScene.add(ring);
@@ -1029,7 +1029,7 @@ let selIdx=0,previewVeh=null,mode='clasica';
 function buildPreview(i){
   if(previewVeh){previewGroup.remove(previewVeh.group);disposeObj(previewVeh.group);}
   const v=GARAGE[i],lk=!isUnlocked(v);
-  previewVeh=makeVehicle({...v,color:lk?'#1b1f27':v.color},lk?'lambert':'phong');
+  previewVeh=makeVehicle({...v,color:lk?'#1b1f27':v.color},lk||!Q.phong?'lambert':'phong');
   previewVeh.group.position.y=0.36;
   previewGroup.add(previewVeh.group);
 }
@@ -1726,9 +1726,15 @@ function fitCamera(){
 fitCamera();
 
 /* medición liviana (sin asignaciones): tiempo de cuadro promedio y draw calls */
-const perf={frameMs:0,calls:0,tris:0,frames:0};
+const perf={frameMs:0,calls:0,tris:0,frames:0,renders:0};
 let last=performance.now(),rafId=0,stopped=false;
-function draw(){
+/* el garaje es casi estático (sólo gira el vehículo detrás de la ficha): se dibuja a 30 Hz (24 Hz en baja)
+   en vez de a la frecuencia de la pantalla; la carrera siempre se dibuja en cada cuadro */
+let gAcc=1;
+function draw(force){
+  const menu=state==='garage'||state==='over';   // pantallas con menú encima: escena casi quieta
+  if(menu&&!force&&gAcc<(QN==='low'?1/24:1/30)-0.004)return;
+  gAcc=0;perf.renders++;
   if(state==='garage')renderer.render(gScene,gCam);
   else renderer.render(scene,camera);
   perf.calls=renderer.info.render.calls;perf.tris=renderer.info.render.triangles;
@@ -1740,6 +1746,7 @@ function frame(now){
   const dt=Math.min(.033,raw),rdt=Math.min(.25,raw);
   const t0=performance.now();
   update(dt,rdt);
+  gAcc+=raw;
   draw();
   perf.frameMs+=((performance.now()-t0)-perf.frameMs)*.05;perf.frames++;
   rafId=requestAnimationFrame(frame);
@@ -1770,7 +1777,8 @@ function applyQuality(q){
     playerVeh.bodyMesh.material=nm;playerVeh.bodyMat=nm;old.dispose();
   }
   resetProps(dist);biomeKey=-1;applyBiome(dist,true);
-  if(paused)draw();
+  if(state==='garage')buildPreview(selIdx);
+  if(paused||state==='garage')draw(true);
 }
 
 /* ============ ENTRADA ============ */
@@ -1852,7 +1860,7 @@ addEventListener('resize',()=>{
   fitCamera();camera.fov=camK.fov;
   camera.aspect=W/H;camera.updateProjectionMatrix();
   fitGarageCam();
-  if(paused)draw();                       // setSize borra el canvas: repintar el cuadro congelado
+  if(paused||state==='garage'||state==='over')draw(true); // setSize borra el canvas: repintar el cuadro congelado
 });
 
 /* ============ MISIONES (MLMissions) ============ */
@@ -1927,7 +1935,7 @@ window.__turbo={
   get changers(){return traffic.filter(t=>t.chT>=0).length;},
   get quality(){return {q:QN,pixelRatio:renderer.getPixelRatio(),particleCap:partCap,props:propSlots.filter(s=>s.inst).length,
     speedLines:Q.lines,shadows:renderer.shadowMap.enabled,shadowSize:Q.shadow,fogFar:scene.fog.far,camFar:camera.far,stars:Q.stars,phong:playerVeh?playerVeh.bodyMat.type:null};},
-  get perf(){return {frameMs:+perf.frameMs.toFixed(2),calls:perf.calls,tris:perf.tris,frames:perf.frames,particles:partLive,
+  get perf(){return {frameMs:+perf.frameMs.toFixed(2),calls:perf.calls,tris:perf.tris,frames:perf.frames,renders:perf.renders,particles:partLive,
     traffic:traffic.length,heapMB:performance.memory?+(performance.memory.usedJSHeapSize/1048576).toFixed(1):null};},
   get progress(){return JSON.parse(JSON.stringify(progress));},
   get unlocked(){return GARAGE.filter(isUnlocked).map(v=>v.id);},

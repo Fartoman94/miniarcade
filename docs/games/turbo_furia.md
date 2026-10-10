@@ -199,6 +199,31 @@ Corridas alternadas original/nuevo para compensar la carga (4 pares por calidad)
 
 Alta (1 corrida): 10,3 FPS, 80 draw calls (incluye pase de sombras). Con este nivel de ruido la diferencia de FPS entre original y «media» no es concluyente (≈ −10 % de promedio); «baja» quedó igual o mejor que el original. Los draw calls bajaron ~3–4×.
 
+### Rendimiento del garaje / menús (ajuste posterior)
+
+Medición del coordinador antes del ajuste (`tests/perf/measure.mjs`, garaje, 1280×800, SwiftShader, 3 corridas): pre-3.0 50,1 / 50,1 / 54,4 FPS; 3.0 media 37,7 / 37,9 / 37,9; 3.0 baja 45,5 / 45,9 / 45,1.
+
+Diagnóstico (variantes medidas una por una): el costo extra estaba en dibujar el escenario del garaje, sobre todo el vehículo de vista previa con pintura Phong + mapa de entorno y el pedestal Phong. Con el garaje sin dibujar se llega a 60 FPS, y sin el auto se queda en la misma cifra que la versión pre-3.0. Ni el DOM de la ficha ni el desplazamiento de cámara influían de forma medible.
+
+Cambios:
+- **El garaje y la pantalla final se dibujan a 30 Hz, o a 24 Hz en calidad baja**, en vez de en cada cuadro. Los dos son escenas casi quietas debajo de un menú. El giro del vehículo sigue usando `dt`, así que mantiene su velocidad. Al redimensionar o cambiar la calidad se repinta en el acto. La carrera se sigue dibujando en todos los cuadros.
+- El pedestal del garaje pasó a Lambert. En calidad baja, la vista previa también usa Lambert; en media y alta conserva Phong + reflejos.
+- El gancho `__turbo.perf.renders` cuenta los cuadros realmente dibujados.
+
+Medición después del ajuste, intercalada, 3 corridas cada una (máquina con carga 7–8). La columna «FPS» es la cadencia de cuadros de la página (`requestAnimationFrame`), no los cuadros dibujados:
+
+| Corrida | pre-3.0 | 3.0 media | 3.0 baja |
+|---|---|---|---|
+| 1 | 43,2 | 60,0 | 60,3 |
+| 2 | 47,9 | 60,2 | 60,1 |
+| 3 | 49,7 | 60,1 | 60,2 |
+| Peor cuadro | 50 ms | 16,8 ms | 16,8 ms |
+| Tareas largas | 2–3 | 1 | 1 |
+
+Prueba nueva: «garaje: se dibuja a frecuencia reducida…», que comprueba que el garaje dibuja entre 1 y 33 veces por segundo y que la carrera dibuja en todos los cuadros. Spec completo tras el ajuste: **39 passed, 1 skipped (4,5 min)**; desktop 19 + 1 skipped, mobile 20.
+
+Con 60 cuadros por segundo de página, el garaje dibuja unos 30 por segundo en media y unos 24 en baja; el gancho midió 21 dibujados sobre 39 cuadros. Media y baja llegan las dos al tope de 60 de la página, así que esta medición no muestra diferencia entre ellas: la diferencia está en el costo por dibujo (Lambert y 24 Hz en baja).
+
 ### Pendientes / NO PROBADO
 
 - No probado en dispositivos reales ni con GPU real; FPS medidos sólo con SwiftShader bajo carga.

@@ -3,7 +3,7 @@
      sin red, la copia en caché. Así un deploy nuevo nunca queda tapado por la caché.
    - Recursos inmutables (Three.js versionado de cdnjs, fuentes, imágenes): cache-first.
    Subir VERSION invalida las cachés viejas. */
-const VERSION = 'ml-v4';
+const VERSION = 'ml-v5';
 const CORE = `${VERSION}-core`, STATIC = `${VERSION}-static`;
 const PRECACHE = ['./', 'index.html', 'matelabs/arcade.js', 'matelabs/intro.js', 'matelabs/portal.js', 'matelabs/catalog.js',
   'games/registry.js', 'matelabs/missions.js', 'matelabs/characters.js', 'matelabs/mascota.webp', 'matelabs/mascota-128.webp', 'matelabs/favicon.png', 'manifest.webmanifest'];
@@ -16,7 +16,7 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
-const isImmutable = url => /\/vendor\/[^/]+-r?\d/.test(url.pathname) || /cdnjs\.cloudflare\.com\/ajax\/libs\/.+\/r?\d/.test(url.href) || /fonts\.(gstatic|googleapis)\.com/.test(url.host) || /\.(webp|png|jpg|svg|woff2?|glb)$/.test(url.pathname);
+const isImmutable = url => /\/vendor\/three-[^/]+\//.test(url.pathname) || /cdnjs\.cloudflare\.com\/ajax\/libs\/.+\/r?\d/.test(url.href) || /fonts\.(gstatic|googleapis)\.com/.test(url.host) || /\.(webp|png|jpg|svg|woff2?|glb)$/.test(url.pathname);
 
 self.addEventListener('fetch', e => {
   const req = e.request;

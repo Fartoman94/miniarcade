@@ -9,12 +9,13 @@
    - score: cómo se compara el récord ('high' = más es mejor, 'level' = nivel alcanzado, 'none').
    - legacyBestKey: clave de localStorage que el juego ya usaba antes del SDK (compatibilidad).
    - category: una de CATEGORIES.
-   - tech: motor/render, para el filtro y la documentación. */
+   - tech: motor/render, para el filtro y la documentación.
+   - added: fecha (AAAA-MM-DD) en que el juego entró al catálogo; alimenta «Nuevos» (dato real, no métrica). */
 
 /** @typedef {{id:string,file:string,title:string,icon:string,accent:string,category:string,tags:string[],
  *   tech:string,description:string,controls:{pc:string,touch:string,gamepad?:string},
  *   score:'high'|'level'|'none',scoreLabel?:string,legacyBestKey?:string,orientation?:'any'|'landscape'|'portrait',
- *   heavy?:boolean, pick?:string, thumb?:string}} GameMeta */
+ *   heavy?:boolean, pick?:string, thumb?:string, added?:string}} GameMeta */
 
 /** @type {Record<string,string>} */
 export const CATEGORIES = {
@@ -23,6 +24,9 @@ export const CATEGORIES = {
   plataformas: 'Plataformas',
   carreras: 'Carreras',
   aventura: 'Aventura',
+  estrategia: 'Estrategia',
+  relajado: 'Relajado',
+  puzles: 'Puzles',
 };
 
 /** @type {GameMeta[]} */

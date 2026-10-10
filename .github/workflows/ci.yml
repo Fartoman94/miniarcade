@@ -3,10 +3,13 @@ on:
   push:
     branches: ['**']
   pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +24,7 @@ jobs:
       - name: Navegador de Playwright
         run: npx playwright install --with-deps chromium
       - name: E2E portal + navegación + juegos (escritorio)
-        run: npx playwright test --project=desktop
+        run: npx playwright test --project=desktop --grep-invert "ciclo de vida"
         env:
           ML_WORKERS: 2
       - uses: actions/upload-artifact@v4

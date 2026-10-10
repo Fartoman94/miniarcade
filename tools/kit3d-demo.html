@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!-- Demo mínima de matelabs/kit3d.js (no es un juego del catálogo): valida import map + Kit3D + SDK. -->
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kit3D demo — MateLabs</title>
+<script type="importmap">{"imports":{"three":"../vendor/three-0.186.1/build/three.module.js","three/addons/":"../vendor/three-0.186.1/addons/"}}</script>
+<script src="../matelabs/arcade.js"></script>
+</head><body style="margin:0;background:#000">
+<script type="module">
+import { createGame, createInput, loadGLB, screen } from '../matelabs/kit3d.js';
+let playing = false, x = 0;
+const g = createGame({ id: 'kit3d_demo', title: 'Demo Kit3D', background: 0x223344, isActive: () => playing,
+  update(dt) { const a = input.axis(); x += a.x * dt * 4; guard.position.x = x; guard.rotation.y += dt; input.endStep(); },
+  onRestart() { x = 0; playing = true; } });
+const { THREE, scene, camera } = g;
+const input = createInput(g.root, { joystick: 'left', buttons: [{ id: 'a', label: 'A', key: 'Space' }] });
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(4, 8, 5); sun.castShadow = true; scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0x3a5a40 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+camera.position.set(0, 3, 7); camera.lookAt(0, 1, 0);
+const guard = await loadGLB('../assets/models/npc_guardia.glb'); scene.add(guard);
+const menu = screen('<span class="k3-kicker">DEMO</span><h1>KIT3D</h1><button class="k3-b" data-go>Jugar</button>');
+menu.on('[data-go]', () => { menu.hide(); playing = true; });
+g.start();
+window.__demo = { g, get x() { return x; } };
+</script></body></html>

@@ -1,0 +1,1 @@
+import{FXAAShader as e}from"../shaders/FXAAShader.js";import{ShaderPass as t}from"./ShaderPass.js";class o extends t{constructor(){super(e)}setSize(s,r){this.material.uniforms.resolution.value.set(1/s,1/r)}}export{o as FXAAPass};

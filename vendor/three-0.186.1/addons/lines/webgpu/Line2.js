@@ -1,0 +1,1 @@
+import{Line2NodeMaterial as t}from"three/webgpu";import{LineSegments2 as o}from"./LineSegments2.js";import{LineGeometry as i}from"../LineGeometry.js";class n extends o{constructor(e=new i,r=new t({color:Math.random()*16777215})){super(e,r),this.isLine2=!0,this.type="Line2"}}export{n as Line2};

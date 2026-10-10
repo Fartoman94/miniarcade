@@ -1,0 +1,1 @@
+import{BackSide as r,Mesh as t,MeshBasicMaterial as i,SphereGeometry as n,Scene as a}from"three";class c extends a{constructor(e=16777215){super(),this.name="ColorEnvironment";const o=new n(1,16,16),s=new i({color:e,side:r});this.add(new t(o,s))}dispose(){this.children[0].geometry.dispose(),this.children[0].material.dispose()}}export{c as ColorEnvironment};
