@@ -15,7 +15,7 @@ test.describe('portal', () => {
   test('buscador, categorías y orden', async ({ page }) => {
     await openGame(page, 'index.html?nosw');
     await page.waitForSelector('html[data-portal=ready]');
-    await page.fill('#q', 'torre');
+    await page.fill('#q', 'torre infinita');
     await expect(page.locator('#grid article.card')).toHaveCount(1);
     await page.fill('#q', 'qwerty');
     await expect(page.locator('.empty')).toBeVisible();
