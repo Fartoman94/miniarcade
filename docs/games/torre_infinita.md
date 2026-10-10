@@ -90,3 +90,103 @@ Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/torre_infinita.spec.
 - La posición del bloque al soltar es la del último cuadro dibujado; a FPS muy bajos la precisión del toque es menor.
 - El registro (`games/registry.js`) dice `scoreLabel: 'pisos'`, pero el juego cuenta **puntos** (las caídas perfectas suman 1 + combo). Ver corrección propuesta en el informe.
 - La demo de la portada sigue animando el canvas mientras se está en el menú (es la presentación del juego; el navegador la frena con la pestaña oculta).
+
+## MiniArcade 3.0
+
+### Estado antes → después
+
+- **Antes:** apilado de un toque con corte, combo de perfectos, cielo por altitud, demo en la portada, SDK (pausa/reinicio/silencio/gamepad/récord). Bloques planos con una cara lateral y tapa, sin misiones, sin dificultad, sin calidad, sin eventos.
+- **Después:** mismo algoritmo de corte y de apilado (verificado bloque por bloque contra una copia literal del original), más misiones (MLMissions), selector de dificultad, niveles de calidad reales, tormentas con viento, piezas especiales, dos eventos estructurales “jefe” (bloque gigante y desafío de estabilidad), zonas de altura, bloques 2.5D con sombras proyectadas, paralaje de fondo, mar de nubes, curvatura de la Tierra en la órbita, relámpagos suaves y cámara que se acerca cuando la torre se angosta.
+
+### Algoritmo de corte (sin cambios)
+
+El cálculo se extrajo a una función pura `computeCut(curCx, curW, topCx, topW, baseW, perfK)` con las mismas operaciones en el mismo orden que el `dropBlock` original. En Normal `perfK = 1` y la ventana perfecta es exactamente `Math.max(8, w·0,045)`; el bloque perfecto sigue creciendo 12 px (tope = ancho de la base) y el corte deja `max(l)…min(r)` con fallo total si quedan ≤ 4 px. Las pruebas comparan con `===` el resultado contra el código original copiado literal en el spec (16 casos fijos + 3000 aleatorios con semilla) y re-calculan pila, combo y puntaje de cada bloque de partidas reales y de una partida de 40 pisos.
+
+Puntaje: igual que antes (`1` por bloque, `1 + combo` por perfecto). Lo nuevo se suma aparte y queda registrado por bloque (`__torre.drops[i].bonus`): dorado ×2 sobre los puntos del bloque; bloque gigante +5 (+10 si es perfecto); tormenta superada +5; desafío de estabilidad ganado +10.
+
+### Misiones
+
+| id | Tipo | Título | Evento (emitido en `dropBlock`) | Meta |
+|---|---|---|---|---|
+| p_altura | principal | Subí 20 pisos | `height` (max) | 20 |
+| p_gigante | principal | Domá el bloque gigante | `giantPlaced` | 1 |
+| s_perfectos | secundaria | 5 caídas perfectas | `perfect` | 5 |
+| s_combo | secundaria | Combo ×4 | `combo` (max) | 4 |
+| s_precision | secundaria | Pulso firme | `precise` (perfecto o ≥ 90 % del ancho) | 8 |
+| s_sin_cortes | secundaria | Sin cortes grandes | `height` (max), **failOn `bigCut`** (corte que deja < 50 %) | 12 |
+| s_tormenta | secundaria | Aguantá la tormenta | `stormCleared` | 1 |
+| s_estable | secundaria | Torre estable | `stabilityWon` | 1 |
+| s_especial | secundaria | Coleccionista | `special` (bloques especiales apoyados) | 3 |
+
+Dos secundarias por partida (rotación del SDK). `runStart()` al empezar (también desde “OTRA VEZ” y “Reiniciar” de la pausa), `runEnd({won})` al perder, al reiniciar desde la pausa, al volver a la portada y al salir. `won` = la partida superó el récord anterior (el juego no tiene final). HUD de misiones abajo a la derecha (`br`; en pantallas < 760 px se sube a 78 px para no pisar la marca de agua). La pantalla final lista las misiones de la partida (✔/✖).
+
+### Dificultad
+
+Selector en la portada (no durante la partida); botón nuevo “⟵ MENÚ Y DIFICULTAD” en la pantalla final para volver a elegir. La demo de la portada siempre usa Normal. **Un solo récord** para todas las dificultades (no se separó por nivel).
+
+| Nivel | Cruce inicial T0 | −s por piso | T mínimo | Tope de velocidad | Ventana perfecta | Ráfagas de tormenta |
+|---|---|---|---|---|---|---|
+| Fácil | 2,9 s | 0,025 | 1,7 s | 2,0 × base | ×1,4 | ±12 % |
+| **Normal (= original)** | 2,5 s | 0,03 | 1,35 s | 2,4 × base | ×1 | ±20 % |
+| Difícil | 2,2 s | 0,035 | 1,15 s | 2,8 × base | ×0,85 | ±26 % |
+| Extremo | 1,9 s | 0,04 | 0,95 s | 3,3 × base | ×0,7 | ±32 % |
+
+Los controles no cambian. El calendario de eventos y piezas es el mismo en todos los niveles.
+
+### Calidad (`onQuality`)
+
+| | Baja | Media | Alta |
+|---|---|---|---|
+| Tope de DPR del canvas | 1 | 2 (como antes) | 2 |
+| Tope de partículas vivas | 90 | 220 | 420 |
+| Confeti por perfecto / escombros por corte | 10 / 4 | 18 / 6 | 26 / 8 (como antes) |
+| Capas de paralaje | 1 (ciudad) | 2 (+ horizonte) | 3 (+ barrio con grúa) |
+| Gotas de lluvia | 70 | 150 | 260 |
+| Nubes / estrellas | 5 / 50 | 9 / 110 | 9 / 110 |
+| Efectos | sin sombras, bandas ni relámpagos | sombras proyectadas, banda de luz, sombra de la torre, mar de nubes, relámpagos | + filo de luz, brillo lateral, nubes sombreadas, estrellas fugaces |
+
+### Contenido nuevo
+
+- **Tormentas** (pisos 16–22, y cada 28): aviso 2 pisos antes, cielo encapotado, lluvia (un único trazo por cuadro, pool fijo), viento que acelera/frena el bloque en movimiento (sólo la velocidad, nunca el corte), relámpago suave como máximo cada 4,5 s (sin destellos estroboscópicos; desactivado con `prefers-reduced-motion`). Superarla: +5.
+- **Bloque gigante** (piso 30, y cada 28): aviso 2 pisos antes; viga de acero 1,6× más ancha (mín. +30 px, tope 1,25 × base) y 20 % más lenta. Se corta con el mismo algoritmo (si cae perfecto, la torre se ensancha hasta la base). Apoyarlo: +5 (+10 perfecto); fallarlo termina la partida como cualquier bloque.
+- **Desafío de estabilidad** (pisos 37–39, y cada 28): tres fases; cada bloque tiene que conservar ≥ 75 % del ancho (marcas naranjas de tolerancia sobre la torre). Fase 2 suma ráfagas, fase 3 además +12 % de velocidad. Ganarlo: +10; si una fase falla, el aviso pasa a “FALLADO” y no hay bono.
+- **Piezas especiales** (pisos fijos fuera de los eventos): dorado (puntos ×2; pisos 5, 29, 41…), hielo (25 % más rápido; pisos 32, 56…), pesado (25 % más lento; pisos 14, 26, 62…), escudo (si el bloque se corta, el combo no se pierde; pisos 11, 23, 35…). Regla: `piso % 12` = 5/8/2/11, salteando los pisos de tormenta, gigante y desafío.
+- **Zonas de altura** con aviso: Ciudad → Sobre las nubes (12) → Cielo alto (30) → Estratósfera (55) → Órbita (85).
+
+### Cambios visuales
+
+Bloques 2.5D con frente de dos tonos, cara lateral sombreada, sombra proyectada sobre la tapa del bloque de abajo (también la del bloque en movimiento: muestra con exactitud dónde va a apoyar), sombra de la torre en el piso, paletas cacheadas por tono y nivel de noche (sin strings nuevos por cuadro), texturas propias para cada especial (brillo del dorado, vetas del hielo, sillería del pesado, escudo, viga con cruces y remaches). Fondo: horizonte y ciudad con paralaje generados una vez por tamaño en canvas fuera de pantalla, mar de nubes a media altura, curvatura de la Tierra en la órbita, sol/luna/nubes como sprites cacheados (antes se creaban degradados radiales en cada cuadro). La cámara se acerca hasta 10 % cuando la torre se angosta. Nada se dibuja desplazado respecto de su posición lógica.
+
+### Pruebas
+
+`tests/e2e/torre_infinita.spec.js` (se ocultan los gamepads en todas las pruebas: esta máquina tiene dos joysticks Xbox 360 reales conectados que el SDK convertía en teclas y soltaban bloques solos). Pruebas nuevas: corte idéntico al original; juego real con verificación de cada pila y puntaje; partida de 40 pisos con todos los eventos verificada bloque por bloque; misiones (principal + secundarias cumplidas y persistentes tras recargar; fallo por `failOn`; cierre en fin de partida; reinicio desde pausa); dificultad (teclado, toque, persistencia, velocidad y ventana medidas); calidad (DPR, tope y ráfaga de partículas, capas); tormenta; bloque gigante; desafío de estabilidad (ganado y fallado); piezas especiales; botón de volver a la portada.
+
+Resultados reales (`ML_WORKERS=1 npx playwright test tests/e2e/torre_infinita.spec.js`, máquina con carga media 55–68 por otros agentes):
+
+- Antes de tocar nada: 17 passed, 1 skipped.
+- Corrida 1 con los cambios: 41 passed, 2 failed, 1 skipped (ambas en mobile por tiempos: un `touchscreen.tap` que superó los 60 s y un arranque que no pasó a `playing` en 5 s). Se agregó margen (timeout 150 s en las pruebas 3.0, arranque con reintento, `expect.poll` con 20 s).
+- Corrida 2: 41 passed, 2 failed, 1 skipped — una prueba vieja (“arranca con entrada real…”, mobile: el toque no arrancó en 5 s) y una nueva (`#over` tardó más de 5 s en aparecer por el `setTimeout` de 550 ms). La prueba vieja no se modificó; reproducida aparte 5/5 veces el toque arranca bien, así que se considera inestabilidad por carga.
+- Sólo las 13 pruebas nuevas en mobile: 13 passed. Sólo las nuevas en desktop: 13 passed.
+- **Corrida final completa: 43 passed, 1 skipped (desktop 21 + 1 omitida táctil, mobile 22).**
+
+### Mediciones
+
+`tests/perf`-style script propio (Chromium headless 1280×800, juega con Espacio cuando el bloque pasa a < 14 px del centro, 12 s; mide la duración de cada callback de rAF = update+render en JS, y el intervalo entre cuadros). Antes = copia del HTML original servida aparte. **La máquina tenía carga media de 63–69** durante todas las mediciones (otros 7 agentes corriendo pruebas), así que los intervalos están dominados por ruido:
+
+| Corrida | Versión | Calidad | JS por cuadro prom. / p95 (ms) | Intervalo prom. / p95 (ms) | Heap (MB) | Entidades máx. |
+|---|---|---|---|---|---|---|
+| 1 | original | (no tenía) | 0,639 / 2,8 | 18,97 / 33,3 | 2,79 | — |
+| 1 | 3.0 | media | 0,811 / 3,3 | 24,39 / 50 | 3,10 | 19 |
+| 1 | 3.0 | baja | 0,712 / 2,9 | 22,23 / 50 | 3,05 | 11 |
+| 2 | original | (no tenía) | 0,995 / 5,1 | 28,94 / 66,6 | 2,86 | — |
+| 2 | 3.0 | media | 0,824 / 3,7 | 25,26 / 50 | 3,31 | 19 |
+| 2 | 3.0 | baja | 0,887 / 4,1 | 29,26 / 66,7 | 3,38 | 11 |
+
+Conclusión honesta: con esta carga no hay diferencia medible entre versiones; el costo JS por cuadro está por debajo de 1 ms en todas. Lo determinista: con calidad baja el tope de entidades fue 11 contra 19 en media (confeti 10 vs 18), y el canvas usa DPR 1 en baja. Antes de los cambios (máquina menos cargada) el original daba 0,36 ms de JS y 16,7 ms de intervalo.
+
+### Pendientes / NO PROBADO
+
+- No se probó en un celular físico (sólo emulación Pixel 7 y capturas 412×915 / 915×412 / 1280×800).
+- Récord único para todas las dificultades.
+- `registry.js` sigue diciendo `scoreLabel: 'pisos'` (ver informe anterior).
+- No se agregó audio de lluvia continuo (sólo truenos sintetizados y sonidos de bono/aviso).

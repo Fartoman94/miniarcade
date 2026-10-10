@@ -318,7 +318,7 @@
   function pollPad() {
     padRAF = 0;
     const map = state.opts && state.opts.gamepad;
-    if (!map) return;
+    if (!map || !padAllowed) return;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     /** @type {Record<string, boolean>} */
     const now = {};
@@ -345,7 +345,11 @@
     if (Object.keys(now).length || anyPad()) padRAF = requestAnimationFrame(pollPad);
   }
   function anyPad() { return navigator.getGamepads && [...navigator.getGamepads()].some(Boolean); }
-  addEventListener('gamepadconnected', e => { track('gamepad', { id: /** @type {GamepadEvent} */ (e).gamepad.id }); if (!padRAF) padRAF = requestAnimationFrame(pollPad); });
+  // En navegadores automatizados (Playwright, CI) se ignoran los mandos físicos de la máquina: si hay
+  // joysticks conectados, sus ejes/botones generaban teclas fantasma durante las pruebas. ?gamepad lo reactiva.
+  const padAllowed = !(/** @type {any} */ (navigator).webdriver) || qs.has('gamepad');
+  addEventListener('gamepadconnected', e => {
+    if (!padAllowed) return; track('gamepad', { id: /** @type {GamepadEvent} */ (e).gamepad.id }); if (!padRAF) padRAF = requestAnimationFrame(pollPad); });
 
   /* ---------- puntajes y estadísticas ---------- */
   /** @param {string} [id] */
