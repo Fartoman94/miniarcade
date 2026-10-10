@@ -23,6 +23,8 @@ async function start(page, isMobile) {
 }
 /** Arranque real + salto de la cuenta regresiva (sólo ?debug) + rivales quietos para pruebas deterministas. */
 async function startDbg(page, isMobile, freeze = true) {
+  // el tiempo de juego sólo avanza con simulate(): sin dependencia de los FPS del runner
+  await D(page, 'manual(true)');
   await start(page, isMobile);
   await D(page, 'skipCountdown()'); await sim(page, 0.1);
   if (freeze) await D(page, 'freezeAI(true)');
@@ -122,7 +124,7 @@ test.describe('Derby de Chatarra', () => {
     await startDbg(page, isMobile);
     await D(page, 'teleport(-34,-2,Math.PI/2)'); await D(page, 'setSpeed(24)');
     expect((await T(page, 'return T.interactions.ramps'))[0]).toMatchObject({ id: 'd_r1', used: 0, lit: false });
-    await hold(page, 'KeyW', 0.6);
+    await hold(page, 'KeyW', 0.85);
     const air = await T(page, 'return T.player');
     expect(air.grounded).toBe(false);
     expect(air.y).toBeGreaterThan(2);
@@ -237,11 +239,12 @@ test.describe('Derby de Chatarra', () => {
     await hold(page, 'KeyW', 2.2);
     expect(await T(page, 'return T.player.speed')).toBeGreaterThan(28);
     // trampa: mina detrás; La Chispa la pisa y se daña
-    await D(page, 'teleport(0,-15,0)'); await D(page, 'give("trampa")'); await usePower(page, isMobile);
-    expect(await T(page, 'return T.interactions.mines')).toBe(1);
+    const mines0 = await T(page, 'return T.interactions.mines');
+    await D(page, 'teleport(-38,-5,0)'); await D(page, 'give("trampa")'); await usePower(page, isMobile);
+    expect(await T(page, 'return T.interactions.mines')).toBe(mines0 + 1);
     await sim(page, 1);
-    await D(page, 'place("chispa",0,-17.8,0)'); await sim(page, 0.3);
-    expect(await T(page, 'return T.interactions.mines')).toBe(0);
+    await D(page, 'place("chispa",-38,-7.8,0)'); await sim(page, 0.3);
+    expect(await T(page, 'return T.interactions.mines')).toBe(mines0);
     expect(await T(page, 'return T.rivals[0].hp')).toBeLessThan(await T(page, 'return T.rivals[0].maxHp'));
     expect((await T(page, 'return T.stats.powerTypes')).length).toBeGreaterThanOrEqual(4);
     expectNoErrors(errors);
@@ -253,15 +256,24 @@ test.describe('Derby de Chatarra', () => {
     await ready(page);
     await startDbg(page, false, false);
     await D(page, 'god(true)');
-    const seen = {};
-    for (let i = 0; i < 160; i++) {
+    // volador: sube, planea sobre la sombra y aterriza vulnerable (patrón natural, semilla fija en ?debug)
+    const seen = new Set();
+    for (let i = 0; i < 160 && !(seen.has('glide') && seen.has('rechargeV')); i++) {
       await sim(page, 0.1);
-      const rs = await T(page, 'return T.rivals.map(r => [r.id, r.state + (r.alert ? "!" : "") + (r.vuln ? "V" : "")])');
-      for (const [id, st] of rs) (seen[id] = seen[id] || new Set()).add(st);
-      if (seen.toro?.has('aim!') && seen.toro?.has('charge') && seen.helice?.has('glide') && seen.helice?.has('rechargeV')) break;
+      const h = await T(page, 'const r = T.rivals[2]; return r.state + (r.vuln ? "V" : "")');
+      seen.add(h);
     }
-    expect([...seen.toro]).toEqual(expect.arrayContaining(['aim!', 'charge']));
-    expect([...seen.helice]).toEqual(expect.arrayContaining(['rise', 'glide', 'rechargeV']));
+    expect([...seen]).toEqual(expect.arrayContaining(['rise', 'glide', 'rechargeV']));
+    // ariete: telegrafía (faros + alerta) y luego carga en línea recta
+    await D(page, 'freezeAI(true)');
+    await D(page, 'place("toro",0,-5,Math.PI)'); await D(page, 'teleport(0,-28,0)');
+    await D(page, 'freezeAI(false)'); await D(page, 'rivalState("toro","aim",0.6)');
+    await sim(page, 0.2);
+    expect(await T(page, 'return [T.rivals[1].state, T.rivals[1].alert]')).toEqual(['aim', true]);
+    await sim(page, 0.5);
+    const ch = await T(page, 'return T.rivals[1]');
+    expect(ch.state).toBe('charge');
+    expect(ch.boost).toBe(true);
     // ariete contra el muro: queda aturdido
     await D(page, 'freezeAI(false)');
     await D(page, 'place("toro",30,0,Math.PI/2)'); await D(page, 'rivalState("toro","charge",2.5)'); await D(page, 'teleport(-30,20,0)');
@@ -270,12 +282,14 @@ test.describe('Derby de Chatarra', () => {
     expect(stun).toBe(true);
     // blindado: la cola recibe mucho más daño que el frente
     await D(page, 'freezeAI(true)'); await D(page, 'god(false)');
-    const hitTank = async (fromZ, yaw) => {
-      await D(page, 'place("tanque",0,-20,0)'); await D(page, 'rivalHP("tanque",200)');
-      await D(page, `teleport(0,${fromZ},${yaw})`); await D(page, 'setSpeed(18)'); await sim(page, 0.8);
-      return 200 - (await T(page, 'return T.rivals[3].hp'));
-    };
-    const rear = await hitTank(-32, 0), front = await hitTank(-8, Math.PI);
+    // embestida guionada en una sola evaluación (pasos fijos), con los demás rivales lejos del recorrido
+    const hitTank = (fromZ, yaw) => T(page, `const D = T.debug;
+      D.place('chispa', -30, 25, 0); D.place('toro', 30, 25, 0); D.place('helice', -30, -25, 0);
+      D.place('tanque', -38, 0, 0); D.rivalHP('tanque', 200); D.setTime(999);
+      D.teleport(-38, ${fromZ}, ${yaw}); D.setSpeed(18); D.simulate(0.8);
+      return 200 - T.rivals[3].hp;`);
+    const rear = await hitTank(-12, 0), front = await hitTank(12, Math.PI);
+    expect(front).toBeGreaterThan(0);
     expect(rear).toBeGreaterThan(front * 2.5);
     expectNoErrors(errors);
   });

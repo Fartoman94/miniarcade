@@ -180,10 +180,13 @@ principal (clasificatoria) + secundaria (saltos) y persistencia tras recargar, c
 reintento limpio; pausa congela 1 s / reanuda / reiniciar; guardado corrupto y con forma inválida; dificultad; calidad;
 celular 412×915 y 915×412 sin superposición ni scroll + botones PODER y NITRO.
 
-**Resultados reales (2026-10-10, `ML_WORKERS=1`):**
+**Determinismo:** con `?debug` las pruebas activan `debug.manual(true)` antes de arrancar: el tiempo de juego sólo avanza con `simulate()` (pasos fijos de 1/60 s), el RNG tiene semilla fija y la embestida al blindado se guiona en una sola evaluación en un carril libre (x=−38). Así no dependen de los FPS del runner.
+
+**Resultados reales (2026-10-10, tras el arreglo de determinismo):**
 - desktop: 16 passed, 1 skipped (la de celular).
 - mobile (Pixel 7): 16 passed, 1 skipped (IA de rivales: idéntica a escritorio y cubierta ahí).
 - Sin errores de consola en ninguna prueba.
+- Bajo carga (`ML_WORKERS=4`, ambos proyectos): 32 passed, 2 skipped.
 
 Además (script manual, no en la suite): 10 reinicios desde la pausa sin loops duplicados de rAF ni crecimiento de heap
 (5,49 → 5,78 MB).
