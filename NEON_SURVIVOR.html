@@ -20,8 +20,8 @@
   #overlay h1 { font-size:clamp(34px,11vw,64px); line-height:1.05; background:linear-gradient(90deg,#0ff,#f0f); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 30px #0ff8; margin-bottom:10px; letter-spacing:4px; }
   #overlay p { margin:6px 0; opacity:.85; }
   #overlay .rec { color:#ff0; text-shadow:0 0 12px #ff08; font-weight:700; opacity:1; letter-spacing:1px; }
-  #overlay button { margin-top:20px; padding:12px 30px; font-size:18px; background:transparent; border:2px solid #0ff; color:#0ff; cursor:pointer; letter-spacing:2px; transition:.2s; border-radius:4px; }
-  #overlay button:hover, #overlay button:focus-visible { background:#0ff; color:#000; box-shadow:0 0 30px #0ff; outline:none; }
+  #playBtn { margin-top:20px; padding:12px 30px; font-size:18px; background:transparent; border:2px solid #0ff; color:#0ff; cursor:pointer; letter-spacing:2px; transition:.2s; border-radius:4px; }
+  #playBtn:hover, #playBtn:focus-visible { background:#0ff; color:#000; box-shadow:0 0 30px #0ff; outline:none; }
   .only-touch { display:none; }
   @media (pointer:coarse) { .only-touch { display:block; } .only-keys { display:none; } }
   #levelUp { position:fixed; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:#000c; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); z-index:20; padding:20px; overflow-y:auto; }
@@ -45,9 +45,23 @@
   #score { position:fixed; top:calc(max(10px,env(safe-area-inset-top)) + 30px); right:max(10px,env(safe-area-inset-right)); font-size:16px; text-shadow:0 0 8px #ff0; pointer-events:none; }
   .hidden { display:none !important; }
   .ml-credit .ml-ava { width:1.9em; height:1.9em; vertical-align:-.65em; }
+  #charPick { margin-top:14px; display:flex; justify-content:center; text-align:left; }
+  #charToast { position:fixed; left:50%; bottom:max(16px,env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:30; max-width:min(420px,calc(100vw - 32px));
+    padding:8px 14px; border:1px solid #f0f; border-radius:6px; background:#0a0f1fe6; color:#fff; font-size:13px; text-align:center; box-shadow:0 0 16px #f0f6; pointer-events:none; }
+  /* menú en pantallas bajas (celular apaisado): todo entra sin cortar arriba */
+  #overlay { justify-content:safe center; }
+  @media (max-height:500px) {
+    #overlay { padding:10px 20px; }
+    #overlay h1 { font-size:clamp(26px,7vh,40px); margin-bottom:2px; }
+    #overlay p { margin:2px 0; font-size:13px; }
+    #playBtn { margin-top:8px; padding:8px 26px; font-size:16px; }
+    #charPick { margin-top:6px; }
+    .ml-credit { margin-top:8px !important; }
+  }
   .ml-credit { margin-top:26px; font-size:11px; letter-spacing:.3em; font-weight:700; color:#8ff; opacity:.75; text-shadow:0 0 10px #0ff8; }
 </style>
 <script src="matelabs/arcade.js"></script>
+<script src="matelabs/characters.js"></script>
 </head>
 <body>
 <script src="matelabs/intro.js" data-game="NEON SURVIVOR" data-accent="#00ffff"></script>
@@ -66,9 +80,12 @@
   <p class="only-keys"><b>WASD / Flechas</b> para moverte · Disparo automático</p>
   <p class="only-touch"><b>Arrastrá el dedo</b> en cualquier lado para moverte · Disparo automático</p>
   <p id="bestScore">Mejor puntaje: 0</p>
+  <div id="charPick"></div>
   <button id="playBtn" type="button">JUGAR</button>
   <div class="ml-credit"><img class="ml-ava" src="matelabs/mascota-128.webp" alt="">CREADO POR MATELABS</div>
 </div>
+
+<div id="charToast" role="status" aria-live="polite" hidden></div>
 
 <div id="levelUp" role="dialog" aria-labelledby="luTitle">
   <h2 id="luTitle">¡SUBISTE DE NIVEL!</h2>
@@ -100,7 +117,7 @@ const overlay = $('overlay'), levelUpEl = $('levelUp'), cardsEl = $('cards');
 let W = 0, H = 0, DPR = 1, vignette = null;
 function resize() {
   const d = Math.min(2, window.devicePixelRatio || 1);
-  if (d !== DPR) spriteCache.clear();
+  if (d !== DPR) { spriteCache.clear(); mati.gfx = null; }
   DPR = d; W = innerWidth; H = innerHeight;
   cvs.width = Math.round(W * DPR); cvs.height = Math.round(H * DPR);
   cvs.style.width = W + 'px'; cvs.style.height = H + 'px';
@@ -134,6 +151,88 @@ function glow(r, color, blur, inner) {
   return s;
 }
 function blit(s, x, y) { ctx.drawImage(s.c, x - s.half, y - s.half, s.size, s.size); }
+
+/* ---------- personaje seleccionable: Clásico (orbe) o Mati Octo (sprites 2D de MLChars) ----------
+   Las 3 poses de Mati son imágenes ESTÁTICAS (quieto / correr / salto), no animación con esqueleto:
+   quieto → idle; moviéndose → alterna run ↔ idle cada 150 ms de juego (zancada falsa); al subir de
+   nivel muestra la pose de salto ~0,45 s. Se voltea según la dirección horizontal. El colisionador
+   no cambia (círculo de radio player.r = 14): el sprite es sólo visual. Brillo neón pre-renderizado
+   una vez por pose y orientación (6 canvas), nunca shadowBlur por frame. */
+const GAME_ID = 'neon_survivor';
+const Chars = window.MLChars || null;
+const MATI_H = 40;          // alto visible del cuerpo en px CSS (el orbe clásico mide ~28 px + halo)
+const STRIDE_MS = 150, JUMP_MS = 450;
+const mati = { want: Chars ? Chars.get(GAME_ID) : 'clasico', sprites: null, gfx: null, failed: false, loading: null };
+function activeChar() { return mati.want === 'mati' && mati.sprites && !mati.failed ? 'mati' : 'clasico'; }
+function charToast(msg) {
+  const t = $('charToast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(charToast.tid); charToast.tid = setTimeout(() => { t.hidden = true; }, 4500);
+}
+function loadMati() {
+  if (!Chars || mati.sprites || mati.loading) return;
+  mati.loading = Chars.loadSprites().then(sp => {
+    mati.loading = null;
+    // validar que las imágenes realmente decodificaron (una respuesta corrupta podría dar 0×0)
+    if (!sp || !(sp.idle.naturalWidth > 0 && sp.run.naturalWidth > 0 && sp.jump.naturalWidth > 0)) throw new Error('sprites vacíos');
+    mati.sprites = sp; mati.failed = false; mati.gfx = null;
+    if (state !== 'play') draw();
+  }).catch(() => {
+    mati.loading = null; mati.failed = true;
+    if (mati.want === 'mati') charToast('No se pudo cargar Mati Octo: seguís con el personaje clásico.');
+  });
+}
+/* Ancla común (centro del cuerpo en la pose quieta): cambiar de pose no mueve al personaje. */
+function matiAnchor(img) {
+  try {
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 24) {
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    if (x1 > x0 && y1 > y0) return { cx: (x0 + x1 + 1) / 2, cy: (y0 + y1 + 1) / 2, h: y1 - y0 + 1 };
+  } catch (e) {}
+  return { cx: 65.5, cy: 70.5, h: 84 }; // medido sobre mati_idle.webp
+}
+function buildMatiGfx() {
+  const sp = mati.sprites, a = matiAnchor(sp.idle);
+  const k = MATI_H / a.h, fs = sp.idle.naturalWidth * k, pad = 10;
+  const w = Math.ceil(fs + pad * 2), h = w;
+  const out = {};
+  for (const pose of ['idle', 'run', 'jump']) for (const flip of [false, true]) {
+    const c = document.createElement('canvas');
+    c.width = c.height = Math.ceil(w * DPR);
+    const g = c.getContext('2d');
+    g.scale(DPR, DPR);
+    if (flip) { g.translate(w, 0); g.scale(-1, 1); }
+    // halo neón: la sombra sigue la silueta del sprite; después el sprite nítido encima
+    g.shadowBlur = 9; g.shadowColor = '#0ffd';
+    g.drawImage(sp[pose], pad, pad, fs, fs);
+    g.shadowBlur = 0;
+    g.drawImage(sp[pose], pad, pad, fs, fs);
+    const ax = pad + a.cx * k;
+    out[pose + (flip ? 'L' : 'R')] = { c, w, h, ax: flip ? w - ax : ax, ay: pad + a.cy * k };
+  }
+  return out;
+}
+function matiPose() {
+  if (!player) return 'idle';
+  if (player.jumpMs > 0) return 'jump';
+  if (player.moving) return Math.floor(player.strideMs / STRIDE_MS) % 2 ? 'idle' : 'run';
+  return 'idle';
+}
+function drawPlayer() {
+  if (activeChar() === 'mati') {
+    if (!mati.gfx) mati.gfx = buildMatiGfx();
+    const pose = matiPose(), s = mati.gfx[pose + (player.face < 0 ? 'L' : 'R')];
+    // vaivén leve en quieto y elevación en el salto: sólo visual, el colisionador sigue en (x, y)
+    const lift = pose === 'jump' ? -5 : (!player.moving && !reduceMotion ? Math.sin(gameMs / 260) * 1.2 : 0);
+    ctx.drawImage(s.c, player.x - s.ax, player.y - s.ay + lift, s.w, s.h);
+  } else {
+    blit(glow(player.r, '#0ff', 30, 'core'), player.x, player.y);
+  }
+}
 
 /* ---------- audio (Web Audio sintetizado, sin archivos) ---------- */
 const sfx = (() => {
@@ -284,7 +383,8 @@ function startGame() {
     x:W/2, y:H/2, r:14, hp:100, maxHp:100, speed:3.2,
     fireRate:400, damage:10, bullets:1, range:350, bulletSpeed:9,
     magnet:110, regen:0, pierce:0, crit:0, lastShot:-1e9,
-    invul:0, xp:0, level:1, trail:[], trailHead:0
+    invul:0, xp:0, level:1, trail:[], trailHead:0,
+    face:1, moving:false, strideMs:0, jumpMs:0 // sólo visuales (personaje)
   };
   for (let i = 0; i < 20; i++) player.trail.push({ x: player.x, y: player.y });
   score = 0; time = 0; gameMs = 0; spawnTimer = 0; difficulty = 1; nextBoss = BOSS_EVERY; bannerT = 0;
@@ -409,6 +509,10 @@ function step() {
   }
   player.x = Math.max(player.r, Math.min(W - player.r, player.x + dx * player.speed));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y + dy * player.speed));
+  player.moving = dx !== 0 || dy !== 0;
+  if (player.moving) player.strideMs += STEP; else player.strideMs = 0;
+  if (dx > .05) player.face = 1; else if (dx < -.05) player.face = -1;
+  if (player.jumpMs > 0) player.jumpMs -= STEP;
 
   // Estela (buffer circular, sin asignaciones)
   player.trailHead = (player.trailHead + 1) % 20;
@@ -487,6 +591,7 @@ function step() {
         player.xp -= xpNeed(player.level);
         player.level++;
         pendingLevels++; // antes, subir varios niveles juntos daba una sola mejora
+        player.jumpMs = JUMP_MS; // festejo visual de Mati al volver a jugar
         addParticles(player.x, player.y, '#0ff', 40, 8);
       }
     }
@@ -639,16 +744,18 @@ function draw() {
   }
 
   // Estela: de la posición más vieja (chica, transparente) a la más nueva
+  // (con Mati, más tenue: si no, la estela quieta forma un disco que tapa el sprite)
   ctx.fillStyle = '#0ff';
+  const trailA = activeChar() === 'mati' ? .2 : .4;
   for (let k = 1; k < 20; k++) {
     const t = player.trail[(player.trailHead + 1 + k) % 20];
-    ctx.globalAlpha = k / 20 * .4;
+    ctx.globalAlpha = k / 20 * trailA;
     ctx.beginPath(); ctx.arc(t.x, t.y, player.r * (k / 20), 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 
   const flicker = player.invul > 0 && Math.floor(gameMs / 60) % 2;
-  if (!flicker) blit(glow(player.r, '#0ff', 30, 'core'), player.x, player.y);
+  if (!flicker) drawPlayer();
   ctx.restore();
 
   // Joystick táctil
@@ -675,6 +782,19 @@ function draw() {
 $('playBtn').addEventListener('click', () => { if (state === 'menu' || state === 'over') startGame(); });
 addEventListener('resize', resize);
 resize();
+
+if (Chars) {
+  if (mati.want === 'mati') loadMati();
+  Chars.picker($('charPick'), {
+    gameId: GAME_ID, title: 'PERSONAJE', classicName: 'Clásico',
+    classicIcon: '<span style="display:block;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle,#fff 0 34%,#0ff 40%);box-shadow:0 0 12px #0ff"></span>',
+    onChange: id => {
+      mati.want = id;
+      if (id === 'mati') { mati.failed = false; loadMati(); }
+      draw();
+    },
+  });
+}
 
 if (ML) ML.init({
   id: 'neon_survivor',
@@ -704,6 +824,10 @@ window.__neon = {
   get px() { return player ? player.x : 0; }, get py() { return player ? player.y : 0; },
   get hp() { return player ? player.hp : 0; }, get best() { return best; }, get looping() { return rafId !== 0; },
   get audio() { return sfx.state; }, get muted() { return sfx.muted; },
+  // personaje: elegido vs. activo (si Mati no cargó, el activo es el clásico), pose visible y colisionador
+  get charWanted() { return mati.want; }, get char() { return activeChar(); }, get charFailed() { return mati.failed; },
+  get pose() { return activeChar() === 'mati' ? matiPose() : 'orb'; }, get face() { return player ? player.face : 1; },
+  get r() { return player ? player.r : 0; },
 };
 </script>
 </body>

@@ -105,8 +105,9 @@
       // Escala y centro comunes tomados de la pose quieta: al cambiar de pose no hay saltos de posición.
       const bb = geos[0].boundingBox, h = bb.max.y - bb.min.y;
       const cx = (bb.max.x + bb.min.x) / 2, cz = (bb.max.z + bb.min.z) / 2;
-      // Material compartido por las tres poses: colores por vértice, sombreado plano low-poly.
-      const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+      // Material compartido por las tres poses: colores por vértice, sombreado plano low-poly
+      // (Phong: en r128 MeshLambertMaterial no admite flatShading y avisa por consola).
+      const mat = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 12, specular: 0x222222 });
       /** @type {Record<string, any>} */
       const out = { material: mat, height: 1 };
       geos.forEach((g, i) => {
@@ -224,9 +225,14 @@
 
     // Vista previa: giro con los cuadros pre-renderizados del modelo 3D (sin cargar Three.js).
     const cv = /** @type {HTMLCanvasElement|null} */ (wrap.querySelector('canvas'));
+    // Sólo se descarga la tira de giro (~36 KB) cuando la tarjeta es visible; las poses del juego
+    // se descargan recién al elegir a Mati.
     let raf = 0, frame = 0, last = 0;
-    loadSprites().then(sp => {
+    /** @type {Promise<HTMLImageElement>|null} */
+    let previewP = null;
+    const startPreview = () => (previewP ||= img(DIR + 'mati_turn.webp')).then(turn => {
       if (!cv) return;
+      const sp = { turn, turnFrames: 16 };
       const ctx = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
       const fw = sp.turn.width / sp.turnFrames, fh = sp.turn.height;
       /** @param {number} t */
@@ -243,6 +249,10 @@
       animBtn.addEventListener('click', () => { if (animate && !raf) raf = requestAnimationFrame(draw); });
       document.addEventListener('visibilitychange', () => { if (!document.hidden && animate && !raf) raf = requestAnimationFrame(draw); });
     }).catch(() => { err.hidden = false; err.textContent = 'No se pudo cargar la vista previa de Mati Octo (se puede elegir igual).'; });
+    if (cv && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) { io.disconnect(); startPreview(); } });
+      io.observe(cv);
+    } else startPreview();
 
     sync();
     container.appendChild(wrap);

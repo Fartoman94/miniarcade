@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="matelabs/arcade.js"></script>
+<script src="matelabs/characters.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;overflow:hidden}
@@ -114,7 +115,9 @@
   .mode:hover{transform:translateX(8px);border-color:#ffd97a;box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 24px rgba(255,200,110,.15)}
   .mode:active{transform:translateX(8px) scale(.98)}
   .m-foot{font-size:10px;letter-spacing:.28em;font-weight:800;color:rgba(255,240,210,.5)}
-  @media (max-width:820px){#menu{justify-content:center;overflow-y:auto;align-content:center}
+  /* "safe": si el menú (con el selector de héroe) no entra en la altura, se scrollea desde arriba
+     en vez de cortar el título fuera de pantalla */
+  @media (max-width:820px){#menu{justify-content:center;overflow-y:auto;align-content:safe center}
     .m-left{align-items:center;text-align:center}.m-ctrl{justify-content:center}}
 
   #over{display:flex;align-items:center;justify-content:center;padding:24px;
@@ -162,6 +165,12 @@
     .hud-c{top:calc(84px + env(safe-area-inset-top));width:min(80vw,320px);padding:6px 10px}
     #exploreHint{top:calc(14px + env(safe-area-inset-top));font-size:11px;max-width:86vw}
   }
+  #charPick{padding:8px 12px;border-radius:12px;background:rgba(14,20,15,.7);border:2px solid rgba(201,162,75,.4)}
+  #charMsg{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,20px);z-index:12;
+       max-width:min(92vw,440px);padding:9px 16px;border-radius:10px;background:rgba(16,22,18,.94);
+       border:2px solid rgba(255,140,106,.7);color:#ffe9b0;font-size:13px;font-weight:700;text-align:center;
+       opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+  #charMsg.show{opacity:1;transform:translate(-50%,0)}
   #nogl{position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;
        padding:30px;text-align:center;font-size:15px;line-height:1.8;background:#0e1c14}
 </style>
@@ -187,6 +196,7 @@
 <div class="pbtn" id="atkBtn">⚔️</div>
 <div class="pbtn" id="jumpBtn"><span class="em">⬆️</span><small>SALTO</small></div>
 <div id="banner"></div>
+<div id="charMsg" role="status" aria-live="polite"></div>
 <div id="popups"></div>
 
 <div class="overlay" id="menu">
@@ -201,6 +211,7 @@
        marchan contra el castillo para llegar al rey. Los faroles se encienden, las espadas se afilan…
        y solo vos te interponés.</p>
     <div class="credit"><span class="credit-k">CREADO POR</span><span class="credit-n"><img class="ml-ava" src="matelabs/mascota-128.webp" alt="">MATELABS</span></div>
+    <div id="charPick"></div>
     <div class="m-ctrl">
       <span class="chip">⌨️ WASD · CLIC GOLPEAR · ESPACIO SALTAR · SHIFT CORRER</span>
       <span class="chip">📱 JOYSTICK · BOTONES ⚔️ Y ⬆️ · DESLIZÁ CÁMARA</span>
@@ -606,7 +617,9 @@ mergeStatic(scene);
 
 /* ================= PERSONAJES ================= */
 function makeKnight(){
-  const g=new THREE.Group();
+  const root=new THREE.Group();
+  /* las piezas del caballero van en su propio grupo: así se puede ocultar entero si se elige a Mati */
+  const g=new THREE.Group();root.add(g);
   const lam=c=>new THREE.MeshLambertMaterial({color:c});
   const legs=[];
   for(const s of[-1,1]){
@@ -649,12 +662,12 @@ function makeKnight(){
       grd.position.y=.06;sw.add(grd);
       const hilt=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.22,6),lam(0x5b3a24));
       hilt.position.y=-.08;sw.add(hilt);
-      ag.add(sw);
+      ag.add(sw);arms.sword=sw;
     }
   }
-  const bs=blobShadow(.6);bs.position.y=.03;g.add(bs);
-  g.userData={legs,arms,cape};
-  return g;
+  const bs=blobShadow(.6);bs.position.y=.03;root.add(bs);
+  root.userData={legs,arms,cape,body:g,sword:arms.sword,armR:arms[1]};
+  return root;
 }
 function makeKing(){
   const g=new THREE.Group();
@@ -701,6 +714,51 @@ const vill2=makeVillager(0x7a5a3a,0x5b3a24);vill2.position.set(-2.5,groundH(-2.5
 
 const playerG=makeKnight();scene.add(playerG);
 const P=playerG.userData;
+
+/* ================= PERSONAJE ELEGIBLE: Mati Octo =================
+   Las 3 poses de MLChars son POSES ESTÁTICAS (no hay esqueleto): se alterna su visibilidad según
+   el estado del héroe (quieto / corriendo / en el aire). El collider no cambia: es el mismo círculo
+   de radio PLAYER_R para los dos personajes, así que la jugabilidad es idéntica. */
+const PLAYER_R=.5;
+const HERO_H=2;            /* alto visual del caballero hasta el casco (sin el penacho) */
+const CHAR_ID='salva_al_rey';
+const MC=window.MLChars||null;
+let heroChar='clasico';    /* el que se ve de verdad: si Mati no carga, sigue el caballero */
+let mati=null,matiPose='idle',matiTint=-1,charMsgT=0;
+function charMsg(txt){
+  const el=$('charMsg');el.textContent=txt;el.classList.add('show');
+  clearTimeout(charMsgT);charMsgT=setTimeout(()=>el.classList.remove('show'),4200);
+}
+function applyHero(id){
+  heroChar=id==='mati'&&mati?'mati':'clasico';
+  P.body.visible=heroChar==='clasico';
+  if(mati)mati.g.visible=heroChar==='mati';
+  /* la espada (y el arco del golpe) se mantienen: con Mati la sostiene un pivote propio */
+  const holder=heroChar==='mati'?mati.pivot:P.armR;
+  if(P.sword.parent!==holder)holder.add(P.sword);
+}
+function buildMati(m){
+  const g=new THREE.Group();g.name='mati';
+  for(const k of['idle','run','jump']){
+    const mesh=m[k];mesh.scale.setScalar(HERO_H);mesh.visible=k==='idle';g.add(mesh);
+  }
+  /* "hombro" para la espada: mismo lado y altura relativa que el brazo del caballero */
+  const pivot=new THREE.Group();pivot.position.set(.72,1.15,.2);g.add(pivot);
+  playerG.add(g);
+  return {g,pivot,idle:m.idle,run:m.run,jump:m.jump,mat:m.material};
+}
+function loadMati(){
+  if(!MC)return;
+  MC.loadMeshes(THREE).then(m=>{
+    if(!mati)mati=buildMati(m);
+    matiPose='idle';
+    applyHero(MC.get(CHAR_ID));
+  }).catch(err=>{
+    console.warn('Mati Octo no cargó, se usa el caballero:',err&&err.message||err);
+    applyHero('clasico');
+    if(MC.get(CHAR_ID)==='mati')charMsg('No se pudo cargar a Mati Octo: seguís con el caballero.');
+  });
+}
 
 /* ================= MONSTRUOS ================= */
 function makeGollum(){
@@ -1304,7 +1362,7 @@ function update(dt){
     }
   }
   const pObj={x:px,z:pz};
-  collide(pObj,.5);px=pObj.x;pz=pObj.z;
+  collide(pObj,PLAYER_R);px=pObj.x;pz=pObj.z;
   py=groundH(px,pz);
   if(!grounded){
     vy-=22*dt;jumpY+=vy*dt;
@@ -1325,6 +1383,18 @@ function update(dt){
   }else P.arms[1].rotation.x=moving?Math.sin(walkT)*.4:.25;
   P.cape.rotation.x=.14+(moving?Math.sin(walkT*2)*.12:Math.sin(time*1.6)*.05);
   invuln=Math.max(0,invuln-dt);
+  if(heroChar==='mati'){
+    /* pose discreta según el estado; al correr se alterna corriendo ↔ quieto cada medio paso
+       (≈0.28 s caminando, ≈0.17 s corriendo) para simular la zancada */
+    const pose=!grounded?'jump':moving?(Math.floor(walkT/Math.PI)%2===0?'run':'idle'):'idle';
+    if(pose!==matiPose){mati[matiPose].visible=false;mati[pose].visible=true;matiPose=pose;}
+    mati.g.rotation.x=moving&&grounded?.12:0;
+    mati.g.scale.y=moving||!grounded?1:1+Math.sin(time*2.4)*.025;
+    mati.pivot.rotation.x=P.arms[1].rotation.x;
+    /* golpe recibido: además del parpadeo, un tinte rojo en el material (sin crear objetos) */
+    const tint=invuln>0?1:0;
+    if(tint!==matiTint){matiTint=tint;mati.mat.emissive.setHex(tint?0x7a1010:0x000000);}
+  }
   playerG.visible=invuln>0?(Math.floor(time*12)%2===0):true;
   playerG.rotation.x=state==='dying'?-1.2:0;
   atkCd=Math.max(0,atkCd-dt);
@@ -1546,11 +1616,21 @@ if(window.MLArcade){
   });
 }
 
+/* selector de personaje en el menú (carga diferida: los GLB se piden solo si se elige a Mati) */
+if(MC){
+  MC.picker($('charPick'),{gameId:CHAR_ID,classicIcon:'🛡️',classicName:'Caballero',title:'ELEGÍ TU HÉROE',
+    onChange:id=>{if(id==='mati')loadMati();else applyHero('clasico');}});
+  if(MC.get(CHAR_ID)==='mati')loadMati();
+}else $('charPick').style.display='none';
+
 /* estado de solo lectura para pruebas automáticas; con ?debug=1 también atajos de prueba */
 const snap=()=>({state,mode,paused:gamePaused,time,playTime,px,pz,score,kills,hearts,wave,waveActive,
   gateHP,kingHP,gateAlive,enemies:enemies.length,pending:pending.length,atkCd,swingT,jumpY,camYaw,
   bestWave,qual,pixelRatio:renderer.getPixelRatio(),calls:renderer.info.render.calls,
-  geometries:renderer.info.memory.geometries,audio:AC?AC.state:'none',muted});
+  geometries:renderer.info.memory.geometries,audio:AC?AC.state:'none',muted,
+  char:heroChar,charPref:MC?MC.get(CHAR_ID):'clasico',pose:heroChar==='mati'?matiPose:'caballero',
+  playerR:PLAYER_R,grounded,tris:renderer.info.render.triangles,
+  heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576*10)/10:null});
 window.__rey={snap};
 if(/[?&]debug\b/.test(location.search))Object.assign(window.__rey,{
   hurt:n=>{invuln=0;damagePlayer(n);},
@@ -1559,6 +1639,10 @@ if(/[?&]debug\b/.test(location.search))Object.assign(window.__rey,{
   near:()=>{for(const e of enemies){e.x=GATE.x+rand(-2,2);e.z=GATE.z+6;}},
   setWave:w=>{wave=w;},
   teleport:(x,z)=>{px=x;pz=z;},
+  /* caja visible del héroe en coordenadas del mundo (sin sombra ni espada) */
+  heroBox:()=>{const b=new THREE.Box3().setFromObject(heroChar==='mati'?mati[matiPose]:P.body);
+    return {minY:b.min.y,maxY:b.max.y,w:b.max.x-b.min.x,d:b.max.z-b.min.z,groundY:py+jumpY,
+      swordIn:P.sword.parent===(heroChar==='mati'?mati.pivot:P.armR)};},
 });
 })();
 </script>

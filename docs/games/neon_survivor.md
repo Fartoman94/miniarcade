@@ -130,3 +130,56 @@ Resultado final (`ML_WORKERS=1 npx playwright test tests/e2e/neon_survivor.spec.
 - No se probó con un gamepad físico (sólo el mapeo a teclas del SDK).
 - El audio se verificó sólo a nivel de estado (`AudioContext` `running`/silenciado), no escuchando en un dispositivo real.
 - El anuncio del Coloso se dibuja con `shadowBlur` sobre texto (sólo 2,5 s cada 2 min; costo aceptable).
+
+## Personaje Mati Octo
+
+### Qué se integró
+- Selector de personaje (`MLChars.picker`) en el menú inicial / de Game Over, entre el mejor puntaje y "JUGAR": **Clásico** (el orbe neón original, predeterminado) o **Mati Octo** (el pulpo robot de MateLabs con su mate). Se opera con flechas (radio group) o con toque/clic; la elección se guarda en `ml:character` y persiste al recargar. Elegir no arranca la partida (el selector frena los eventos).
+- `matelabs/characters.js` se carga en el `<head>` después de `arcade.js`. Los sprites 2D (`MLChars.loadSprites()`, WebP de 128×128 mirando a la derecha) se piden al elegir Mati o al abrir el juego con Mati ya elegido. Ojo: la vista previa giratoria del propio selector también llama a `loadSprites()` al dibujarse, así que hoy los WebP se descargan al mostrar el menú aunque esté elegido el clásico (es comportamiento del archivo compartido, no del juego).
+- Brillo neón **pre-renderizado**: al cargar se arman 6 canvas (3 poses × derecha/izquierda) con un halo cian (`shadowBlur` 9 sobre la silueta + el sprite nítido encima). En cada frame se hace un único `drawImage`; nunca `shadowBlur` por frame. Se regeneran sólo si cambia el DPR.
+- CSS: los estilos del botón del menú (`#overlay button`) pasaron a `#playBtn` para no pisar las tarjetas del selector; el overlay usa `justify-content: safe center` y una variante compacta para pantallas de ≤ 500 px de alto (celular apaisado 915×412: todo entra sin scroll). Revisado con capturas en 1280×800, Pixel 7 vertical y 915×412.
+
+### Poses (imágenes estáticas, no animación)
+Las 3 poses son imágenes fijas pre-renderizadas, sin esqueleto ni animación. El juego elige una por estado:
+
+| Estado | Pose |
+|---|---|
+| Quieto | `idle` + vaivén vertical procedural de ±1,2 px (desactivado con `prefers-reduced-motion`) |
+| Moviéndose (teclado o joystick) | alterna `run` ↔ `idle` cada 150 ms de juego (zancada falsa) |
+| Al subir de nivel | `jump` durante 450 ms de juego (se ve detrás del panel de mejoras y al volver a jugar), elevado 5 px |
+
+No hay salto en el juego; el uso de `jump` es sólo un festejo visual. Mira hacia donde se mueve en horizontal (sprite volteado para la izquierda; con movimiento vertical puro conserva la última orientación).
+
+### Escala y colisionador
+- El colisionador **no cambió**: sigue siendo el círculo de radio `player.r = 14` en `(player.x, player.y)` para enemigos, orbes y límites de pantalla. El sprite es sólo visual.
+- El cuerpo de Mati se dibuja con 40 px de alto (el orbe clásico mide 28 px más el halo), centrado en el centro del colisionador. El ancla es el centro del recuadro opaco de la pose quieta (medido una vez sobre los píxeles) y es común a las tres poses, así cambiar de pose no desplaza al personaje.
+- Efectos existentes: el parpadeo de invulnerabilidad funciona igual (se saltea el dibujo). La estela cian se dibuja con la mitad de opacidad con Mati, porque quieta formaba un disco que tapaba el sprite.
+
+### Si falla la carga
+Si los WebP no cargan (error de red o imagen vacía), el juego sigue con el orbe clásico sin cortar nada y muestra un aviso no bloqueante (`#charToast`, `role="status"`, 4,5 s): "No se pudo cargar Mati Octo: seguís con el personaje clásico." La elección guardada no se borra; si se vuelve a elegir Mati en el selector, se reintenta la carga. Si se arranca una partida mientras los sprites todavía cargan, se ve el orbe clásico hasta que llegan.
+
+### Hook de pruebas (`window.__neon`, sólo lectura)
+Nuevos campos: `charWanted` (elección guardada), `char` (personaje activo de verdad), `charFailed`, `pose` (`idle`/`run`/`jump`, u `orb` para el clásico), `face` (1 derecha / −1 izquierda), `r` (radio del colisionador).
+
+### Pruebas
+3 pruebas nuevas en `tests/e2e/neon_survivor.spec.js` (bloque "personaje Mati Octo"):
+1. El selector aparece en el menú con el clásico marcado; se elige Mati con ArrowRight (PC) o toque (móvil), no arranca la partida, persiste tras recargar y se puede volver al clásico (ArrowLeft / toque).
+2. Partida con Mati: pose `idle` quieto, `run` y `face = -1` con la flecha izquierda, vuelve a `idle` al soltar, `face = 1` con la derecha, `jump` al subir de nivel y `idle` después. Colisionador: `r` igual al del clásico (14), y un enemigo a `r + e.r + 2` px no lastima mientras que a `r + e.r − 2` px sí.
+3. Fallo de red (`page.route` aborta los `.webp` y `.glb`): se avisa, el personaje activo es el clásico y la partida avanza; sin `pageerror` (sólo se ignoran los avisos de recurso abortado a propósito).
+
+Resultado (`ML_WORKERS=1 npx playwright test tests/e2e/neon_survivor.spec.js`): **28 passed, 2 skipped** en 2,2 min (desktop 14 + 1 omitida, mobile 14 + 1 omitida; las omitidas son las de sólo-PC / sólo-móvil que ya existían). Pasó en la primera corrida.
+
+### Rendimiento (medido en partida, Chromium headless 1280×800, DPR 1, load average ~32)
+| Medida | Clásico | Mati Octo |
+|---|---|---|
+| FPS reales en partida, escena vacía (4 s) | 58,4–60,2 | 59,4–60,3 |
+| Costo de dibujar sólo al jugador (promedio de 2000) | 21–22 µs | 50–54 µs |
+| `draw()` completo con 260 enemigos + 100 orbes (promedio de 60) | 29,7–33,7 ms | 31,1–39,2 ms |
+| Heap JS usado | 2,5–3,2 MB | 2,4–3,4 MB |
+
+El costo extra de Mati es ~30 µs por frame; la diferencia en el `draw()` completo está dentro del ruido de la máquina saturada (dos corridas por personaje). Memoria extra: 6 canvas de 81×81 px por DPR (≈ 160 KB a DPR 1, ≈ 630 KB a DPR 2) más los 4 WebP.
+
+### Pendientes
+- La vista previa del selector descarga los sprites aunque esté elegido el clásico (ver arriba; habría que cambiarlo en `characters.js`).
+- Con movimiento sólo vertical se usa la misma pose lateral (no hay sprites de frente/espalda).
+- No probado en un celular físico; los tamaños se verificaron con capturas de Playwright.

@@ -90,3 +90,60 @@ Resultado real de la última corrida: **19 passed, 1 skipped (3.1 min)**. Escrit
 ## Actualización (integración con el SDK)
 - El SDK ahora admite acciones propias en el menú de pausa (`actions`). ¡Salva al Rey! agrega **☰ Menú del juego**, que resuelve la salida del modo exploración sin recargar. Cubierto por el test `modo exploración: "Menú del juego"…` (desktop y mobile, 2/2 pasan).
 - Controles del registro actualizados (J para golpear, Q/E cámara, B correr, LB/RB cámara).
+
+## Personaje Mati Octo
+
+### Qué se integró
+- `matelabs/characters.js` se carga en el `<head>` después de `arcade.js`. En el menú, debajo del cartel "Creado por MateLabs", está el selector **ELEGÍ TU HÉROE** (`MLChars.picker`): **Caballero** (el original, por defecto) o **Mati Octo**. Es un radio group: flechas para cambiar con teclado, tap/clic con el dedo o el mouse; las teclas y toques del selector no llegan al juego. La elección se guarda en `ml:character` y sobrevive a la recarga.
+- Carga diferida: los tres GLB (`MLChars.loadMeshes(THREE)`) se piden solo si Mati está elegido al cargar la página o en el momento de elegirlo. Con el Caballero no se baja ningún `.glb` (lo verifica un test). Ojo: la miniatura giratoria del selector (código compartido) sí baja los `.webp` de Mati al abrir el menú.
+- El caballero de primitivas ahora vive en un subgrupo (`P.body`) del grupo del héroe; la sombra queda afuera. Al usar a Mati se oculta ese subgrupo y se muestra el grupo `mati` con las tres poses colgadas del mismo `playerG`, así que posición, giro hacia donde se mueve (`rotation.y = prot`), rebote al caminar, parpadeo de invulnerabilidad y la caída final (`rotation.x = -1.2`) funcionan igual sin tocar nada más.
+
+### Poses (estáticas, no animadas)
+Los GLB son **tres poses fijas sin esqueleto**; no hay animación esquelética. Se cambia de pose alternando `visible` de tres mallas creadas una sola vez:
+- **quieto** (`idle`): en el piso y sin moverse. Movimiento procedural barato: un leve "respirar" (escala Y ±2.5 %).
+- **corriendo** (`run`): mientras se mueve en el piso. Para simular la zancada se alterna `run` ↔ `idle` cada medio paso (≈0.28 s caminando, ≈0.17 s con Shift), más una inclinación hacia adelante de 0.12 rad y el rebote que ya tenía el caballero.
+- **en el aire** (`jump`): mientras no está apoyado (salto).
+- Caída al morir: la pose que esté visible se tumba con el grupo, como el caballero.
+
+### Escala, orientación y collider
+- Mati se escala a **2.0 unidades** de alto (el caballero mide 2.0 hasta el casco; el penacho llega a ~2.3). Medido en el juego: alto 2.04, base exactamente a la altura del piso (`minY = groundY`).
+- Los GLB miran a +Z, igual que el caballero: se usa el mismo `prot` sin corrección.
+- **El collider no cambió**: sigue siendo el círculo de radio `PLAYER_R = 0.5` (antes un `.5` literal en `collide()`); se expone `playerR` en `__rey.snap()`. Un test mete al héroe dentro del collider del portón y comprueba que el empuje deja exactamente la misma posición con los dos personajes.
+- Mati es más ancho que el caballero (1.56 × 1.03 contra ~1.2 con escudo). Como el collider es el mismo, los tentáculos pueden asomar un poco dentro de muros o casas al pegarse a ellos; se priorizó no cambiar la jugabilidad.
+- La cámara sigue apuntando a 1.6 sobre los pies, igual que antes.
+
+### Efectos
+- **Espada y arco del golpe**: la espada original no se duplica; se reparenta a un pivote propio de Mati (a la derecha del cuerpo, a la altura del "hombro") y recibe la misma rotación de swing que el brazo del caballero. El arco blanco del golpe no dependía del modelo y sigue igual.
+- **Golpe recibido**: el caballero solo parpadeaba; con Mati además se tiñe de rojo el `emissive` del material compartido mientras dura la invulnerabilidad (solo se cambia el valor al entrar/salir, sin crear objetos por cuadro).
+- **Muerte**: la misma caída hacia atrás.
+
+### Si falla la carga
+Si los GLB no bajan o no se pueden leer, `loadMeshes` rechaza: el juego queda con el Caballero (la partida arranca y se juega normal) y aparece abajo un aviso no bloqueante durante ~4 s: "No se pudo cargar a Mati Octo: seguís con el caballero." (además de un `console.warn`). La preferencia guardada no se borra, así que se reintenta en la próxima carga. Si se arranca la partida antes de que termine la descarga, se juega con el Caballero y Mati aparece apenas termina.
+
+### Pruebas
+Se agregaron 4 tests a `tests/e2e/salva_al_rey.spec.js`:
+1. Selector: por defecto Caballero y sin pedidos de `.glb`; flechas (→ Mati con foco, ← vuelve), tap/clic, el juego sigue en el menú; tras recargar sigue Mati y se carga.
+2. Partida con Mati: alto 1.9–2.15, pies en el piso, espada en el pivote; con W la pose pasa por `run` y vuelve a `idle` al soltar; el salto muestra `jump`; J golpea; daño y caída final llegan a la pantalla de fin.
+3. Collider idéntico con los dos personajes (mismo empuje del portón, `playerR = 0.5`).
+4. Fallo de red (`page.route` aborta `.glb` y `.webp`): aviso visible, personaje `clasico`, la partida avanza, sin errores fuera de los "Failed to load resource" de los pedidos abortados por el test.
+
+`__rey.snap()` ahora también expone `char`, `charPref`, `pose`, `playerR`, `grounded`, `tris` y `heap`; con `?debug=1` hay `heroBox()`.
+
+Resultado real (`ML_WORKERS=1 npx playwright test tests/e2e/salva_al_rey.spec.js`): **29 passed, 1 skipped (3.4 min)**. Escritorio: 14 passed y 1 skipped (el táctil es solo para móvil). Móvil: 15 de 15 passed.
+
+Capturas revisadas: menú en 1280×800 (el selector entra en la columna izquierda), Pixel 7 vertical (el menú ya no entraba entero: se cambió a `align-content: safe center` para que scrollee desde arriba sin cortar el título) y apaisado 915×412 (el selector entra en la columna izquierda y los botones de modo siguen completos en pantalla).
+
+### Rendimiento (medido en partida, modo paseo caminando, 1280×800, SwiftShader)
+| | Caballero | Mati Octo |
+|---|---|---|
+| llamadas de dibujo (promedio) | 108–111 | 96–98 |
+| triángulos por cuadro | ~15 000–15 800 | ~20 600–20 800 |
+| geometrías en memoria | 98 | 99–100 |
+| heap JS | 6.8–9.4 MB | 7.7–7.8 MB |
+
+Con Mati hay ~13 llamadas de dibujo menos (una malla por pose + la espada contra ~17 piezas del caballero) y ~5 000 triángulos más. El tiempo por cuadro no se puede comparar: se midió con load average ~33 por los otros agentes y dio 93–177 ms por cuadro en ambos casos, puro ruido.
+
+### Pendientes
+- `characters.js` crea el material con `flatShading`, que `MeshLambertMaterial` de r128 no tiene: avisa por consola (warning, no error) y el sombreado plano no se aplica. El juego ya tenía muchos avisos iguales propios.
+- Los tentáculos pueden asomar dentro de muros al pegarse (ver collider).
+- Repetir la medición de tiempo por cuadro con la máquina libre.
