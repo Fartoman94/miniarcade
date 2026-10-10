@@ -25,6 +25,7 @@ const START = {
   mareas_profundas: async p => { await p.keyboard.press('Enter'); },
   cocina_caos: async p => { await p.keyboard.press('Enter'); },
   corsarios_abismo: async p => { await p.click('#ca-menu [data-go]'); },
+  portales_imposibles: async p => { await p.click('#pi-menu [data-go]'); },
 };
 
 /** Cuenta callbacks de rAF por segundo para detectar loops duplicados. */

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c1520">
+<title>Portales Imposibles — MateLabs</title>
+<meta name="description" content="Puzles de portales en 3D: abrí dos portales, lanzate a toda velocidad, mové cubos, desviá láseres, esquivá torretas y desarmá el Núcleo Fractal. Creado por MateLabs.">
+<link rel="icon" type="image/png" href="matelabs/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"./vendor/three-0.186.1/build/three.module.js","three/addons/":"./vendor/three-0.186.1/addons/"}}</script>
+<script src="matelabs/arcade.js"></script>
+<script src="matelabs/missions.js"></script>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#0c1520}</style>
+</head>
+<body>
+<script src="matelabs/intro.js" data-game="PORTALES IMPOSIBLES" data-accent="#9b7bff"></script>
+<div id="pi-loading" style="position:fixed;inset:0;display:grid;place-items:center;color:#9b7bff;font:700 13px system-ui;letter-spacing:.2em">CALIBRANDO PORTALES…</div>
+<script type="module">
+import './games/portales_imposibles/main.js';
+document.getElementById('pi-loading')?.remove();
+</script>
+<noscript><p style="color:#fff;font-family:system-ui;padding:24px">Portales Imposibles necesita JavaScript y WebGL.</p></noscript>
+</body>
+</html>
