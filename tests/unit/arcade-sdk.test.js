@@ -139,3 +139,32 @@ describe('calidad gráfica', () => {
     expect(document.querySelector('.mla-nogl')).not.toBeNull();
   });
 });
+
+describe('opciones fuera de partida', () => {
+  it('sin partida activa, el botón abre OPCIONES sin pausar ni reanudar el juego', () => {
+    const ML = window.MLArcade;
+    if (ML.isPaused()) ML.resume();
+    game.active = false;
+    const p0 = game.paused, r0 = game.resumed;
+    const btn = document.querySelector('.mla-bar button[aria-label="Opciones"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+    expect(ML.isPaused()).toBe(true);
+    expect(document.querySelector('#mla-ptitle').textContent).toBe('OPCIONES');
+    expect(document.querySelector('.mla-pause').classList.contains('mla-optmode')).toBe(true);
+    expect(game.paused).toBe(p0);
+    // mientras está abierto, la entrada no llega al juego
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+    expect(game.keys).not.toContain('Space');
+    // Escape cierra sin llamar onResume
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', bubbles: true }));
+    expect(ML.isPaused()).toBe(false);
+    expect(game.resumed).toBe(r0);
+    expect(document.querySelector('#mla-ptitle').textContent).toBe('PAUSA');
+  });
+  it('en partida el mismo botón es ⏸ Pausa', () => {
+    game.active = true; window.MLArcade.refresh();
+    expect(document.querySelector('.mla-bar button[aria-label="Pausa"]').textContent).toBe('⏸');
+    game.active = false; window.MLArcade.refresh();
+  });
+});

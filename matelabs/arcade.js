@@ -69,7 +69,7 @@
   /* ---------- estado ---------- */
   const qs = new URLSearchParams(location.search);
   const state = {
-    id: '', title: '', paused: false, started: false, playStart: 0,
+    id: '', title: '', paused: false, menuOnly: false, started: false, playStart: 0,
     debug: qs.has('debug'),
     /** @type {any} */ meta: null,
     /** @type {Omit<Required<InitOpts>,'onRestart'> & {onRestart: (()=>void)|null}} */ opts: /** @type {any} */ (null),
@@ -101,6 +101,7 @@
     background:rgba(2,8,12,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
     font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#fff;padding:16px}
   .mla-pause[hidden]{display:none}
+  .mla-optmode [data-a="restart"],.mla-optmode [data-a="custom"]{display:none}
   .mla-card{width:min(360px,100%);max-height:100%;overflow:auto;background:linear-gradient(180deg,#0e2430,#08141c);
     border:1px solid rgba(46,230,230,.3);border-radius:18px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 40px rgba(46,230,230,.12);
     display:flex;flex-direction:column;gap:10px;text-align:center}
@@ -205,7 +206,14 @@
 
   function refreshButtons() {
     if (btnMute) { btnMute.textContent = settings.muted ? '🔇' : '🔊'; btnMute.title = settings.muted ? 'Activar sonido' : 'Silenciar'; btnMute.setAttribute('aria-pressed', String(settings.muted)); }
-    if (btnPause) { btnPause.hidden = !isActive() && !state.paused; }
+    if (btnPause) {
+      // en partida: ⏸ pausa; fuera de partida (menús del juego): ⚙ opciones (sonido, calidad, ayuda)
+      const opts = !isActive() && !(state.paused && !state.menuOnly);
+      btnPause.hidden = false;
+      btnPause.textContent = opts ? '⚙' : '⏸';
+      btnPause.title = opts ? 'Opciones' : 'Pausa (Esc / P)';
+      btnPause.setAttribute('aria-label', opts ? 'Opciones' : 'Pausa');
+    }
     const m = pauseEl && pauseEl.querySelector('[data-a="mute"]');
     if (m) m.textContent = settings.muted ? '🔇 Sonido: NO' : '🔊 Sonido: SÍ';
     const qb = pauseEl && pauseEl.querySelector('[data-a="quality"]');
@@ -231,16 +239,38 @@
     refreshButtons();
     return true;
   }
-  /** @param {boolean} [silent] no llamar onResume (p. ej. porque se va a reiniciar) */
-  function resume(silent = false) {
-    if (!state.paused) return false;
-    state.paused = false;
-    if (pauseEl) pauseEl.hidden = true;
-    if (!silent) { try { state.opts.onResume(); } catch (e) { reportError(e); } }
+  /** Opciones fuera de partida: mismo panel, sin tocar el juego (no hay simulación que congelar). */
+  function openOptions() {
+    if (state.paused || !state.opts || !pauseEl) return false;
+    state.paused = true; state.menuOnly = true;
+    pauseEl.classList.add('mla-optmode');
+    const h = pauseEl.querySelector('#mla-ptitle'), b = /** @type {HTMLElement|null} */ (pauseEl.querySelector('.mla-primary'));
+    if (h) h.textContent = 'OPCIONES';
+    if (b) { b.textContent = '✓ Cerrar'; b.focus({ preventScroll: true }); }
+    pauseEl.hidden = false;
+    track('options');
     refreshButtons();
     return true;
   }
-  function togglePause() { return state.paused ? resume() : pause(); }
+  /** @param {boolean} [silent] no llamar onResume (p. ej. porque se va a reiniciar) */
+  function resume(silent = false) {
+    if (!state.paused) return false;
+    const wasMenu = state.menuOnly;
+    state.paused = false; state.menuOnly = false;
+    if (pauseEl) {
+      pauseEl.hidden = true;
+      if (wasMenu) {
+        pauseEl.classList.remove('mla-optmode');
+        const h = pauseEl.querySelector('#mla-ptitle'), b = pauseEl.querySelector('.mla-primary');
+        if (h) h.textContent = 'PAUSA';
+        if (b) b.textContent = '▶ Reanudar';
+      }
+    }
+    if (!silent && !wasMenu) { try { state.opts.onResume(); } catch (e) { reportError(e); } }
+    refreshButtons();
+    return true;
+  }
+  function togglePause() { return state.paused ? resume() : isActive() ? pause() : openOptions(); }
 
   // Mientras está en pausa, la entrada no llega al juego (salvo al menú de pausa y la barra).
   const BLOCK = ['keydown', 'keyup', 'pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'click', 'wheel', 'contextmenu'];
@@ -497,7 +527,7 @@
       track('open');
       return API;
     },
-    pause, resume, togglePause,
+    pause, resume, togglePause, openOptions,
     isPaused: () => state.paused,
     /** Llamar cuando el jugador arranca una partida. */
     started: gameStarted,

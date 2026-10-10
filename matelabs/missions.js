@@ -94,8 +94,8 @@
   .mlm-hud.tl{top:max(48px,env(safe-area-inset-top));left:8px}.mlm-hud.tr{top:max(48px,env(safe-area-inset-top));right:8px;align-items:flex-end}
   .mlm-hud.bl{bottom:max(56px,env(safe-area-inset-bottom));left:8px}.mlm-hud.br{bottom:max(56px,env(safe-area-inset-bottom));right:8px;align-items:flex-end}
   .mlm-hud[hidden]{display:none}
-  .mlm-m{display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:rgba(4,12,18,.55);
-    border:1px solid rgba(255,255,255,.14);font-size:11px;font-weight:700;line-height:1.25;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  .mlm-m{display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:rgba(4,12,18,.78);
+    border:1px solid rgba(255,255,255,.14);font-size:11px;font-weight:700;line-height:1.25}
   .mlm-m.primary{border-color:rgba(255,217,61,.55)}
   .mlm-m .ic{font-size:11px}
   .mlm-m .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
