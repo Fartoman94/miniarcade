@@ -1143,6 +1143,11 @@ if(DEBUG)window.__fruta.debug={
   launch(type,x){launchOne(false,type,x);},
   boss(hp,t){if(state!=='playing')return;startBoss();if(hp)boss.hp=boss.max=hp;if(t)boss.t=t;},
   bossNow(){if(boss){boss.state='fight';boss.y=H*.42;}},
+  // tajo sintético: mismo camino que el gesto real (addTrailPoint + endSwipe), sin depender del ritmo de los eventos
+  cut(x1,y1,x2,y2,steps=16){if(state!=='playing')return false;
+    const sw=newSwipe(-1-swipeSeq,x1,y1);
+    for(let i=1;i<=steps;i++){addTrailPoint(sw,x1+(x2-x1)*i/steps,y1+(y2-y1)*i/steps);if(state!=='playing')break;}
+    if(swipes.get(sw.ptr)===sw){swipes.delete(sw.ptr);endSwipe(sw);}return true;},
   wave(){wave();},
   clear(){fruits.length=0;warns.length=0;spawnQueue.length=0;},
   hold(on=true){spawnT=on?1e9:.5;waveT=on?1e9:2;},
