@@ -397,7 +397,8 @@ test.describe('MUERTE GLORIOSA', () => {
     await page.evaluate(() => window.MLArcade.settings.set('quality', 'low'));
     await nearSpikes(page);
     await ev(page, 'g.P.x = 430;');
-    await expect.poll(async () => (await ev(page, 'return g.counts.parts'))).toBeGreaterThan(0);
+    // la explosión dura poco: sondeo fino y margen amplio (en CI la muerte puede tardar varios segundos)
+    await expect.poll(async () => (await ev(page, 'return g.counts.parts')), { timeout: 30_000, intervals: [50] }).toBeGreaterThan(0);
     expect(await ev(page, 'return g.counts.parts')).toBeLessThanOrEqual(60);
     expectNoErrors(errors);
   });
