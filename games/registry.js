@@ -132,6 +132,13 @@ export const GAMES = [
     controls: { pc: 'W/S acelerar-frenar · A/D girar · Espacio derrape · Shift nitro · E potenciador', touch: 'Volante + botones ACEL, FRENO, NITRO y PODER', gamepad: 'Stick girar · RT acelerar · LT frenar · A nitro · X potenciador · B derrape' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'arena_mutante', thumb: 'games/thumbs/arena_mutante.webp', file: 'arena_mutante.html', title: 'ARENA MUTANTE', icon: '☣️', accent: '#a6ff2e',
+    category: 'accion', tags: ['Supervivencia 3D', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Supervivencia 3D en tercera persona: restablecé generadores, aguantá 6 oleadas mutantes y escapá del Coloso Radiactivo.',
+    controls: { pc: 'WASD mover · mouse/flechas apuntar · clic/J disparar · Espacio rodar · E usar · Q pulso · F barricada · R recargar', touch: 'Doble stick (mover y apuntar) · FUEGO o disparo automático · RODAR · USAR · PULSO · BARR.', gamepad: 'Sticks mover y cámara · RT disparar · LT mira · A rodar · X usar · LB pulso · Y barricada · B recargar' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

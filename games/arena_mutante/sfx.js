@@ -1,0 +1,46 @@
+// @ts-check
+/* Sonido sintetizado (createAudio().tone) con atenuación por distancia al jugador. */
+export function createSfx(audio, playerPos) {
+  const near = (p, k = 22) => { if (!p) return 1; const pp = playerPos(); const d = Math.hypot(p.x - pp.x, p.z - pp.z); return Math.max(0, 1 - d / k); };
+  const t = (o, p, k) => { const v = near(p, k); if (v <= 0.03) return; audio.tone({ ...o, v: (o.v ?? 0.18) * v }); };
+  return {
+    shot() { audio.tone({ noise: true, d: 0.07, v: 0.16, id: 'shot', gap: 0.05 }); audio.tone({ f: 190, f2: 70, d: 0.08, type: 'square', v: 0.07, id: 'shot2', gap: 0.05 }); },
+    empty() { audio.tone({ f: 900, d: 0.04, type: 'square', v: 0.05, id: 'empty', gap: 0.2 }); },
+    reload() { audio.tone({ f: 420, d: 0.05, type: 'square', v: 0.06 }); setTimeout(() => audio.tone({ f: 620, d: 0.06, type: 'square', v: 0.07 }), 160); },
+    hit(crit) { audio.tone({ f: crit ? 1500 : 1100, f2: crit ? 900 : 700, d: 0.05, type: 'square', v: 0.06, id: 'hit', gap: 0.03 }); },
+    armor() { audio.tone({ f: 2400, f2: 1800, d: 0.06, type: 'triangle', v: 0.06, id: 'armor', gap: 0.05 }); },
+    kill() { audio.tone({ noise: true, d: 0.18, v: 0.12, id: 'kill', gap: 0.05 }); audio.tone({ f: 160, f2: 50, d: 0.2, type: 'sawtooth', v: 0.06, id: 'kill2', gap: 0.05 }); },
+    roll() { audio.tone({ noise: true, d: 0.22, v: 0.08, id: 'roll', gap: 0.1 }); },
+    hurt() { audio.tone({ f: 140, f2: 60, d: 0.22, type: 'sawtooth', v: 0.2, id: 'hurt', gap: 0.15 }); },
+    pulse() { audio.tone({ f: 90, f2: 600, d: 0.35, type: 'sine', v: 0.28 }); audio.tone({ noise: true, d: 0.3, v: 0.14 }); },
+    pickup() { audio.tone({ f: 880, f2: 1320, d: 0.09, type: 'triangle', v: 0.1, id: 'pick', gap: 0.05 }); },
+    heal() { audio.tone({ f: 520, f2: 1040, d: 0.25, type: 'sine', v: 0.14 }); },
+    click() { audio.tone({ f: 700, d: 0.04, type: 'square', v: 0.05, id: 'click', gap: 0.04 }); },
+    crate() { audio.tone({ f: 300, f2: 500, d: 0.12, type: 'square', v: 0.08 }); audio.tone({ noise: true, d: 0.1, v: 0.08 }); },
+    build() { audio.tone({ f: 220, d: 0.06, type: 'square', v: 0.1 }); setTimeout(() => audio.tone({ f: 260, d: 0.06, type: 'square', v: 0.1 }), 90); setTimeout(() => audio.tone({ noise: true, d: 0.12, v: 0.1 }), 180); },
+    gen(p) { audio.tone({ f: 70 + p * 220, d: 0.12, type: 'sawtooth', v: 0.05, id: 'gen', gap: 0.1 }); },
+    genOn() { audio.tone({ f: 110, f2: 440, d: 0.6, type: 'sawtooth', v: 0.16 }); audio.tone({ f: 660, d: 0.3, type: 'triangle', v: 0.1 }); },
+    door(p) { t({ noise: true, d: 0.45, v: 0.12 }, p); t({ f: 80, f2: 60, d: 0.45, type: 'square', v: 0.06 }, p); },
+    bash(p) { t({ f: 90, f2: 50, d: 0.12, type: 'square', v: 0.14, id: 'bash', gap: 0.1 }, p); },
+    trap(kind) { if (kind === 'tesla') audio.tone({ f: 1200, f2: 300, d: 0.35, type: 'sawtooth', v: 0.12 }); else audio.tone({ noise: true, d: 0.6, v: 0.14 }); },
+    zap(p) { t({ f: 1600, f2: 400, d: 0.08, type: 'sawtooth', v: 0.08, id: 'zap', gap: 0.06 }, p); },
+    screech(p) { t({ f: 1300, f2: 1800, d: 0.18, type: 'sawtooth', v: 0.08, id: 'scr', gap: 0.12 }, p); },
+    growl(p) { t({ f: 70, f2: 50, d: 0.45, type: 'sawtooth', v: 0.16, id: 'growl', gap: 0.2 }, p, 30); },
+    roar(p, big = false) { t({ f: big ? 60 : 90, f2: big ? 30 : 45, d: big ? 1.4 : 0.7, type: 'sawtooth', v: big ? 0.32 : 0.2 }, p, big ? 80 : 30); },
+    gurgle(p) { t({ f: 200, f2: 120, d: 0.35, type: 'triangle', v: 0.12, id: 'gurg', gap: 0.15 }, p); },
+    splat(p) { t({ noise: true, d: 0.2, v: 0.12, id: 'splat', gap: 0.06 }, p); },
+    swell(p) { t({ f: 300, f2: 700, d: 0.5, type: 'sine', v: 0.12 }, p); },
+    hiss(p) { t({ noise: true, d: 0.4, v: 0.14, id: 'hiss', gap: 0.2 }, p, 14); },
+    heart(v) { audio.tone({ f: 55, d: 0.12, type: 'sine', v: 0.25 * v, id: 'heart', gap: 0.25 }); },
+    thud(p) { t({ f: 80, f2: 35, d: 0.3, type: 'sine', v: 0.3, id: 'thud', gap: 0.08 }, p, 40); },
+    boom(p) { t({ noise: true, d: 0.6, v: 0.3, id: 'boom', gap: 0.08 }, p, 80); t({ f: 60, f2: 25, d: 0.6, type: 'sine', v: 0.3 }, p, 80); },
+    charge(p) { t({ f: 200, f2: 1200, d: 1.1, type: 'sawtooth', v: 0.1 }, p, 60); },
+    spawn(p) { t({ f: 120, f2: 260, d: 0.3, type: 'triangle', v: 0.08, id: 'spawn', gap: 0.15 }, p, 30); },
+    radio() { audio.tone({ f: 1200, d: 0.06, type: 'square', v: 0.06 }); setTimeout(() => audio.tone({ f: 900, d: 0.06, type: 'square', v: 0.06 }), 120); },
+    engine(p) { t({ f: 70, f2: 90, d: 0.5, type: 'sawtooth', v: 0.1, id: 'eng', gap: 0.4 }, p, 80); },
+    mission() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => audio.tone({ f, d: 0.18, type: 'triangle', v: 0.13 }), i * 90)); },
+    wave() { audio.tone({ f: 220, f2: 180, d: 0.5, type: 'square', v: 0.1 }); setTimeout(() => audio.tone({ f: 220, f2: 180, d: 0.5, type: 'square', v: 0.1 }), 600); },
+    lose() { [392, 330, 262, 196].forEach((f, i) => setTimeout(() => audio.tone({ f, d: 0.3, type: 'sawtooth', v: 0.1 }), i * 180)); },
+    lowhp() { audio.tone({ f: 880, d: 0.08, type: 'square', v: 0.05, id: 'low', gap: 0.9 }); },
+  };
+}
