@@ -22,6 +22,7 @@ const START = {
   derby_chatarra: async p => { await p.keyboard.press('Enter'); },
   arena_mutante: async p => { await p.keyboard.press('Enter'); },
   carrera_vertical: async p => { await p.keyboard.press('Enter'); },
+  mareas_profundas: async p => { await p.keyboard.press('Enter'); },
 };
 
 /** Cuenta callbacks de rAF por segundo para detectar loops duplicados. */

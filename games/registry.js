@@ -146,6 +146,13 @@ export const GAMES = [
     controls: { pc: 'WASD correr · Espacio saltar/trepar · Shift deslizar · F tirolina · R punto de control · mouse/Q-E cámara', touch: 'Joystick + botones SALTO/DESLIZ/ACCIÓN · arrastrar para mirar', gamepad: 'Stick correr · A saltar · B deslizar · X acción · Y punto de control · LB/RB cámara' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'mareas_profundas', thumb: 'games/thumbs/mareas_profundas.webp', file: 'mareas_profundas.html', title: 'MAREAS PROFUNDAS', icon: '🌊', accent: '#ffb547',
+    category: 'aventura', tags: ['Exploración submarina', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Piloteá un minisubmarino con sonar, escaneá fauna, recuperá la caja negra y encendé el faro de la fosa ante el Leviatán.',
+    controls: { pc: 'W/S avanzar · A/D girar · Espacio/Shift subir-bajar · E usar/escanear · Q sonar · C foto · L luz', touch: 'Joystick + botones SUBIR/BAJAR/SONAR/USAR/FOTO/LUZ · arrastrar para mirar', gamepad: 'Stick mover · A usar · B sonar · X foto · Y luz · RB/LB subir/bajar' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */
