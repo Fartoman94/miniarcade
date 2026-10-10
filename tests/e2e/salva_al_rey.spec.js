@@ -206,6 +206,18 @@ test('celular apaisado: los botones de modo entran en pantalla y arrancan la par
   expectNoErrors(errors);
 });
 
+test('menú de modos: «Explorar el Reino del Alba» existe y lleva a reino_alba.html', async ({ page, isMobile }) => {
+  const { errors } = await open(page);
+  const link = page.locator('#modeRealm');
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute('href', 'reino_alba.html');
+  await expect(link).toContainText('Explorar el Reino del Alba');
+  if (isMobile) await link.tap(); else await link.click();
+  await page.waitForURL(/reino_alba\.html/);
+  await expect(page.locator('#ra-menu h1')).toContainText('REINO DEL ALBA', { timeout: 30_000 });
+  expectNoErrors(errors);
+});
+
 test('modo exploración: "Menú del juego" en la pausa vuelve al menú de modos', async ({ page, isMobile }) => {
   const { errors } = await open(page);
   if (isMobile) await page.tap('#modeExplore'); else await page.click('#modeExplore');

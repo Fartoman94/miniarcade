@@ -113,6 +113,8 @@
   .mode .dd{font-size:12.5px;color:rgba(232,224,200,.85);font-weight:600;margin-top:4px;line-height:1.45}
   .mode.mission{border-left:8px solid #c93a30}
   .mode.explore{border-left:8px solid #4a9ac9}
+  .mode.realm{border-left:8px solid #f2b544;text-decoration:none}
+  @media (max-height:540px){.mode.realm .dd{display:none}}
   .mode:hover{transform:translateX(8px);border-color:#ffd97a;box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 24px rgba(255,200,110,.15)}
   .mode:active{transform:translateX(8px) scale(.98)}
   .m-foot{font-size:10px;letter-spacing:.28em;font-weight:800;color:rgba(255,240,210,.5)}
@@ -263,6 +265,11 @@
       <span><span class="tt">Pasear por la villa</span><br>
       <span class="dd">Sin monstruos: explorá el pueblo medieval, saltá por los tejados del mundo y mirá cómo se encienden los faroles al caer la noche.</span></span>
     </button>
+    <a class="mode realm" id="modeRealm" href="reino_alba.html">
+      <span class="em">🏰</span>
+      <span><span class="tt">Explorar el Reino del Alba</span><br>
+      <span class="dd">Entrá a casas y al castillo, hablá con 12 vecinos y viví la aventura de la llave del alba.</span></span>
+    </a>
     <div class="m-foot">CREADO POR MATELABS · HECHO CON HTML5</div>
   </div>
 </div>
