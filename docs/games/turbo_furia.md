@@ -89,3 +89,120 @@ Resultado real: **11 passed, 1 skipped** (el test táctil se saltea en desktop) 
 - Las animaciones CSS (banner de cuenta, popups de puntos) siguen corriendo durante la pausa; es sólo visual.
 - No se probó en dispositivos reales ni con un gamepad físico (el mapa se configuró pero no se verificó con hardware).
 - Las mediciones de FPS no son representativas por la carga de la máquina durante la sesión (ver arriba).
+
+## MiniArcade 3.0
+
+### Estado antes → después
+
+| | Antes | Después |
+|---|---|---|
+| Vehículos | 5 (3 autos, 2 motos), modelos de cajas, 2 stats (vel., agilidad) | 9: los 5 originales + 4 especiales desbloqueables (HIPERNOVA X, FLECHA SOLAR, MONSTRUO 6X6, COHETE 77); siluetas por perfil extruido, ruedas con rayos que giran, ruedas delanteras que doblan, cabeceo al acelerar/frenar, luces de freno; 3 stats (VEL, ACEL, MANEJO) con aceleración propia por vehículo |
+| Modos | 1 (infinita) | 3: Clásica (la original + eventos), Contrarreloj, Duelo contra rival con IA |
+| Tráfico | 6 tipos, siempre en su carril | 8 tipos (+camioneta van, colectivo); algunos cambian de carril con **guiño de 1 s antes** |
+| Peligros / eventos | — | Obras en la ruta (cartel naranja 70 m antes + aviso en HUD), latas de nitro, rival que aparece de atrás y hay que pasar |
+| Escenario | Desierto al atardecer fijo | 4 biomas que se suceden cada 3 km con transición de 400 m: Desierto·atardecer, Costa·mediodía (mar), Bosque·noche (estrellas, luna, haz de luces), Ciudad neón·noche (skyline) |
+| Nitro | ×1,3 vel. tope, partículas | además aceleración ×2,4, llamas en el escape, borde cálido en pantalla, cámara que retrocede/baja + FOV, líneas de velocidad, sonido más grave y filtro abierto |
+| Progreso | Récord único `turbo_best` | + `turbo:progress` (desbloqueos, km totales, etc.) y `turbo:ranking` (ranking **local** por vehículo/modo/dificultad) con migración |
+| SDK 3.0 | — | MLMissions (11 misiones), dificultad, `onQuality`, `requireWebGL()` |
+
+### Misiones (MLMissions, `hud:'tl'`, 2 secundarias por partida)
+
+Los eventos se emiten desde la lógica del juego (no del render).
+
+| id | Tipo | Misión | Evento | Meta |
+|---|---|---|---|---|
+| tf_km3 | principal | Recorré 3 km | `km` (máx., cada 100 m) | 3 |
+| tf_km6 | principal | Recorré 6 km | `km` (máx.) | 6 |
+| tf_clean | secundaria | 10 adelantamientos limpios (sin choque en los últimos 5 s) | `cleanOvertake` | 10 |
+| tf_near | secundaria | Hacé 5 «CASI» | `nearMiss` | 5 |
+| tf_combo | secundaria | Combo CASI ×3 | `combo` (máx.) | 3 |
+| tf_nocrash | secundaria | 2 km sin chocar | `km` (máx.), **failOn `crash`** | 2 |
+| tf_rival | secundaria | Superá a un rival | `rivalBeat` | 1 |
+| tf_works | secundaria | Esquivá 3 obras | `worksDodged` | 3 |
+| tf_cans | secundaria | Juntá 3 latas de nitro | `nitroCan` | 3 |
+| tf_nitro | secundaria | Nitro a fondo 3 s | `nitroHold` (máx.) | 3 |
+| tf_record | secundaria | Superá tu récord (o 1000 pts si no hay récord) | `record` | 1 |
+
+`runStart()` al largar (también desde «Reiniciar partida» y «Otra vez», cerrando antes la partida en curso con `runEnd({won:false})`); `runEnd({won})` en la pantalla final (Duelo: ganó/perdió; Contrarreloj: `won:true`; Clásica: `false`), al volver al garaje y en `onExit`. Las fichas van arriba a la izquierda; los puntos bajaron debajo (la barra del arcade está arriba a la derecha). La firma «CREADO POR MATELABS» del HUD pasó abajo al centro también en PC.
+
+### Dificultad (selector en el garaje, nunca a mitad de carrera)
+
+| Parámetro | Fácil | **Normal (= balance original)** | Difícil | Extremo |
+|---|---|---|---|---|
+| Intervalo de aparición del tráfico | ×1,35 | ×1 | ×0,82 | ×0,68 |
+| Tráfico simultáneo máx. | 10 | 13 | 15 | 17 |
+| Aumento de vel. tope por km / máximo | +0,35 / +6 | +0,5 / +9 | +0,65 / +12 | +0,8 / +15 |
+| Recarga de nitro (/s) | 13 | 11 | 9,5 | 8,5 |
+| Invulnerabilidad tras choque | 2,5 s | 2 s | 1,7 s | 1,4 s |
+| Vel. del rival (× tu tope) | 0,94 | 1 | 1,04 | 1,08 |
+| Prob. de que un auto cambie de carril | 0 | 0,10 | 0,20 | 0,30 |
+| Obras cada | 900–1300 m | 650–1000 m | 500–800 m | 380–650 m |
+| Rival (Clásica/Contrarreloj) cada | 3000 m | 2500 m | 2000 m | 1600 m |
+| Contrarreloj: tiempo inicial / por control | 70 / +20 s | 60 / +15 s | 55 / +12 s | 50 / +10 s |
+| Multiplicador de puntos | ×0,8 | ×1 | ×1,25 | ×1,5 |
+
+Normal conserva los números originales de tráfico, rampa de velocidad, nitro e invulnerabilidad; lo nuevo en Normal son los eventos agregados (obras, latas, rival y 10 % de autos que cambian de carril, siempre con guiño). Los controles no cambian. **Récord:** se mantiene un único récord global (SDK + `turbo_best`); la separación por dificultad está en el ranking local, que es por vehículo · modo · dificultad (top 5, sólo este dispositivo, se aclara en el diálogo «No es un ranking mundial»).
+
+### Calidad (`onQuality`)
+
+| | Baja | Media | Alta |
+|---|---|---|---|
+| pixelRatio | 0,8 (pantallas dpr 1) / 1 | mín(dpr, 1,5) | mín(dpr, 2) |
+| Sombras reales (mapa) | no | no (sombras blob) | sí, 1024 (jugador y rival) |
+| Pintura del jugador | Lambert | Phong + mapa de entorno procedural | Phong + mapa de entorno |
+| Partículas (InstancedMesh) | 36 | 70 | 110 |
+| Líneas de velocidad | 0 | 28 | 56 |
+| Props de escenario visibles | 8 | 16 | 24 |
+| Niebla / distancia de dibujo | 360 / 430 | 520 / 620 | 600 / 720 |
+| Estrellas / skyline | 0 / no | 180 / sí | 360 / sí |
+
+### Contenido nuevo
+
+- **Garaje con desbloqueos persistentes** (`turbo:progress` v2): HIPERNOVA X (8 km acumulados), FLECHA SOLAR (5 km en una carrera), MONSTRUO 6X6 (40 «CASI» acumulados), COHETE 77 (ganar un duelo). Bloqueado = silueta oscura, botón «🔒 BLOQUEADO» con progreso. Se recuerda el último vehículo y modo. **Migración:** si no existe `turbo:progress`, se crea y se guarda `turbo_best` como `legacyBest` (se sigue escribiendo `turbo_best`).
+- **Modos:** Contrarreloj (reloj, controles cada 1,5 km con arco, choque = −5 s sin perder vidas, empieza en la Costa); Duelo (3 km contra EL CÓNDOR, barra de progreso tú/rival, arco de meta, empieza en la Ciudad neón; rubber-band suave ±10 % para que nunca quede imposible).
+- **Rival con IA** (también como evento en Clásica/Contrarreloj): esquiva tráfico y obras cambiando de carril con guiño, frena detrás si no hay hueco, usa nitro, nunca embiste al jugador desde atrás; tocarlo es un «ROCE» (frena, sin perder vida). Pasarlo: +400 y `rivalBeat`; si se aleja 380 m o pasan 55 s, se escapa.
+- **Obras:** vallas a rayas, conos y lámpara con pulso suave (sin destellos), cartel triangular 70 m antes y aviso «⚠ OBRAS EN LA RUTA». Nunca aparecen con un auto entre la obra y vos en ese carril, y se respeta la regla de dejar siempre un carril libre.
+- **Latas de nitro** (+35 de nitro, +25 pts).
+- **Tráfico:** van y colectivo nuevos; cambios de carril con guiño intermitente lento (1 s de aviso + 1,2 s de maniobra), nunca hacia un carril ocupado ni con obra adelante.
+
+### Cambios visuales y de rendimiento
+
+- Vehículos con perfil lateral extruido (r128), piezas fusionadas por material con colores por vértice: ~8 draw calls por auto del tráfico (antes ~20). Geometrías cacheadas por tipo (no se liberan ni se recrean al cambiar de vehículo).
+- Postes reflectivos fusionados en una malla que se desplaza en módulo (2 draw calls en vez de 76), montañas en una malla, props por bioma fusionados (1–2 draw calls cada uno), partículas en un `InstancedMesh` (1 draw call), líneas de velocidad en un `LineSegments`.
+- Fichas de misiones sin `backdrop-filter` en este juego (re-desenfocar el canvas 3D cada cuadro costaba ~30 % de FPS en SwiftShader).
+- `prefers-reduced-motion`: sin sacudida de cámara, FOV del nitro reducido, líneas de velocidad a la mitad.
+- Hitbox AABB **sin cambios** (mismas medidas `w`/`l` y misma fórmula); los modelos no exceden la hitbox salvo las ruedas (+0,24 m de ancho, igual que antes).
+
+### Arreglos de robustez
+
+- La cuenta regresiva, la animación de choque final y el cierre de modo usan tiempo real acotado (≤ 0,25 s por cuadro) en vez del `dt` de juego acotado a 33 ms: con WebGL por software a 3 FPS la cuenta tardaba >20 s (era la causa del test que fallaba en CI). La física sigue con `dt` ≤ 33 ms.
+- Tras elegir modo/dificultad con mouse o toque, el foco vuelve al juego para que Enter/Espacio larguen.
+- Las pruebas que medían por reloj de pared (táctil, puntos antes de chocar) ahora esperan condiciones del reloj del juego.
+
+### Pruebas
+
+`ML_WORKERS=1 npx playwright test tests/e2e/turbo_furia.spec.js` (corrida final, 10/10/2026): **37 passed, 1 skipped, 6,4 min** — desktop 18 passed + 1 skipped (el táctil es sólo mobile), mobile 19 passed.
+
+Nuevas: misiones (principal + secundaria cumplidas, falla de `tf_nocrash` al chocar, reinicio desde pausa, persistencia tras recargar), dificultad (teclado + toque/clic, persistencia, parámetros e invulnerabilidad medida en carrera), calidad baja/alta (pixelRatio, partículas, props, sombras, niebla, material), obras (aviso, choque en tu carril, esquivar suma), nitro (Shift gasta y acelera, borde de pantalla, lata recarga), rival (entra de atrás, se lo supera con premio, sin perder vidas) + cambio de carril con guiño, duelo (gana → desbloquea COHETE 77; pierde cuando el rival llega primero), contrarreloj (choque resta 5 s y no vidas, fin por tiempo), garaje (migración de `turbo_best`, bloqueo, desbloqueo persistente, ranking local), biomas día/noche + hitboxes de los 17 modelos, garaje usable en 1280×800, 412×915 y 915×412. Todas las pruebas ocultan `navigator.getGamepads` (el equipo tiene dos joysticks físicos con entradas trabadas).
+
+### Mediciones (reales, Chromium headless + SwiftShader, 1280×800, 20 s de manejo real en zigzag con nitro; equipo compartido con carga ~26–30)
+
+Corridas alternadas original/nuevo para compensar la carga (4 pares por calidad). Draw calls contados interceptando `drawArrays/drawElements`.
+
+| | Original | Nuevo — media | Nuevo — baja |
+|---|---|---|---|
+| FPS (4 corridas) | 13,8 · 21,6 · 19,3 · 23,6 (media) / 20,2 · 20,1 · 23,9 · 25,3 (baja; el original ignora la calidad) | 14,8 · 16,1 · 16,9 · 22,7 | 20,6 · 36,1 · 28,3 · 26,7 |
+| Draw calls por cuadro | 185–219 | 65–69 | 44–52 |
+| Cuadro mediano | 33–67 ms | 33–67 ms | 17–50 ms |
+| Heap JS | 6,7–9,2 MB | 7,2–8,2 MB | 6,5–7,2 MB |
+| CPU de update+render (gancho) | — | 2,1–3,3 ms | 1,2–2,5 ms |
+
+Alta (1 corrida): 10,3 FPS, 80 draw calls (incluye pase de sombras). Con este nivel de ruido la diferencia de FPS entre original y «media» no es concluyente (≈ −10 % de promedio); «baja» quedó igual o mejor que el original. Los draw calls bajaron ~3–4×.
+
+### Pendientes / NO PROBADO
+
+- No probado en dispositivos reales ni con GPU real; FPS medidos sólo con SwiftShader bajo carga.
+- Gamepad no probado con hardware (los joysticks del equipo tienen entradas trabadas).
+- El récord global sigue siendo uno solo (no por dificultad); la separación está en el ranking local.
+- Idea para cuando se actualice three.js (no en esta ronda): `MeshStandardMaterial` + PMREM para la pintura e `InstancedMesh` para el tráfico.
+- El modo Duelo es siempre contra EL CÓNDOR a 3 km; no hay selector de pista (cada modo arranca en su bioma).
