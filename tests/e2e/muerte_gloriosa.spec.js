@@ -87,7 +87,7 @@ test.describe('MUERTE GLORIOSA', () => {
     await page.keyboard.down('ArrowRight');
     await expect.poll(async () => (await mg(page)).deaths, { timeout: 30000 }).toBe(1);
     await page.keyboard.up('ArrowRight');
-    await expect(page.locator('#card')).toBeVisible();
+    await expect(page.locator('#card')).toBeVisible({ timeout: 30_000 }); // la caída usa tiempo de juego: lenta en CI
     await page.keyboard.press('Escape');
     await expect(page.locator('.mla-pause')).toBeVisible();
     await page.locator('.mla-pause [data-a="restart"]').click();
