@@ -87,3 +87,33 @@ test('service worker: el portal abre sin conexión tras la primera visita', asyn
   await expect(page.locator('#grid article.card')).toHaveCount(8);
   await context.setOffline(false);
 });
+
+test.describe('portada 3.0', () => {
+  test('hero: "Jugar ahora" va a una selección del equipo y, tras jugar, al último juego', async ({ page }) => {
+    const { errors } = await openGame(page, 'index.html?nosw');
+    await page.waitForSelector('html[data-portal=ready]');
+    const href = await page.locator('#playNow').getAttribute('href');
+    expect(['muerte_gloriosa.html', 'Salva_al_rey.html', 'torre_infinita.html']).toContain(href);
+    await expect(page.locator('#orbit a')).toHaveCount(8);
+    await expect(page.locator('#picks .pick')).toHaveCount(3);
+    await page.evaluate(() => localStorage.setItem('ml:stats', JSON.stringify({ turbo_furia: { plays: 2, timeMs: 1000, last: Date.now() } })));
+    await page.reload();
+    await page.waitForSelector('html[data-portal=ready]');
+    await expect(page.locator('#playNow')).toHaveAttribute('href', 'turbo_furia.html');
+    await expect(page.locator('#playNowSub')).toContainText('Seguir con TURBO FURIA');
+    expectNoErrors(errors);
+  });
+
+  test('logros de misiones aparecen en la tarjeta y la ficha', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('ml:stats', JSON.stringify({ clavado: { plays: 1, timeMs: 1000, last: 1 } }));
+      localStorage.setItem('ml:missions', JSON.stringify({ clavado: { done: { a: 1, b: 2 }, runs: 3 } }));
+    });
+    await openGame(page, 'index.html?nosw#/juego/clavado');
+    await page.waitForSelector('html[data-portal=ready]');
+    await expect(page.locator('dialog#detail .d-stats')).toContainText('LOGROS');
+    await expect(page.locator('dialog#detail .d-stats')).toContainText('2');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('article[data-id=clavado] .ach')).toContainText('2');
+  });
+});

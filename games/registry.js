@@ -14,7 +14,7 @@
 /** @typedef {{id:string,file:string,title:string,icon:string,accent:string,category:string,tags:string[],
  *   tech:string,description:string,controls:{pc:string,touch:string,gamepad?:string},
  *   score:'high'|'level'|'none',scoreLabel?:string,legacyBestKey?:string,orientation?:'any'|'landscape'|'portrait',
- *   heavy?:boolean}} GameMeta */
+ *   heavy?:boolean, pick?:string, thumb?:string}} GameMeta */
 
 /** @type {Record<string,string>} */
 export const CATEGORIES = {
@@ -46,7 +46,8 @@ export const GAMES = [
     category: 'plataformas', tags: ['Parkour', '6 niveles'], tech: 'Canvas 2D',
     description: 'Parece un juego de caminar y saltar… pero el nivel te odia. Yunques, pinchos, barriles y trampolines traicioneros.',
     controls: { pc: '← → caminar · Espacio saltar · R reiniciar nivel · Esc pausa', touch: 'Botones ◀ ▶ y SALTAR en pantalla', gamepad: 'Stick/cruceta mover · A saltar · X reiniciar nivel' },
-    score: 'high', scoreLabel: 'niveles superados', legacyBestKey: 'mg_best', orientation: 'landscape',
+    score: 'high', scoreLabel: 'niveles superados',
+    pick: 'El nivel te odia, y el narrador también. Ideal para reírse.', legacyBestKey: 'mg_best', orientation: 'landscape',
   },
   {
     id: 'neon_survivor', file: 'NEON_SURVIVOR.html', title: 'NEON SURVIVOR', icon: '🟣', accent: '#00ffff',
@@ -61,6 +62,7 @@ export const GAMES = [
     description: 'Defendé el reino medieval en 3D. 10 oleadas de monstruos contra el portón y el rey. Modo exploración incluido.',
     controls: { pc: 'WASD mover · clic o J golpear · Espacio saltar · Shift correr · Q/E cámara', touch: 'Joystick · botones ⚔️ y ⬆️ · deslizá la cámara', gamepad: 'Stick mover · A saltar · X golpear · B correr · LB/RB cámara' },
     score: 'level', scoreLabel: 'oleada', legacyBestKey: 'rey_best', orientation: 'landscape', heavy: true,
+    pick: 'Defensa en 3D con noche que cae y faroles que se encienden.',
   },
   {
     id: 'torre_infinita', file: 'torre_infinita.html', title: 'TORRE INFINITA', icon: '🧱', accent: '#ffd93d',
@@ -68,6 +70,7 @@ export const GAMES = [
     description: 'Apilá bloques, clavá caídas perfectas y subí hasta donde el cielo se apague. Cielos que cambian con la altura.',
     controls: { pc: 'Clic o Espacio para soltar el bloque', touch: 'Tocá la pantalla para soltar', gamepad: 'A para soltar' },
     score: 'high', scoreLabel: 'puntos', legacyBestKey: 'torre_best', orientation: 'any',
+    pick: 'Un toque, una torre, y "una más" hasta las tres de la mañana.',
   },
   {
     id: 'turbo_furia', file: 'turbo_furia.html', title: 'TURBO FURIA', icon: '🏁', accent: '#ff8c1a',

@@ -30,8 +30,10 @@ let sort = ['featured', 'played', 'recent', 'az'].includes(saved.sort) ? saved.s
 let query = '';
 /** @type {HTMLSelectElement} */ ($('sort')).value = sort;
 
+/** Logros (misiones completadas al menos una vez) de un juego. @param {string} id */
+const achievements = id => { const d = store.get('ml:missions', {})[id]; return d && d.done ? Object.keys(d.done).length : 0; };
 /** @param {GameMeta} g */
-const info = g => ({ best: ML.scores.best(g.id), ...ML.stats(g.id) });
+const info = g => ({ best: ML.scores.best(g.id), ...ML.stats(g.id), ach: achievements(g.id) });
 
 function renderChips() {
   const list = [['todos', 'Todos'], ...Object.entries(CATEGORIES).filter(([k]) => GAMES.some(g => g.category === k)), ['favoritos', '♥ Favoritos']];
@@ -46,6 +48,24 @@ function renderMe() {
   me.innerHTML = `<div><b>${t.plays}</b><span>PARTIDAS</span></div><div><b>${fmtTime(t.timeMs)}</b><span>JUGADO</span></div><div><b>${t.tried}/${GAMES.length}</b><span>PROBADOS</span></div>`;
 }
 
+/** Hero: "Jugar ahora" lleva al último juego jugado; si nunca jugó, a una selección del equipo. */
+function renderHero() {
+  const last = GAMES.map(g => ({ g, s: info(g) })).filter(x => x.s.last).sort((a, b) => b.s.last - a.s.last)[0];
+  const picks = GAMES.filter(g => g.pick);
+  const g = last ? last.g : picks[new Date().getDate() % Math.max(1, picks.length)] || GAMES[0];
+  const a = /** @type {HTMLAnchorElement} */ ($('playNow'));
+  a.href = g.file;
+  $('playNowSub').textContent = last ? `Seguir con ${g.title}` : g.title;
+  const n = GAMES.length;
+  $('orbit').innerHTML = GAMES.map((x, i) => `<a href="${x.file}" style="${vars(x)};--a:${(360 / n) * i - 90}deg" title="${esc(x.title)}" aria-label="Jugar ${esc(x.title)}"><span aria-hidden="true">${x.icon}</span></a>`).join('');
+}
+
+function renderPicks() {
+  const picks = GAMES.filter(g => g.pick);
+  $('picksSec').hidden = !picks.length;
+  $('picks').innerHTML = picks.map(g => `<a class="pick" href="${g.file}" style="${vars(g)}"><div class="icon-wrap" aria-hidden="true">${g.icon}</div><span><em>${esc(CATEGORIES[g.category]).toUpperCase()}</em><b>${esc(g.title)}</b><small>${esc(g.pick || '')}</small></span></a>`).join('');
+}
+
 function renderContinue() {
   const recent = GAMES.map(g => ({ g, s: info(g) })).filter(x => x.s.last).sort((a, b) => b.s.last - a.s.last).slice(0, 4);
   $('continueSec').hidden = !recent.length;
@@ -56,12 +76,13 @@ function renderContinue() {
 /** @param {GameMeta} g @param {ReturnType<typeof info>} s @param {number} i */
 function card(g, s, i) {
   const fav = favs.has(g.id);
-  return `<article class="card" style="${vars(g)};animation-delay:${i * .05}s" data-id="${g.id}">
-    <div class="card-top"><div class="icon-wrap" aria-hidden="true">${g.icon}</div>
+  const thumb = g.thumb ? `<div class="thumb"><img src="${g.thumb}" alt="" loading="lazy" decoding="async" width="480" height="270"><div class="icon-wrap" aria-hidden="true">${g.icon}</div></div>` : '';
+  return `<article class="card${g.thumb ? ' has-thumb' : ''}" style="${vars(g)};animation-delay:${i * .05}s" data-id="${g.id}">
+    ${thumb}<div class="card-top"><div class="icon-wrap" aria-hidden="true">${g.icon}</div>
       <button type="button" class="fav" data-fav="${g.id}" aria-pressed="${fav}" aria-label="${fav ? 'Quitar de' : 'Agregar a'} favoritos: ${esc(g.title)}">${fav ? '♥' : '♡'}</button></div>
     <div class="grow"><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p></div>
     <div class="tags"><span class="tag">${esc(CATEGORIES[g.category])}</span>${g.tags.map((t, j) => `<span class="tag${j === 0 ? ' highlight' : ''}">${esc(t)}</span>`).join('')}</div>
-    ${s.plays ? `<div class="mystats"><span>Récord <b>${esc(bestText(g, s.best))}</b></span><span>Partidas <b>${s.plays}</b></span></div>` : ''}
+    ${s.plays ? `<div class="mystats"><span>Récord <b>${esc(bestText(g, s.best))}</b></span><span>Partidas <b>${s.plays}</b></span>${s.ach ? `<span class="ach">🏅 <b>${s.ach}</b></span>` : ''}</div>` : ''}
     <div class="actions"><a class="play-btn" href="${g.file}">▶ JUGAR</a><button type="button" class="info-btn" data-info="${g.id}" aria-label="Ver ficha de ${esc(g.title)}">Ficha</button></div>
   </article>`;
 }
@@ -94,7 +115,7 @@ function openDetail(id, keep = false) {
     <div class="d-body">
       <p>${esc(g.description)}</p>
       <div><h3>CONTROLES</h3><dl class="ctrl"><dt>PC</dt><dd>${esc(g.controls.pc)}</dd><dt>Táctil</dt><dd>${esc(g.controls.touch)}</dd>${g.controls.gamepad ? `<dt>Gamepad</dt><dd>${esc(g.controls.gamepad)}</dd>` : ''}<dt>Pausa</dt><dd>Esc, P o el botón ⏸</dd></dl></div>
-      <div><h3>TUS NÚMEROS</h3><div class="d-stats"><div><b>${esc(bestText(g, s.best))}</b><span>RÉCORD</span></div><div><b>${s.plays}</b><span>PARTIDAS</span></div><div><b>${s.timeMs ? fmtTime(s.timeMs) : '—'}</b><span>TIEMPO</span></div></div></div>
+      <div><h3>TUS NÚMEROS</h3><div class="d-stats"><div><b>${esc(bestText(g, s.best))}</b><span>RÉCORD</span></div><div><b>${s.plays}</b><span>PARTIDAS</span></div><div><b>${s.timeMs ? fmtTime(s.timeMs) : '—'}</b><span>TIEMPO</span></div><div><b>${s.ach || '—'}</b><span>LOGROS</span></div></div></div>
       ${g.heavy ? '<p style="font-size:13px;color:#9a9aa8">ℹ️ Juego 3D: la primera vez descarga Three.js (~600 KB).</p>' : ''}
       <div class="actions"><a class="play-btn" href="${g.file}">▶ JUGAR</a><button type="button" class="info-btn" data-fav="${g.id}" aria-pressed="${fav}">${fav ? '♥ Favorito' : '♡ Favorito'}</button></div>
       <div><h3>TE PUEDE GUSTAR</h3><div class="recs">${recommend(g, GAMES, info).map(r => `<button type="button" data-info="${r.id}"><span aria-hidden="true">${r.icon}</span>${esc(r.title)}</button>`).join('')}</div></div>
@@ -132,9 +153,9 @@ $('detail').addEventListener('close', () => { if (location.hash.startsWith('#/ju
 function route() { const m = location.hash.match(/^#\/juego\/([\w-]+)/); if (m) openDetail(m[1]); }
 addEventListener('hashchange', route);
 // Al volver desde un juego con el botón Atrás (bfcache) los números se actualizan.
-addEventListener('pageshow', e => { if (e.persisted) { renderMe(); renderContinue(); renderGrid(); } });
+addEventListener('pageshow', e => { if (e.persisted) { renderHero(); renderMe(); renderContinue(); renderGrid(); } });
 
-renderChips(); renderMe(); renderContinue(); renderGrid(); route();
+renderHero(); renderPicks(); renderChips(); renderMe(); renderContinue(); renderGrid(); route();
 document.documentElement.dataset.portal = 'ready';
 
 // Service worker: caché de archivos estáticos para cargas repetidas y modo sin conexión.
