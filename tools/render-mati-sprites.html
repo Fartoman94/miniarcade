@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!-- Herramienta de desarrollo: pre-renderiza los GLB de Mati Octo a sprites WebP para los juegos 2D.
+     Uso: node tools/render-mati-sprites.mjs (abre esta página en Chromium headless y guarda los archivos). -->
+<html lang="es"><head><meta charset="UTF-8"><title>Render Mati</title></head>
+<body style="margin:0;background:#333">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../matelabs/characters.js"></script>
+<script>
+(async () => {
+  const S = 256; // tamaño de cada cuadro
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1); renderer.setSize(S, S); renderer.setClearColor(0, 0);
+  document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xcff6ff, 0x1a2230, 0.85));
+  const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(2, 3, 4); scene.add(key);
+  const rim = new THREE.DirectionalLight(0x2ee6e6, 0.55); rim.position.set(-3, 2, -3); scene.add(rim);
+  const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+  const M = await MLChars.loadMeshes(THREE);
+  // Altura de las poses respecto de la quieta (jump está más alta): se usa el mismo encuadre para todas.
+  const frame = (mesh, yaw) => {
+    scene.children.filter(o => o.isMesh).forEach(o => scene.remove(o));
+    mesh.rotation.y = yaw; scene.add(mesh);
+    cam.position.set(0, 0.62, 3.05); cam.lookAt(0, 0.56, 0);
+    renderer.render(scene, cam);
+    return renderer.domElement.toDataURL('image/png');
+  };
+  const out = {};
+  // De perfil mirando a la derecha (+X): sirve para plataformas y top-down 3/4. Leve giro hacia la cámara.
+  for (const p of ['idle', 'run', 'jump']) out[p] = frame(M[p], Math.PI / 2 - 0.45);
+  // Giro completo de la pose quieta en 16 cuadros, para la vista previa del selector.
+  out.turn = [];
+  for (let i = 0; i < 16; i++) out.turn.push(frame(M.idle, (i / 16) * Math.PI * 2));
+  window.__sprites = out;
+})().catch(e => { window.__spritesErr = String(e); });
+</script>
+</body></html>
