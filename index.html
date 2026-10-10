@@ -214,10 +214,10 @@
         <div><small>UNA COLECCIÓN DE</small><b>MATE<span>LABS</span></b></div>
       </div>
       <h1>Mini Arcade</h1>
-      <p class="subtitle">Ocho mundos listos para jugar: reflejos, plataformas, hordas, carreras y aventuras en 3D. Sin instalación, en PC y celular.</p>
+      <p class="subtitle" id="heroSub">Mundos listos para jugar: reflejos, plataformas, hordas, carreras y aventuras en 3D. Sin instalación, en PC y celular.</p>
       <div class="hero-cta">
         <a class="cta main" id="playNow" href="clavado.html">▶ JUGAR AHORA<small id="playNowSub">¡CLAVADO!</small></a>
-        <a class="cta alt" href="#catalogo">Ver los 8 juegos</a>
+        <a class="cta alt" href="#catalogo" id="seeAll">Ver los juegos</a>
       </div>
       <div class="me" id="me" aria-label="Tus estadísticas" hidden></div>
     </div>
@@ -246,6 +246,11 @@
     </label>
   </div>
   <div class="chips" id="chips" role="group" aria-label="Categorías"></div>
+
+  <section id="newSec" hidden aria-labelledby="newTitle">
+    <h2 class="row" id="newTitle">Nuevos en MiniArcade</h2>
+    <div class="picks" id="newGames"></div>
+  </section>
 
   <section id="picksSec" aria-labelledby="picksTitle">
     <h2 class="row" id="picksTitle">Selección del equipo</h2>

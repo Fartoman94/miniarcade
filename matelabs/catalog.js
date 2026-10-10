@@ -17,7 +17,7 @@ export const sortKey = s => norm(s).replace(/[^a-z0-9 ]/g, '').trim();
  */
 export function filterGames(games, { cat, query, sort, favs, info, categories }) {
   const q = norm(query.trim());
-  let list = games.filter(g => cat === 'todos' || (cat === 'favoritos' ? favs.has(g.id) : g.category === cat));
+  let list = games.filter(g => cat === 'todos' || (cat === 'favoritos' ? favs.has(g.id) : cat === '3d' ? /three\.js|webgl/i.test(g.tech) : g.category === cat));
   if (q) {
     const words = q.split(/\s+/);
     list = list.filter(g => {

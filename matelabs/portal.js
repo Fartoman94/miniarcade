@@ -25,7 +25,7 @@ const vars = g => `--glow:${g.accent};--glow-soft:${hexA(g.accent, .15)};--accen
 await ML.registry(); // asegura la migración de récords guardados por versiones anteriores
 const favs = new Set(/** @type {string[]} */ (store.get(FAV_KEY, [])).filter(id => GAMES.some(g => g.id === id)));
 const saved = store.get(VIEW_KEY, {});
-let cat = saved.cat && (saved.cat === 'todos' || saved.cat === 'favoritos' || CATEGORIES[saved.cat]) ? saved.cat : 'todos';
+let cat = saved.cat && (saved.cat === 'todos' || saved.cat === 'favoritos' || saved.cat === '3d' || CATEGORIES[saved.cat]) ? saved.cat : 'todos';
 let sort = ['featured', 'played', 'recent', 'az'].includes(saved.sort) ? saved.sort : 'featured';
 let query = '';
 /** @type {HTMLSelectElement} */ ($('sort')).value = sort;
@@ -33,10 +33,12 @@ let query = '';
 /** Logros (misiones completadas al menos una vez) de un juego. @param {string} id */
 const achievements = id => { const d = store.get('ml:missions', {})[id]; return d && d.done ? Object.keys(d.done).length : 0; };
 /** @param {GameMeta} g */
+const is3D = g => /three\.js|webgl/i.test(g.tech);
+/** @param {GameMeta} g */
 const info = g => ({ best: ML.scores.best(g.id), ...ML.stats(g.id), ach: achievements(g.id) });
 
 function renderChips() {
-  const list = [['todos', 'Todos'], ...Object.entries(CATEGORIES).filter(([k]) => GAMES.some(g => g.category === k)), ['favoritos', '♥ Favoritos']];
+  const list = [['todos', 'Todos'], ...(GAMES.some(is3D) ? [['3d', '🧊 3D']] : []), ...Object.entries(CATEGORIES).filter(([k]) => GAMES.some(g => g.category === k)), ['favoritos', '♥ Favoritos']];
   $('chips').innerHTML = list.map(([k, v]) => `<button type="button" class="chip" data-cat="${k}" aria-pressed="${k === cat}">${esc(v)}</button>`).join('');
 }
 
@@ -58,6 +60,14 @@ function renderHero() {
   $('playNowSub').textContent = last ? `Seguir con ${g.title}` : g.title;
   const n = GAMES.length;
   $('orbit').innerHTML = GAMES.map((x, i) => `<a href="${x.file}" style="${vars(x)};--a:${(360 / n) * i - 90}deg" title="${esc(x.title)}" aria-label="Jugar ${esc(x.title)}"><span aria-hidden="true">${x.icon}</span></a>`).join('');
+}
+
+/** «Nuevos»: juegos agregados en los últimos 45 días según la fecha real del registro. */
+function renderNew() {
+  const now = Date.now();
+  const fresh = GAMES.filter(g => g.added && now - Date.parse(g.added) < 45 * 864e5).sort((a, b) => Date.parse(/** @type {string} */ (b.added)) - Date.parse(/** @type {string} */ (a.added)));
+  $('newSec').hidden = !fresh.length;
+  $('newGames').innerHTML = fresh.slice(0, 6).map(g => `<a class="pick" href="${g.file}" style="${vars(g)}"><div class="icon-wrap" aria-hidden="true">${g.icon}</div><span><em>NUEVO · ${esc(CATEGORIES[g.category]).toUpperCase()}</em><b>${esc(g.title)}</b><small>${esc(g.description)}</small></span></a>`).join('');
 }
 
 function renderPicks() {
@@ -155,7 +165,8 @@ addEventListener('hashchange', route);
 // Al volver desde un juego con el botón Atrás (bfcache) los números se actualizan.
 addEventListener('pageshow', e => { if (e.persisted) { renderHero(); renderMe(); renderContinue(); renderGrid(); } });
 
-renderHero(); renderPicks(); renderChips(); renderMe(); renderContinue(); renderGrid(); route();
+$('seeAll').textContent = `Ver los ${GAMES.length} juegos`;
+renderHero(); renderNew(); renderPicks(); renderChips(); renderMe(); renderContinue(); renderGrid(); route();
 document.documentElement.dataset.portal = 'ready';
 
 // Service worker: caché de archivos estáticos para cargas repetidas y modo sin conexión.

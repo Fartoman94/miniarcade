@@ -73,3 +73,12 @@ describe('catálogo', () => {
     expect(norm('Ñandú ÁRBOL')).toBe('nandu arbol');
   });
 });
+
+describe('filtro 3D', () => {
+  it('devuelve sólo los juegos con Three.js/WebGL', () => {
+    const ids = filterGames(GAMES, { ...base, cat: '3d' }).list.map(g => g.id);
+    expect(ids.length).toBeGreaterThanOrEqual(3);
+    expect(ids).toContain('turbo_furia');
+    expect(ids).not.toContain('clavado');
+  });
+});
