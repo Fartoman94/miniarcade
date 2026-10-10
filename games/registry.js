@@ -160,6 +160,13 @@ export const GAMES = [
     controls: { pc: 'WASD mover · E acción (mantener: picar/lavar/apagar) · Q ayudante · Shift impulso', touch: 'Joystick · ACCIÓN contextual grande · ⚡ impulso · 🧑‍🍳 encargo del ayudante', gamepad: 'Stick mover · A acción · X ayudante · B impulso · LB/RB encargos' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'corsarios_abismo', thumb: 'games/thumbs/corsarios_abismo.webp', file: 'corsarios_abismo.html', title: 'CORSARIOS DEL ABISMO', icon: '🏴‍☠️', accent: '#ffbe3d',
+    category: 'aventura', tags: ['Naval 3D', 'Jefe final'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Navegá con el viento, cañoneá de costado, desenterrá tesoros en 3 mares, tomá el fuerte y hundí al Almirante Espectral.',
+    controls: { pc: 'W/S velas · A/D timón · Q/E andanadas babor/estribor · Espacio acción · R kit', touch: 'Timón virtual (velas y giro) + botones BABOR, ESTRIB., ACCIÓN y KIT', gamepad: 'Stick timón y velas · LB/RB andanadas · A acción · X kit' },
+    score: 'high', scoreLabel: 'botín', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

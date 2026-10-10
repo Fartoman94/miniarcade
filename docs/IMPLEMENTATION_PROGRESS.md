@@ -14,7 +14,7 @@ Estados: `pending` · `in_progress` · `test_failed` · `ready_for_review` · `r
 | 08 | EL VALLE ENCANTADO | valle_encantado.html | Three.js r128 | released (reino: pending) | main | reino explorable pendiente |
 | 09 | Guardianes Estelares* | guardianes_estelares.html | Three.js 0.186 | released | main (PR #7, 971fd82) | *renombrado (marca de terceros) · 37 tests ok |
 | 10 | Arena Mutante | arena_mutante.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 39 tests ok (+ bajo carga) |
-| 11 | Corsarios del Abismo | corsarios_abismo.html | Three.js 0.186 | in_progress | — | |
+| 11 | Corsarios del Abismo | corsarios_abismo.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 31 tests ok (+ bajo carga) |
 | 12 | Granja de Runas | granja_runas.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 39 tests ok |
 | 13 | Templo de los Ecos | templo_ecos.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 30 tests ok |
 | 14 | Bastiones Elementales | bastiones_elementales.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 32 tests ok |
