@@ -15,10 +15,10 @@ function aim(c, tx, tz) {
   return { steer: clamp(-ang * 2.6, -1, 1), ang, dist: Math.hypot(dx, dz) };
 }
 
-/** @param {any} c */
-export function initAI(c) {
-  c.ai = { state: c.rtype === 'volador' ? 'cruise' : 'hunt', t: 0, st: 0, target: null, retarget: 0, stuck: 0, rev: 0, revSteer: 0, cool: 1.5 + Math.random() * 2,
-    hop: 4 + Math.random() * 3, flee: 0, side: Math.random() < 0.5 ? -1 : 1, lx: 0, lz: 0, lockYaw: 0, sx: 0, sz: 0, gT: 0, horn: false };
+/** @param {any} c @param {()=>number} [rand] */
+export function initAI(c, rand = Math.random) {
+  c.ai = { state: c.rtype === 'volador' ? 'cruise' : 'hunt', t: 0, st: 0, target: null, retarget: 0, stuck: 0, rev: 0, revSteer: 0, cool: 1.5 + rand() * 2,
+    hop: 4 + rand() * 3, flee: 0, side: rand() < 0.5 ? -1 : 1, lx: 0, lz: 0, lockYaw: 0, sx: 0, sz: 0, gT: 0, horn: false };
 }
 
 /**

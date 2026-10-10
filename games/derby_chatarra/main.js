@@ -93,7 +93,7 @@ const fx = createFx(scene, reduced);
 const sfx = createSfx(game.audio);
 const ui = createUI();
 const cars = createCars(scene);
-const rand = rng(Date.now() & 0xffff);
+const rand = rng(DEBUG ? 12345 : Date.now() & 0xffff);
 
 let input = createInput(game.root, {
   joystick: 'left',
@@ -116,7 +116,7 @@ const run = { round: 1, time: 0, left: 90, countdown: 0, cdShown: -1, repairs: 0
   endT: 0, deadT: 0, result: /** @type {any} */ (null), moved: 0, near: '', engT: 0, skidT: 0, setupFor: '' };
 /** @type {any} */ let cut = null;
 let tipId = '', tipT = 0, cutSkip = false;
-const dbg = { freezeAI: false, god: false };
+const dbg = { freezeAI: false, god: false, manual: false, stepping: false };
 const cam = { x: 0, y: 8, z: 20, yaw: 0, fov: 62, orbit: 0, lx: 0, ly: 0, lz: 0 };
 
 /* ======================= tutorial contextual ======================= */
@@ -179,7 +179,7 @@ function setupRound(n) {
   RIVAL_IDS.forEach((rid, i) => {
     const r = RIVALS[rid], spec = { ...r };
     const c = cars.make({ id: rid, name: r.name, model: r.model, color: r.color, spec, hp: Math.round(r.hp * d.rivalHp), rtype: r.type });
-    initAI(c); place(c, sp[i + 1]); rivals.push(c);
+    initAI(c, rand); place(c, sp[i + 1]); rivals.push(c);
     if (r.type === 'ariete') { decals[rid] = { lane: makeDecal('lane', 0xff2a2a) }; scene.add(/** @type {THREE.Mesh} */ (decals[rid].lane)); }
     if (r.type === 'volador') { decals[rid] = { shadow: makeDecal('circle', 0xff2020), ring: makeDecal('ring', 0xff5050) }; scene.add(/** @type {any} */ (decals[rid].shadow), /** @type {any} */ (decals[rid].ring)); }
   });
@@ -618,6 +618,8 @@ function playerControl(dt) {
   run.moved += Math.abs(P.speed) * dt;
 }
 function update(dt) {
+  // ?debug con manual(true): el tiempo de juego sólo avanza con simulate() (pruebas deterministas)
+  if (dbg.manual && !dbg.stepping) return;
   if (overlay) { input.endStep(); return; }
   if (!ACTIVE.has(state)) {
     // menús y pantallas finales: la arena sigue viva de fondo
@@ -640,7 +642,7 @@ function update(dt) {
     run.countdown -= dt;
     const n = Math.ceil(run.countdown - 0.2);
     if (n !== run.cdShown && run.countdown < 3) { run.cdShown = n; if (n > 0) { ui.big(String(n), 'PREPARATE', 0.9); sfx.beep(false); } }
-    if (run.countdown <= 0.2) { state = 'play'; ui.big('¡YA!', 'A DESTROZAR', 0.8); sfx.beep(true); setTimeout(() => tip('drive'), 400); }
+    if (run.countdown <= 0.2) { state = 'play'; ui.big('¡YA!', 'A DESTROZAR', 0.8); sfx.beep(true); tip('drive'); }
     for (const c of cars.list) { c.ctl.throttle = 0; c.ctl.steer = 0; c.ctl.nitro = false; c.ctl.handbrake = false; }
     if (P && (input.any('KeyW', 'ArrowUp') || input.button('gas'))) sfx.engine(8, false, 1);
   } else if (state === 'play') {
@@ -964,14 +966,15 @@ if (DEBUG) {
   /** @type {any} */ (hook).debug = {
     goto(n) { startRound(n); run.countdown = 0.21; },
     skipCountdown() { run.countdown = 0.21; },
-    simulate(sec) { game.simulate(sec); },
+    simulate(sec) { dbg.stepping = true; try { game.simulate(sec); } finally { dbg.stepping = false; } },
+    manual(on = true) { dbg.manual = on; },
     teleport(x, z, yaw) { P.x = x; P.z = z; P.y = arena.heightAt(x, z); if (yaw !== undefined) { P.yaw = yaw; cam.yaw = yaw; } P.vx = P.vz = P.vy = 0; P.yawRate = 0; P.grounded = true; cam.x = x - Math.sin(P.yaw) * 9; cam.z = z - Math.cos(P.yaw) * 9; },
     place(id, x, z, yaw) { const c = cars.list.find(o => o.id === id); if (!c) return false; c.x = x; c.z = z; c.y = arena.heightAt(x, z); if (yaw !== undefined) c.yaw = yaw; c.vx = c.vz = c.vy = 0; c.yawRate = 0; c.grounded = true; return true; },
     setSpeed(v) { P.vx = Math.sin(P.yaw) * v; P.vz = Math.cos(P.yaw) * v; },
     setHP(n) { P.hp = n; }, hurt(n) { damageCar(P, n, 'l', null, 'debug'); },
     rivalHP(id, n) { const c = rivals.find(o => o.id === id); if (c) c.hp = n; },
     give(type) { P.slot = type; },
-    rivalState(id, st, t) { const c = rivals.find(o => o.id === id); if (!c) return false; c.ai.state = st; c.ai.st = t ?? 1; if (st === 'charge') { c.ai.lockYaw = c.yaw; c.boostT = t ?? 2; } return true; },
+    rivalState(id, st, t) { const c = rivals.find(o => o.id === id); if (!c) return false; c.stunT = 0; c.ai.state = st; c.ai.st = t ?? 1; if (st === 'charge') { c.ai.lockYaw = c.yaw; c.boostT = t ?? 2; } return true; },
     freezeAI(on = true) { dbg.freezeAI = on; }, god(on = true) { dbg.god = on; },
     wreck(id) { for (const c of rivals) if ((id === 'all' || c.id === id) && !c.wrecked) damageCar(c, 9999, 'l', P, 'debug'); },
     setTime(t) { run.left = t; },
