@@ -3,7 +3,7 @@
      sin red, la copia en caché. Así un deploy nuevo nunca queda tapado por la caché.
    - Recursos inmutables (Three.js versionado de cdnjs, fuentes, imágenes): cache-first.
    Subir VERSION invalida las cachés viejas. */
-const VERSION = 'ml-v3';
+const VERSION = 'ml-v4';
 const CORE = `${VERSION}-core`, STATIC = `${VERSION}-static`;
 const PRECACHE = ['./', 'index.html', 'matelabs/arcade.js', 'matelabs/intro.js', 'matelabs/portal.js', 'matelabs/catalog.js',
   'games/registry.js', 'matelabs/missions.js', 'matelabs/characters.js', 'matelabs/mascota.webp', 'matelabs/mascota-128.webp', 'matelabs/favicon.png', 'manifest.webmanifest'];

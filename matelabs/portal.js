@@ -76,7 +76,7 @@ function renderContinue() {
 /** @param {GameMeta} g @param {ReturnType<typeof info>} s @param {number} i */
 function card(g, s, i) {
   const fav = favs.has(g.id);
-  const thumb = g.thumb ? `<div class="thumb"><img src="${g.thumb}" alt="" loading="lazy" decoding="async" width="480" height="270"><div class="icon-wrap" aria-hidden="true">${g.icon}</div></div>` : '';
+  const thumb = g.thumb ? `<div class="thumb"><img src="${g.thumb}" alt="" loading="lazy" decoding="async" width="480" height="270"></div>` : '';
   return `<article class="card${g.thumb ? ' has-thumb' : ''}" style="${vars(g)};animation-delay:${i * .05}s" data-id="${g.id}">
     ${thumb}<div class="card-top"><div class="icon-wrap" aria-hidden="true">${g.icon}</div>
       <button type="button" class="fav" data-fav="${g.id}" aria-pressed="${fav}" aria-label="${fav ? 'Quitar de' : 'Agregar a'} favoritos: ${esc(g.title)}">${fav ? '♥' : '♡'}</button></div>
