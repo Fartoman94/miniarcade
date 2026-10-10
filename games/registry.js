@@ -139,6 +139,13 @@ export const GAMES = [
     controls: { pc: 'WASD mover · mouse/flechas apuntar · clic/J disparar · Espacio rodar · E usar · Q pulso · F barricada · R recargar', touch: 'Doble stick (mover y apuntar) · FUEGO o disparo automático · RODAR · USAR · PULSO · BARR.', gamepad: 'Sticks mover y cámara · RT disparar · LT mira · A rodar · X usar · LB pulso · Y barricada · B recargar' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'carrera_vertical', thumb: 'games/thumbs/carrera_vertical.webp', file: 'carrera_vertical.html', title: 'CARRERA VERTICAL', icon: '🏃', accent: '#ff7a2f',
+    category: 'plataformas', tags: ['Parkour 3D', 'Contrarreloj'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-10',
+    description: 'Corré por azoteas y paredes, colgate de tirolinas, batí a tu fantasma en tres distritos y escapá del dron jefe.',
+    controls: { pc: 'WASD correr · Espacio saltar/trepar · Shift deslizar · F tirolina · R punto de control · mouse/Q-E cámara', touch: 'Joystick + botones SALTO/DESLIZ/ACCIÓN · arrastrar para mirar', gamepad: 'Stick correr · A saltar · B deslizar · X acción · Y punto de control · LB/RB cámara' },
+    score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

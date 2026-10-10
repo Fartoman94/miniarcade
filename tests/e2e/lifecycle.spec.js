@@ -21,6 +21,7 @@ const START = {
   bastiones_elementales: async p => { await p.keyboard.press('Enter'); },
   derby_chatarra: async p => { await p.keyboard.press('Enter'); },
   arena_mutante: async p => { await p.keyboard.press('Enter'); },
+  carrera_vertical: async p => { await p.keyboard.press('Enter'); },
 };
 
 /** Cuenta callbacks de rAF por segundo para detectar loops duplicados. */

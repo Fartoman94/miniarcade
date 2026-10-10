@@ -21,8 +21,8 @@ Estados: `pending` · `in_progress` · `test_failed` · `ready_for_review` · `r
 | 15 | Derby de Chatarra | derby_chatarra.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 32 tests ok |
 | 16 | Academia de Dragones | academia_dragones.html | Three.js 0.186 | released | main (PR #7, 971fd82) | 34 tests ok |
 | 17 | Mareas Profundas | mareas_profundas.html | Three.js 0.186 | in_progress | — | |
-| 18 | Carrera Vertical | carrera_vertical.html | Three.js 0.186 | in_progress | — | |
+| 18 | Carrera Vertical | carrera_vertical.html | Three.js 0.186 | ready_for_review | feat/miniarcade-3 | 30 tests ok (+ bajo carga) |
 | 19 | Cocina del Caos | cocina_caos.html | Three.js 0.186 | in_progress | — | |
-| 20 | Portales Imposibles | portales_imposibles.html | Three.js 0.186 | pending | — | |
+| 20 | Portales Imposibles | portales_imposibles.html | Three.js 0.186 | in_progress | — | |
 
 **Total released: 15/20** (8 originales + 7 nuevos, PR #7 mergeado el 2026-10-10 con CI en verde). El reino explorable de 05/08 está en `docs/specs/REINO_EXPLORABLE.md`.
