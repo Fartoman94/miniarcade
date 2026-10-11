@@ -19,12 +19,12 @@ acelera con la tensión). No se usan GLB del paquete (no encajaban con la escala
 ## Controles
 | Acción | PC | Táctil | Gamepad |
 |---|---|---|---|
-| Correr (el sprint llega solo si no frenás) | WASD / flechas | joystick izquierdo | stick / cruceta |
+| Correr (el sprint llega solo si no frenás) | WASD / flechas | joystick flotante (se centra donde apoyás el pulgar, mitad inferior izquierda) | stick / cruceta |
 | Mirar (la cámara vuelve sola detrás tuyo) | arrastrar el mouse, Q / E | arrastrar el dedo fuera de los controles | LB / RB |
 | Saltar (mantener = más alto) · trepar · saltar de pared | Espacio* | SALTO | A |
 | Deslizar · rodar al caer · salto largo (saltar deslizando) | Shift* (también C / Ctrl) | DESLIZ | B |
 | Acción contextual (colgarse de la tirolina) | F* | ACCIÓN (se ilumina cuando sirve) | X |
-| Volver al punto de control | R* | menú de pausa | Y |
+| Volver al punto de control | R* | mantener ↩ 0,45 s (o menú de pausa) | Y |
 | Pausa | Esc / P | ⏸ de la barra | Start |
 
 \* Re-asignables en **Controles y opciones** (menú y pausa), junto con sensibilidad, invertir vertical, cámara automática,
@@ -172,7 +172,7 @@ fall, combo, clocksAll, autopilot, stopLoop`. `autopilot(ruta)` sigue puntos de 
 acción, esperar) usando la física real: con él se verificó que los cuatro circuitos se pueden completar.
 
 ## Pruebas (`tests/e2e/carrera_vertical.spec.js`)
-19 pruebas. Las de jugabilidad detienen el bucle real (`debug.stopLoop()`) y avanzan con pasos fijos (`simulate`/`trace`)
+22 pruebas. Las de jugabilidad detienen el bucle real (`debug.stopLoop()`) y avanzan con pasos fijos (`simulate`/`trace`)
 mientras las teclas o toques reales siguen apretados: no dependen de cuadros reales ni del reloj (CI con 2 núcleos).
 Quedan con bucle real sólo las de controles (arranque desde el menú, tutorial, pausa, celular).
 Cobertura: carga sin errores; arranque con Enter/toque + cuenta regresiva + correr/saltar (teclado y joystick por CDP);
@@ -187,7 +187,15 @@ escape, recompensa y puntaje); derrotas (tiempo agotado, capturas) con reintento
 reiniciar; guardado corrupto y con forma inválida; dificultad; calidad; celular 412×915 y 915×412 sin superposición ni
 scroll + botones táctiles (dos dedos: joystick + DESLIZ).
 
-**Resultados reales (2026-10-10, máquina compartida con load average ~40):**
+**Resultados reales tras la pasada móvil (2026-10-11, load average ~40):**
+- `ML_WORKERS=1`, ambos proyectos: **33 passed, 11 skipped, 0 failed** (13.5 min). desktop: 18 passed, 4 skipped (las 4 de
+  celular); mobile (Pixel 7): 15 passed, 7 skipped.
+- `ML_WORKERS=4`, ambos proyectos: **33 passed, 11 skipped, 0 failed** (14.1 min).
+- `lifecycle.spec.js -g carrera`: 1 passed, 1 skipped.
+- Prueba intermitente arreglada: «puertas automáticas» fallaba a veces (1 de 4 corridas) porque el dron de esa zona podía
+  volver a detectar mientras el bucle real corría antes de `stopLoop`, renovando con razón la traba; ahora espera 3 s sin alarmas nuevas.
+
+**Resultados anteriores (2026-10-10, máquina compartida con load average ~40):**
 - `ML_WORKERS=1`, ambos proyectos: **30 passed, 8 skipped, 0 failed** (13.8 min). desktop: 18 passed, 1 skipped (la de
   celular); mobile (Pixel 7): 12 passed, 7 skipped (parkour por teclado, ascensor, puertas, IA de rivales, recorrido de
   escenarios, misiones y fantasma: lógica idéntica, cubiertas en escritorio).
@@ -215,6 +223,41 @@ La CPU del juego (simulación + armado del render) es ~1–3 ms por cuadro; el r
 carga extrema (el tope de 250 ms por cuadro del Kit3D se alcanzaba). Degradación para hardware inferior: Baja quita
 sombras, halos, estelas de viento y estrellas, baja DPR a 1, recorta el horizonte (320 → 70 edificios), partículas
 (420 → 90) y el plano lejano (380 → 170 m).
+
+## Móvil
+Pasada mobile-first (2026-10-11). Capturas reales (Chromium + emulación táctil Pixel 7, DPR 2–3) en
+`.perf/carrera_vertical-mobile/`: `before-<ancho>x<alto>-{menu,play}.png` y `after-<ancho>x<alto>-{menu,play}.png` para
+360×640, 390×844, 412×915, 915×412 y 844×390; además `after-844x390-{help,opts,end}.png` y `after-360x640-{help,opts,end}.png`.
+(El recuadro «fps · heap» abajo a la izquierda de las capturas es el medidor del SDK con `?debug`; no aparece al jugar.)
+
+**Problemas encontrados → arreglos**
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| Menú cortado abajo en apaisado (915×412 y 844×390: 484 px de contenido en 412/390, sin pista de que había más) | En apaisado bajo el menú pasa a **dos columnas**: título + «Correr» (56 px) + crédito a la izquierda; circuitos, dificultad y opciones a la derecha, por debajo de la barra del SDK. Entra entero en 412 y 390 px de alto. |
+| Menú desbordado en 360×640 (801 px) y 390×844 (862 px); el título quedaba bajo la barra del SDK en vertical | Margen superior para la barra (62 px), detalle de dificultad plegable (`<details>`, abierto sólo con > 880 px de alto), versión compacta ≤ 700 px de alto (sin bajada ni contadores en las tarjetas). Ahora 640/640, 844/844, 915/915. |
+| Pantallas largas (opciones, ayuda) sin pista de scroll | Aviso fijo «▾ Deslizá para ver más» mientras queda contenido abajo, en las cuatro pantallas. En táctil, opciones no muestra las teclas re-asignables (no aplican) y explica los controles táctiles. |
+| Objetivos chicos: dificultad 33 px de alto, botones del tutorial 32 px, «DIFICULTAD» 10 px | En táctil: dificultad ≥ 44 px, tutorial ≥ 44 px, botones de pantallas ≥ 48 px, «Correr» ≥ 56 px, etiqueta 11 px (sólo CSS del juego, sin tocar `missions.js`). |
+| Controles táctiles genéricos (tres círculos iguales de 68 px en fila; SALTO lejos del pulgar) | Racimo para el pulgar derecho: **SALTO 86 px** (80 en apaisado bajo) en el punto de reposo, DESLIZ 66 px abajo a su izquierda, ACCIÓN 62 px encima (se ilumina cuando sirve); respetan `safe-area-inset-*`. Al apretar: naranja + escala (respuesta visual) y vibración corta opcional (`navigator.vibrate`, se apaga en Opciones «Vibración» o con movimiento reducido). |
+| Un toque impreciso fuera del joystick (132 px) giraba la cámara en vez de correr | **Joystick flotante**: toda la zona inferior izquierda (52 % × 46 % en vertical, 42 % × 62 % en apaisado) centra el joystick bajo el dedo; al soltar vuelve a su lugar. El resto de la pantalla (fuera de botones) sigue siendo para mirar; multitáctil probado (joystick + mirar + SALTO a la vez). |
+| No había forma táctil de volver al punto de control (sólo desde la pausa) | Botón **↩** (46 px) lejos del pulgar derecho; requiere **mantener 0,45 s** (anillo de progreso) para no perder el avance por un toque accidental; un toque corto avisa. |
+| Las misiones del SDK (top 48 px) tocaban la barra de 56 px en táctil; el cronómetro también | Misiones a 60 px y HUD izquierdo más angosto en táctil (CSS del juego). |
+| En vertical el tutorial tapaba a la corredora (360×640) | En vertical el tutorial va arriba, debajo del HUD y de las misiones (posición medida en vivo); en apaisado sigue a la izquierda, por encima de la capa táctil (se puede tocar). |
+| Vertical = túnel (FOV horizontal ~37°) | En vertical: FOV base 72° (en lugar de 62°) y el encuadre se corre hacia abajo (`setViewOffset`), así la corredora queda entre el joystick y los botones y se ve más recorrido adelante. Aviso suave **«Girá el teléfono: en apaisado ves más»** una vez por sesión, 5 s de juego, se cierra tocándolo; nunca bloquea. Rotar en plena carrera reacomoda todo sin perder el estado. |
+| Al pasar a segundo plano con un dedo apoyado, el corredor podía seguir «empujado» al volver | Además de la pausa del SDK, `visibilitychange` limpia la entrada, devuelve el joystick y cancela ↩. |
+
+Ya estaban bien (verificado): `touch-action:none` en la superficie del juego (sin zoom ni scroll al jugar; el viewport no
+usa `user-scalable=no`), calidad automática = Media en táctil (DPR ≤ 1,5, sin sombras), audio que se reanuda con gesto.
+
+**Pruebas nuevas (proyecto `mobile`, Pixel 7)** — `celular: matriz de tamaños…` (los 5 tamaños: menú sin cortes ni bajo la
+barra, «Correr» ≥ 56 px visible, objetivos ≥ 44 px, pista de scroll coherente; luego arranque sólo táctil y, rotando en
+plena carrera por los 5 tamaños, HUD/tutorial/misiones/barra/joystick/botones/↩/avisos sin choques ni fuera de pantalla,
+SALTO ≥ 56 px, sigue en `play` y el toque salta); `celular: joystick flotante…` (toque impreciso centra el joystick y no
+gira la cámara, corre; segundo dedo mira; tercer dedo SALTA sin soltar; ↩ corto no hace nada y avisa, mantenido devuelve
+sin penalización); `celular: segundo plano…` (aviso de girar se cierra y no bloquea; pausa al ocultarse y entrada limpia).
+La prueba móvil previa ahora también incluye ↩ en el control de superposición.
+
+**No probado:** teléfonos reales (no hay disponibles): sólo emulación de Chromium. La vibración no se puede verificar en
+headless (sólo que la opción existe y persiste). iOS Safari (gestos del sistema, barra inferior) sin verificar.
 
 ## Pendiente / NO PROBADO
 - NO PROBADO en dispositivos reales (sólo Chromium headless con SwiftShader en una máquina compartida y cargada).

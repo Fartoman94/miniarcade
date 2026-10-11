@@ -121,7 +121,8 @@
     font:700 12px system-ui,sans-serif;cursor:pointer;touch-action:manipulation}
   .mlm-diff button[aria-checked="true"]{background:#fff;color:#111;border-color:#fff}
   .mlm-diff button:focus-visible{outline:2px solid #2ee6e6;outline-offset:2px}
-  @media (pointer:coarse){.mlm-diff button{min-height:44px;padding:10px 14px;font-size:13px}.mlm-diff-t{font-size:11px}}
+  @media (pointer:coarse){.mlm-diff button{min-height:44px;padding:10px 14px;font-size:13px}.mlm-diff-t{font-size:11px}
+    .mlm-hud.tl,.mlm-hud.tr{top:calc(60px + env(safe-area-inset-top))}.mlm-hud.top{top:calc(60px + env(safe-area-inset-top))}}
   @media (max-height:480px){.mlm-hud.top{top:4px}.mlm-m{font-size:11px;padding:2px 7px}}
   @media (prefers-reduced-motion:reduce){.mlm-toast{transition:none}}
   `;

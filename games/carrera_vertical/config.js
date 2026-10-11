@@ -60,7 +60,7 @@ export const SAVE_DEFAULTS = {
   runs: 0,
   last: 'amanecer',
   tutorial: { off: false, seen: /** @type {Record<string, boolean>} */ ({}) },
-  opts: { sens: 1, invert: false, motion: 'auto', ghost: 'best', music: true, autocam: true, binds: { jump: 'Space', slide: 'ShiftLeft', action: 'KeyF', respawn: 'KeyR' } },
+  opts: { sens: 1, invert: false, motion: 'auto', ghost: 'best', music: true, autocam: true, haptics: true, binds: { jump: 'Space', slide: 'ShiftLeft', action: 'KeyF', respawn: 'KeyR' } },
 };
 
 /** Etiqueta legible de un código de tecla. @param {string} code */
