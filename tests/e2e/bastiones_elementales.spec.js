@@ -269,9 +269,12 @@ test.describe('Bastiones Elementales', () => {
     await D(page, 'killAll()');
     // gólem: congela una torre cercana con aviso
     await D(page, 'setGold(500)'); await D(page, 'build(2, "ballesta")');
-    await D(page, 'spawn("golem", 1, 0)');
+    // el primer pisotón llega a los 3–7 s (azar): si el gólem ya pasó de largo la torre, se prueba con otro
     let frozen = false;
-    for (let i = 0; i < 60 && !frozen; i++) { await D(page, 'simulate(0.5)'); frozen = await T(page, 'return T.towers.some(t => t.frozen)'); }
+    for (let k = 0; k < 4 && !frozen; k++) {
+      await D(page, 'killAll()'); await D(page, 'spawn("golem", 1, 0)');
+      for (let i = 0; i < 24 && !frozen; i++) { await D(page, 'simulate(0.5)'); frozen = await T(page, 'return T.towers.some(t => t.frozen)'); }
+    }
     expect(frozen).toBe(true);
     expect(await D(page, 'hurtEnemy(0, 100, "hielo")')).toBe(25);
     await D(page, 'killAll()');
@@ -623,6 +626,194 @@ test.describe('Bastiones Elementales', () => {
     await page.locator('.k3-btn[aria-label="wave"]').tap();
     await expect.poll(() => T(page, 'return T.wave'), POLL).toBe(1);
     await page.setViewportSize({ width: 412, height: 915 });
+    expectNoErrors(errors);
+  });
+
+  /* ---------------- celular: pasada mobile-first ---------------- */
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+  /** Mide la UI propia: fuera de pantalla, superposiciones entre sí y con la barra del SDK, objetivos chicos y scroll. */
+  async function layout(page, sels, targets) {
+    return page.evaluate(([sels, targets]) => {
+      const shown = e => { const b = e.getBoundingClientRect(); const s = getComputedStyle(e); return b.width > 0 && b.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && !e.closest('[hidden]'); };
+      const boxes = [];
+      for (const s of sels) document.querySelectorAll(s).forEach((e, i) => { if (shown(e)) { const b = e.getBoundingClientRect(); boxes.push({ s: s + '#' + i, x: b.left, y: b.top, r: b.right, b: b.bottom }); } });
+      const hits = [];
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i], c = boxes[j];
+        if (a.s.split('#')[0] === c.s.split('#')[0]) continue;
+        if (a.x < c.r - 1 && a.r > c.x + 1 && a.y < c.b - 1 && a.b > c.y + 1) hits.push(a.s + ' × ' + c.s);
+      }
+      const out = boxes.filter(b => b.x < -1 || b.y < -1 || b.r > innerWidth + 1 || b.b > innerHeight + 1).map(b => b.s);
+      const small = [];
+      for (const s of targets) document.querySelectorAll(s).forEach(e => { if (!shown(e)) return; const b = e.getBoundingClientRect(); if (b.width < 44 || b.height < 44) small.push(`${s} «${(e.textContent || '').trim().slice(0, 16)}» ${Math.round(b.width)}×${Math.round(b.height)}`); });
+      return { hits, out, small, sw: document.documentElement.scrollWidth, w: innerWidth };
+    }, [sels, targets]);
+  }
+  const camStill = page => expect.poll(() => T(page, 'return T.camMoving'), POLL).toBe(false);
+
+  test('celular: matriz 360×640 → 844×390 (menú, ayuda, controles, HUD y panel caben, objetivos ≥ 44 px, toque real juega)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    test.setTimeout(300_000);
+    await noTutorial(page);
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 300);
+      const go = page.locator('#be-menu [data-go]');
+      await expect(go, `${w}×${h} botón principal`).toBeInViewport({ ratio: 1 });
+      const gb = /** @type {any} */ (await go.boundingBox());
+      expect(gb.height, `${w}×${h} principal ≥ 56`).toBeGreaterThanOrEqual(56);
+      const m = await layout(page, ['#be-menu .k3-b', '#be-menu .be-maps', '#be-menu [role=radiogroup]', '#be-menu h1', '.mla-bar'], ['#be-menu button', '.mla-bar button']);
+      expect(m.hits, `${w}×${h} menú`).toEqual([]);
+      expect(m.out, `${w}×${h} menú entra sin scroll`).toEqual([]);
+      expect(m.small, `${w}×${h} menú`).toEqual([]);
+      expect(m.sw, `${w}×${h} sin scroll horizontal`).toBeLessThanOrEqual(m.w);
+      // ayuda y controles: tapan el menú (no se transparenta) y el título no queda bajo la barra del SDK
+      for (const [btn, scr, close] of [['help', '#be-help', 'closeHelp'], ['opts', '#be-opts', 'closeOpts']]) {
+        await page.locator(`#be-menu [data-m="${btn}"]`).tap();
+        await expect(page.locator(scr)).toBeVisible();
+        await expect(page.locator('#be-menu')).toBeHidden();
+        const o = await layout(page, [`${scr} h1`, `${scr} .k3-kicker`, '.mla-bar'], [`${scr} button`, `${scr} select`]);
+        expect(o.hits, `${w}×${h} ${btn}`).toEqual([]);
+        expect(o.small, `${w}×${h} ${btn}`).toEqual([]);
+        expect(o.sw).toBeLessThanOrEqual(o.w);
+        await page.locator(`${scr} [data-m="${close}"]`).tap();
+        await expect(page.locator('#be-menu')).toBeVisible();
+      }
+    }
+    // partida con toques reales, revisada en cada tamaño
+    await page.setViewportSize({ width: 360, height: 640 });
+    await start(page, true);
+    const pad = await freePad(page);
+    await tapObj(page, true, 'pad', pad);
+    await expect.poll(() => T(page, 'return T.panel'), POLL).toBe('pad');
+    await page.locator('#be-panel [data-a="build"][data-v="ballesta"]').tap();
+    await expect.poll(() => T(page, 'return T.towers.length'), POLL).toBe(1);
+    await page.locator('#be-panel [data-a="close"]').tap();
+    await expect.poll(() => T(page, 'return T.panel'), POLL).toBe('');
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 500);
+      await camStill(page);
+      const hud = await layout(page, ['#be-status', '.be-top', '.mla-bar', '.k3-touch .k3-btn'], ['.k3-touch .k3-btn', '.mla-bar button']);
+      expect(hud.hits, `${w}×${h} HUD`).toEqual([]);
+      expect(hud.out, `${w}×${h} HUD`).toEqual([]);
+      expect(hud.small, `${w}×${h} HUD`).toEqual([]);
+      expect(hud.sw).toBeLessThanOrEqual(hud.w);
+      // tocar una plataforma: el panel cabe, no pisa HUD/barra y la plataforma elegida queda a la vista
+      const p = await freePad(page);
+      expect(p, `${w}×${h} hay plataforma tocable`).toBeGreaterThanOrEqual(0);
+      await tapObj(page, true, 'pad', p);
+      await expect.poll(() => T(page, 'return T.panel'), POLL).toBe('pad');
+      await camStill(page);
+      const pl = await layout(page, ['#be-panel', '#be-status', '.be-top', '.mla-bar'], ['#be-panel button']);
+      expect(pl.hits, `${w}×${h} panel`).toEqual([]);
+      expect(pl.out, `${w}×${h} panel`).toEqual([]);
+      expect(pl.small, `${w}×${h} panel`).toEqual([]);
+      expect(await freeSpot(page, 'pad', p), `${w}×${h} la plataforma elegida no queda tapada`).toBeTruthy();
+      await page.locator('#be-panel [data-a="close"]').tap();
+      await expect.poll(() => T(page, 'return T.panel'), POLL).toBe('');
+    }
+    // acción principal por toque: llamar la oleada y ver enemigos
+    await camStill(page);
+    await page.locator('.k3-btn[aria-label="wave"]').tap();
+    await expect.poll(() => T(page, 'return T.wave'), POLL).toBe(1);
+    await D(page, 'simulate(4)');
+    expect((await T(page, 'return T.enemies')).total).toBeGreaterThan(0);
+    expectNoErrors(errors);
+  });
+
+  test('celular: toque preciso (radio de dedo, lupa ante toques ambiguos) y el panel no tapa lo elegido', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    await noTutorial(page);
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 360, height: 640 });
+    await ready(page);
+    await start(page, true);
+    await camStill(page);
+    // 1) un toque 20 px al costado de la plataforma igual la elige (en 360 px de ancho mide ~20 px)
+    const pad = await freePad(page);
+    const sp = /** @type {any} */ (await freeSpot(page, 'pad', pad));
+    const off = await page.evaluate(([x, y]) => { for (const [dx, dy] of [[20, 0], [-20, 0], [0, 20], [0, -20]]) { const e = document.elementFromPoint(x + dx, y + dy); if (e && e.tagName === 'CANVAS') return [x + dx, y + dy]; } return null; }, [sp.x, sp.y]);
+    expect(off).toBeTruthy();
+    await page.touchscreen.tap(off[0], off[1]);
+    await expect.poll(() => T(page, 'return T.panel'), POLL).toBe('pad');
+    expect((await T(page, 'return T.selected')).pad).toBe(pad);
+    await page.locator('#be-panel [data-a="close"]').tap();
+    await camStill(page);
+    // 2) toque justo entre dos plataformas cercanas: no adivina, acerca la cámara (lupa)
+    const pair = await page.evaluate(id => {
+      const T = /** @type {any} */ (window)['__' + id];
+      const ss = T.pads.map((_, i) => T.screenOf('pad', i));
+      let best = null;
+      for (let a = 0; a < ss.length; a++) for (let b = a + 1; b < ss.length; b++) {
+        if (!ss[a].vis || !ss[b].vis) continue;
+        const d = Math.hypot(ss[a].x - ss[b].x, ss[a].y - ss[b].y), mx = (ss[a].x + ss[b].x) / 2, my = (ss[a].y + ss[b].y) / 2;
+        const e = document.elementFromPoint(mx, my);
+        if (d < 56 && e && e.tagName === 'CANVAS' && (!best || d < best.d)) best = { d, mx, my };
+      }
+      return best;
+    }, ID);
+    expect(pair, 'hay dos plataformas a menos de 56 px en 360×640').toBeTruthy();
+    const d0 = (await T(page, 'return T.camera')).dist;
+    await page.touchscreen.tap(pair.mx, pair.my);
+    await expect.poll(() => T(page, 'return T.lastPick'), POLL).toBe('zoom');
+    expect(await T(page, 'return T.panel')).toBe('');
+    await expect.poll(() => T(page, 'return T.camera.dist'), POLL).toBeLessThan(d0 - 4);
+    // 3) plataforma en la franja donde aparece el panel: la cámara se desliza y queda a la vista
+    await D(page, 'camTo(0, 0, 40)');
+    await camStill(page);
+    const low = await page.evaluate(id => {
+      const T = /** @type {any} */ (window)['__' + id];
+      let best = null;
+      T.pads.forEach((_, i) => { const s = T.screenOf('pad', i); if (!s.vis || s.y < innerHeight * 0.66) return; const e = document.elementFromPoint(s.x, s.y); if (e && e.tagName === 'CANVAS' && T.pads[i].tower === null && (!best || s.y > best.y)) best = { i, y: s.y }; });
+      return best;
+    }, ID);
+    expect(low, 'hay una plataforma en el tercio inferior').toBeTruthy();
+    await tapObj(page, true, 'pad', low.i);
+    await expect.poll(() => T(page, 'return T.panel'), POLL).toBe('pad');
+    await camStill(page);
+    const vis = await page.evaluate(([id, i]) => { const s = /** @type {any} */ (window)['__' + id].screenOf('pad', i); const r = document.getElementById('be-panel').getBoundingClientRect(); const e = document.elementFromPoint(s.x, s.y); return { canvas: !!e && e.tagName === 'CANVAS', above: s.y < r.top }; }, [ID, low.i]);
+    expect(vis).toEqual({ canvas: true, above: true });
+    // 4) girar el teléfono con el panel abierto: sigue la partida, la selección y la plataforma a la vista
+    await page.setViewportSize({ width: 640, height: 360 });
+    await expect.poll(() => T(page, 'return T.camera.yaw'), POLL).toBeLessThan(0.2);
+    await camStill(page);
+    expect(await T(page, 'return T.state')).toBe('play');
+    expect((await T(page, 'return T.selected')).pad).toBe(low.i);
+    expect(await freeSpot(page, 'pad', low.i)).toBeTruthy();
+    expectNoErrors(errors);
+  });
+
+  test('celular: vibración corta al construir (apagable) y gestos que no se confunden con toques', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    await noTutorial(page);
+    await page.addInitScript(() => { /** @type {any} */ (window).__vib = []; Object.defineProperty(navigator, 'vibrate', { value: ms => { /** @type {any} */ (window).__vib.push(ms); return true; }, configurable: true }); });
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await start(page, true);
+    await camStill(page);
+    const pad = await freePad(page);
+    await tapObj(page, true, 'pad', pad);
+    await expect.poll(() => T(page, 'return T.panel'), POLL).toBe('pad');
+    await page.locator('#be-panel [data-a="build"][data-v="ballesta"]').tap();
+    await expect.poll(() => T(page, 'return T.towers.length'), POLL).toBe(1);
+    expect(await page.evaluate(() => /** @type {any} */ (window).__vib)).toContain(20);
+    await page.locator('#be-panel [data-a="close"]').tap();
+    // arrastrar empezando sobre una plataforma no la selecciona (es gesto, no toque)
+    await camStill(page);
+    const p2 = /** @type {any} */ (await freeSpot(page, 'pad', await freePad(page)));
+    await touch(page, 'touchStart', [[p2.x, p2.y]]); await touch(page, 'touchMove', [[p2.x + 10, p2.y]]); await touch(page, 'touchMove', [[p2.x + 60, p2.y + 10]]); await touch(page, 'touchEnd', []);
+    await wait(page, 300);
+    expect(await T(page, 'return T.panel')).toBe('');
+    // apagar la vibración desde Controles (sólo aparece en táctil)
+    await page.locator('.mla-bar button[aria-label="Pausa"]').tap();
+    await page.locator('.mla-pause [data-a="custom"] >> text=Controles').tap();
+    await expect(page.locator('#be-opts [data-o="haptics"]')).toBeVisible();
+    await expect(page.locator('#be-opts [data-m="bind"]').first()).toBeHidden();
+    await page.locator('#be-opts [data-o="haptics"]').tap();
+    expect(await T(page, 'return T.save.settings.haptics')).toBe(false);
     expectNoErrors(errors);
   });
 });

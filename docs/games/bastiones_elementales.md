@@ -149,16 +149,65 @@ cambiar de escenario); el resto se aplica en vivo.
 ## Guardado (`bastiones_elementales:save`, versión 1, `createSave`)
 `{ unlocked, mapSel, wavesTotal, defended, titan, wins, runs, kills, best:[{waves,won,score}|null ×3],
 checkpoint:{map,wave,gold,crystal,score,kills,moves,diff,fireBuilt,auxLost,maxed,towers:[{pad,type,lv,prio,inv}],bridges:[],aux:[{hp,alive,charge}]}|null,
-settings:{pan,zoom,invert,motion,ranges,binds:{wave,speed,upgrade,sell}}, tutorial:{done} }`.
+settings:{pan,zoom,invert,motion,ranges,haptics,binds:{wave,speed,upgrade,sell}}, tutorial:{done} }`.
 JSON corrupto → se descarta (copia en `bastiones_elementales:save:corrupto`) y se arranca de cero; forma inválida →
 `sanitize()` repara campo por campo (rangos, teclas válidas no reservadas, punto de control coherente, claves extra fuera).
 Logros/dificultad: `ml:missions` / `ml:difficulty`; récord: `ml:scores` (vía `MLArcade.ended({score})`).
+
+## Móvil
+Pasada mobile-first (2026-10-11). Medido en Chromium headless con emulación táctil (isMobile + hasTouch, DPR 3) a
+360×640, 390×844, 412×915, 915×412 y 844×390. **No probado en teléfonos reales** (no hay dispositivos): sólo emulación.
+
+Capturas reales (script de capturas, sin el contador de FPS de `?debug`):
+- Antes: `.perf/mobile-bastiones/before/<tamaño>-{menu,help,opts,play,panel,tower}.png` + `result.json`
+- Después: `.perf/mobile-bastiones/after/<tamaño>-{menu,help,opts,play,panel,tower}.png` + `result.json`
+- Auditoría central previa: `.perf/mobile-audit/bastiones_elementales-*.png`
+
+| Problema encontrado (tamaño) | Arreglo |
+|---|---|
+| Con la barra del SDK de 44 px en táctil, el cartel de oleada pisaba la barra (412×915: falla real de la prueba «celular» existente) y el bloque de estado quedaba debajo del botón ⌂ (360×640) | En vertical táctil el cartel de oleada baja a +62 px; en ≤ 430 px también el estado; en apaisado el cartel se angosta para no llegar a la barra |
+| «Cómo jugar» / «Controles» abiertos desde el menú se transparentaban sobre el menú (texto encimado en todos los tamaños) y su título quedaba bajo la barra del SDK | El menú se oculta al abrir la ayuda/controles y vuelve al cerrar; las pantallas dejan 62 px arriba para la barra |
+| Objetivos chicos: ✕ del panel 34×34, OK/Saltar del tutorial 38×33, deslizadores 150×16, selector 88×33, botones de teclas 88×31; menú apaisado: principal 237×39, secundarios 41 px | Táctil: ✕ 44×44, tutorial ≥ 44×52, filas de opciones ≥ 44 (el `label` entero es el área de toque), selector y deslizadores 44 px de alto, botón principal ≥ 56 px, secundarios ≥ 44–48 px |
+| Texto de 9–10 px: ESENCIA/PTS, TUTORIAL, CONSTRUIR, nombres de escenario, tablas de ayuda | ≥ 11 px en táctil (etiquetas) y 12 px en costos, marcadores y texto de dificultad |
+| Ayuda y Controles con columnas PC/Gamepad y reasignación de teclas que no aplican en el celular (tabla de 4 columnas apretada en 360 px) | En táctil sólo la columna TÁCTIL; teclas y gamepad ocultos (siguen en escritorio) |
+| Menú apaisado 844×390 con los botones más grandes: «Cómo jugar»/«Controles» quedaban fuera de pantalla | Menú apaisado compacto (escenarios 52 px, huecos menores): todo entra sin scroll en 844×390 y 915×412 |
+| Plataformas de ~20 px y separadas 36–47 px en pantalla (360–412 px de ancho): tocar al lado fallaba o elegía otra | Selección táctil por distancia en píxeles con radio mínimo de dedo de 30 px; si el dedo queda casi igual de cerca de dos objetos (< 7 px de diferencia) **no adivina**: acerca la cámara al punto tocado («lupa») y avisa «tocá de nuevo». Escritorio sin cambios |
+| El panel de construir/torre (abajo, 270 px en vertical; centro-abajo en apaisado) podía tapar la plataforma o torre recién tocada | Al elegir algo tapado por el panel o el HUD, la cámara se desliza hasta dejarlo sobre el panel (se permite correr la cámara 4 u. más allá del borde mientras hay selección; vuelve al cerrar) |
+| Tutorial en 360 px: los dos botones al costado lo hacían de 8 líneas y tapaba medio mapa | En ≤ 560 px los botones van en una fila debajo del texto |
+| Girar el teléfono en plena partida dejaba el encuadre del otro formato (mapa cortado) | En el giro se reencuadra el mapa (sin tocar el estado) y se vuelve a mostrar lo seleccionado |
+| Sin respuesta háptica | Vibración corta (8–45 ms) al elegir, construir, mejorar, vender, palanca, cosecha, fuga y acción denegada; sólo con entrada táctil, desactivada con movimiento reducido y con el interruptor «Vibración al tocar» de Controles (nuevo ajuste `settings.haptics`) |
+| Feedback de presión | `:active` (escala + brillo) en botones del panel, tutorial, escenarios y pantallas |
+
+Ya estaba bien y se verificó: `touch-action:none` en la superficie del juego (Kit3D), sin `user-scalable=no`; arrastre
+vs. toque con umbral de 12 px y 700 ms, dos dedos nunca cuentan como toque; los botones ▶▶ x1 ⟲ ⟳ (64 px) se ocultan con el
+panel abierto; calidad «auto» en táctil = media (DPR ≤ 1.5, sin sombras); pausa al ocultar la pestaña y audio reanudado
+por gesto (SDK). Ambas orientaciones son jugables: no hace falta aviso de «girá el teléfono».
+
+Arreglo funcional (escritorio y celular): el gólem gastaba su pisotón helado aunque no tuviera ninguna torre a tiro
+(enfriamiento de 7 s perdido); ahora reintenta a los 1.5 s. Además la prueba de rivales fallaba ~50 % por azar (primer
+pisotón a los 3–7 s, cuando el gólem a veces ya había pasado la torre): ahora reintenta con otro gólem.
+
+Pruebas nuevas (proyecto `mobile`, Pixel 7): matriz de 5 tamaños (menú/ayuda/controles sin superposición con la barra,
+botón principal ≥ 56 px visible, todo ≥ 44 px, sin scroll horizontal; partida con toques reales: HUD sin superposición,
+panel dentro de pantalla y sin tapar la plataforma elegida, oleada llamada con ▶▶ y enemigos en el mapa); toque preciso
+(toque a 20 px del centro elige la plataforma, toque entre dos plataformas activa la lupa, plataforma del tercio inferior
+queda sobre el panel, giro a apaisado con el panel abierto); vibración al construir + apagado desde Controles + arrastre que
+empieza sobre una plataforma no la elige.
+
+**Resultados reales (2026-10-11, `tests/e2e/bastiones_elementales.spec.js`, 21 pruebas × 2 proyectos):**
+- `ML_WORKERS=1`: desktop 17 passed / 4 skipped (las 4 «celular»); mobile (Pixel 7) 18 passed / 3 skipped (IA de rivales,
+  sinergias y teclado). Total 35 passed, 7 skipped, 0 failed, 25.5 min.
+- `ML_WORKERS=4`: mismo reparto, 35 passed, 7 skipped, 0 failed, 11.7 min.
+- La prueba de rivales (escritorio) con `--repeat-each 6`: 6/6 (antes del arreglo fallaba 2 de 4).
+
+Pendiente: en 640×360 (apaisado muy bajo, fuera de la matriz) los botones secundarios del menú requieren desplazar el menú;
+no hay prueba en hardware real (rendimiento de GPU, vibración real, notch/barra de inicio reales).
 
 ## Gancho de pruebas
 `window.__bastiones_elementales` (congelado, sólo lectura): `state, scene, mapIndex, phase, wave, wavesDone, waves,
 countdown, gold, crystal, crystalMax, hp, score, kills, runTime, simTime, paused, speed, moves, overlay, selected, panel,
 moving, towers, enemies{total,ground,air,byType,list}, bridges, levers, aux, pads, route, routes, boss, missions,
-difficulty, quality, perf, camera, player, tutorial, combos, counts, save, screenOf(kind,i)`.
+difficulty, quality, perf, camera, camMoving, lastPick, player, tutorial, combos, counts, save, screenOf(kind,i)`.
 Con `?debug` agrega `debug`: `simulate, goto, unlockAll, setGold, setCrystal, spawn, startWave, killAll, clearWaves,
 spawnBoss, skipCine, bossPhase, bossHp, hurtBoss, hitBoss, hurtEnemy, status, winMap, loseMap, build, upgrade,
 upgradeAll, charge, hurtAux, setSpeed, camTo, emit`.
@@ -180,7 +229,7 @@ sombras, partículas, luces, decoración, niebla, clima); teclado/gamepad (reasi
 1-4, U, cruceta en el panel, ⌫, WASD); celular 412×915 y 915×412 (sin superposición ni scroll, con y sin panel abierto,
 botones táctiles ocultos con el panel, arrastre, pellizco, giro y botón de oleada por CDP/toques).
 
-**Resultados reales (2026-10-10, `ML_WORKERS=1 npx playwright test tests/e2e/bastiones_elementales.spec.js`, 5.2 min):**
+**Resultados previos a la pasada móvil (2026-10-10, `ML_WORKERS=1 npx playwright test tests/e2e/bastiones_elementales.spec.js`, 5.2 min):**
 - desktop: 17 passed, 1 skipped (la de celular).
 - mobile (Pixel 7): 15 passed, 3 skipped (IA de rivales, sinergias y teclado: lógica idéntica o exclusiva de escritorio).
 - Total: 32 passed, 4 skipped, 0 failed. Sin errores de consola en ninguna prueba.
