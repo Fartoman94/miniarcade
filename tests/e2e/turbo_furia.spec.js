@@ -31,6 +31,18 @@ async function touchHoldUntil(page, x, y, cond, arg) {
   return px;
 }
 
+/** Apoya un dedo, lo desliza dx px en 8 pasos y lo mantiene hasta que se cumpla la condición; devuelve playerX al soltar. */
+async function touchDragHoldUntil(page, x, y, dx, cond, arg) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
+  for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * i / 8, y, id: 1 }] });
+  await page.waitForFunction(cond, arg, { timeout: 60_000 });
+  const px = await page.evaluate(() => window.__turbo.playerX);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  return px;
+}
+
 test.describe('TURBO FURIA', () => {
   // Este equipo tiene joysticks físicos conectados con entradas trabadas (/dev/input/js*): Chromium los ve y el SDK
   // los traduce a teclas. Las pruebas no deben depender del hardware, así que se ocultan los gamepads.
@@ -132,16 +144,16 @@ test.describe('TURBO FURIA', () => {
     expectNoErrors(errors);
   });
 
-  test('táctil: deslizar dobla y el botón de nitro responde', async ({ page }, testInfo) => {
+  test('táctil: deslizar dobla (relativo al dedo) y el botón de nitro responde', async ({ page }, testInfo) => {
     test.skip(!isMobile(testInfo), 'sólo en el proyecto mobile');
     const { errors } = await openGame(page, 'turbo_furia.html');
     await startRun(page, true);
     const vp = page.viewportSize();
     const x0 = (await T(page)).playerX;
-    // el dedo se mantiene hasta que el auto llegue (reloj del juego: con WebGL por software puede ir a pocos FPS)
-    const x1 = await touchHoldUntil(page, vp.width - 20, vp.height / 2, () => window.__turbo.playerX > -1.75 + 2);
+    // dirección relativa: apoyar en el centro y deslizar a la derecha; el dedo se mantiene hasta que el auto llegue
+    const x1 = await touchDragHoldUntil(page, vp.width / 2, vp.height / 2, 150, () => window.__turbo.playerX > -1.75 + 2);
     expect(x1).toBeGreaterThan(x0 + 2);
-    const x2 = await touchHoldUntil(page, 20, vp.height / 2, x => window.__turbo.playerX < x - 2, x1);
+    const x2 = await touchDragHoldUntil(page, vp.width / 2, vp.height / 2, -150, x => window.__turbo.playerX < x - 2, x1);
     expect(x2).toBeLessThan(x1 - 2);
     // nitro: el botón se ilumina mientras se mantiene
     const nb = await page.locator('#nitroBtn').boundingBox();
@@ -454,4 +466,184 @@ test.describe('TURBO FURIA', () => {
       expectNoErrors(errors);
     });
   }
+});
+
+/* ================= Móvil (proyecto 'mobile', Pixel 7 con toque) ================= */
+test.describe('TURBO FURIA · móvil', () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(!isMobile(testInfo), 'sólo en el proyecto mobile');
+    await page.addInitScript(() => { try { Object.defineProperty(navigator, 'getGamepads', { value: () => [] }); } catch (e) {} });
+  });
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+
+  /** Cajas de la UI propia + barra del arcade + fichas de misiones (sólo lo visible). */
+  const boxes = (page, sels) => page.evaluate(sels => {
+    const out = {};
+    for (const [k, s] of Object.entries(sels)) {
+      out[k] = [...document.querySelectorAll(s)].filter(el => {
+        const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+        return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+      }).map(el => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height, id: el.id || el.className }; });
+    }
+    return { W: innerWidth, H: innerHeight, sw: document.documentElement.scrollWidth, sh: document.documentElement.scrollHeight, ...out };
+  }, sels);
+  const hit = (a, b) => a.x < b.r - 1 && b.x < a.r - 1 && a.y < b.b - 1 && b.y < a.b - 1;
+  const inside = (a, W, H) => a.x >= -1 && a.y >= -1 && a.r <= W + 1 && a.b <= H + 1;
+
+  for (const [w, h] of SIZES) {
+    test(`matriz ${w}×${h}: garaje y carrera sin desbordes ni solapes, objetivos ≥ 44 px y largada sólo con toques`, async ({ page }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize({ width: w, height: h });
+      const { errors } = await openGame(page, 'turbo_furia.html?test=1');
+      await page.waitForFunction(() => window.__turbo && window.__turbo.state === 'garage', null, { timeout: 60_000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+      await wait(page, 400);
+      // ---- garaje ----
+      const g = await boxes(page, { bar: '.mla-bar', top: '.g-top > *', arrows: '.g-arrow', plate: '.g-plate', go: '#goBtn', rank: '#rankBtn', btns: '#garage button, .mla-bar button' });
+      expect(g.sw).toBeLessThanOrEqual(w);
+      expect(g.sh).toBeLessThanOrEqual(h);
+      const bar = g.bar[0];
+      for (const el of [...g.top, ...g.arrows, ...g.plate]) {
+        expect(inside(el, w, h), `${el.id} dentro de ${w}×${h}`).toBe(true);
+        expect(hit(el, bar), `${el.id} no pisa la barra del arcade`).toBe(false);
+      }
+      for (const a of g.arrows) {
+        expect(hit(a, g.plate[0]), 'flecha no pisa la ficha').toBe(false);
+        for (const t of g.top) expect(hit(a, t), 'flecha no pisa el título').toBe(false);
+      }
+      for (const t of g.top) expect(hit(t, g.plate[0]), `${t.id} no queda debajo de la ficha`).toBe(false);
+      for (const b of g.btns) expect(Math.min(b.w, b.h), `${b.id} ≥ 44 px`).toBeGreaterThanOrEqual(44);
+      expect(g.go[0].h).toBeGreaterThanOrEqual(56);
+      // el botón principal está a la vista y es lo que recibe el toque en su centro
+      const go = g.go[0];
+      expect(inside(go, w, h)).toBe(true);
+      expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('#goBtn') !== null, [go.x + go.w / 2, go.y + go.h / 2])).toBe(true);
+      // ---- carrera, sólo con toques ----
+      await page.locator('#goBtn').tap();
+      await page.waitForFunction(() => window.__turbo.state === 'playing', null, { timeout: 60_000 });
+      await page.waitForFunction(() => document.querySelector('.mlm-hud') && !document.querySelector('.mlm-hud').hidden);
+      await wait(page, 300);
+      const p = await boxes(page, { bar: '.mla-bar', mlm: '.mlm-hud', tl: '.hud-tl', tr: '.hud-tr', speedo: '.speedo', pedals: '.pedal', toolBtns: '.mla-bar button' });
+      expect(p.sw).toBeLessThanOrEqual(w);
+      const own = [...p.tl, ...p.tr, ...p.speedo, ...p.pedals];
+      for (const el of own) {
+        expect(inside(el, w, h), `${el.id} dentro`).toBe(true);
+        expect(hit(el, p.bar[0]), `${el.id} no pisa la barra`).toBe(false);
+        expect(hit(el, p.mlm[0]), `${el.id} no pisa las misiones`).toBe(false);
+      }
+      for (const a of own) for (const b of own) if (a !== b) expect(hit(a, b), `${a.id} vs ${b.id}`).toBe(false);
+      for (const b of [...p.pedals, ...p.toolBtns]) expect(Math.min(b.w, b.h)).toBeGreaterThanOrEqual(44);
+      for (const b of p.pedals) expect(Math.min(b.w, b.h)).toBeGreaterThanOrEqual(56);
+      // acción principal: doblar deslizando + nitro con otro dedo a la vez (multitáctil)
+      await page.evaluate(() => { window.__turbo.clearTraffic(); window.__turbo.setLane(1); });
+      const nb = p.pedals.find(b => b.id === 'nitroBtn');
+      const cdp = await page.context().newCDPSession(page);
+      const sx = w / 2, sy = h * 0.55;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: sx, y: sy, id: 1 }] });
+      for (let i = 1; i <= 6; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: sx + 20 * i, y: sy, id: 1 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: sx + 120, y: sy, id: 1 }, { x: nb.x + nb.w / 2, y: nb.y + nb.h / 2, id: 2 }] });
+      await page.waitForFunction(() => window.__turbo.playerX > 0.5 && window.__turbo.nitroActive, null, { timeout: 60_000 });
+      await expect(page.locator('#nitroBtn')).toHaveClass(/on/);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await cdp.detach();
+      await expect(page.locator('#nitroBtn')).not.toHaveClass(/on/);
+      expectNoErrors(errors);
+    });
+  }
+
+  test('gestos: sin user-scalable=no, superficie de juego sin gestos del navegador y un toque quieto no dobla', async ({ page }) => {
+    test.setTimeout(120_000);
+    const { errors } = await openGame(page, 'turbo_furia.html');
+    const meta = await page.getAttribute('meta[name="viewport"]', 'content');
+    expect(meta).not.toMatch(/user-scalable\s*=\s*no|maximum-scale/);
+    expect(await page.evaluate(() => getComputedStyle(document.body).touchAction)).toBe('none');
+    await startRun(page, true);
+    await page.evaluate(() => window.__turbo.clearTraffic && window.__turbo.clearTraffic());
+    const x0 = (await T(page)).playerX;
+    // toque sostenido sin deslizar en el borde derecho (antes: el auto saltaba a la posición del dedo)
+    const vp = page.viewportSize();
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: vp.width - 30, y: vp.height / 2, id: 1 }] });
+    await wait(page, 900);
+    const x1 = (await T(page)).playerX;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    expect(Math.abs(x1 - x0)).toBeLessThan(0.3);
+    // la página no se desplazó ni hizo zoom
+    expect(await page.evaluate(() => [scrollX, scrollY, visualViewport ? visualViewport.scale : 1])).toEqual([0, 0, 1]);
+    expectNoErrors(errors);
+  });
+
+  test('rotación a mitad de carrera: conserva el estado y reencuadra cámara, HUD y garaje', async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const { errors } = await openGame(page, 'turbo_furia.html?test=1');
+    await page.waitForFunction(() => window.__turbo && window.__turbo.state === 'garage', null, { timeout: 60_000 });
+    await page.locator('#goBtn').tap();
+    await page.waitForFunction(() => window.__turbo.state === 'playing', null, { timeout: 60_000 });
+    await page.evaluate(() => window.__turbo.addDist(300));
+    const a = await T(page);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await wait(page, 500);
+    const b = await T(page);
+    expect(b.state).toBe('playing');
+    expect(b.lives).toBe(a.lives);
+    expect(b.dist).toBeGreaterThanOrEqual(a.dist);
+    const m = await page.evaluate(() => {
+      const c = document.getElementById('c'); const r = s => document.querySelector(s).getBoundingClientRect();
+      return { cw: c.clientWidth, ch: c.clientHeight, nitro: r('#nitroBtn'), speedo: r('.speedo') };
+    });
+    expect([m.cw, m.ch]).toEqual([844, 390]);
+    expect(m.nitro.right).toBeLessThanOrEqual(844);
+    expect(m.speedo.bottom).toBeLessThanOrEqual(m.nitro.top);
+    // de vuelta al garaje en apaisado → vertical: las flechas siguen fuera de la ficha
+    await page.evaluate(() => { const T = window.__turbo; T.forceCrash(); T.forceCrash(); T.forceCrash(); });
+    await page.waitForFunction(() => window.__turbo.state === 'over', null, { timeout: 30_000 });
+    await wait(page, 700);
+    await page.locator('#garageBtn').tap();
+    await page.setViewportSize({ width: 360, height: 640 });
+    await wait(page, 400);
+    const g = await page.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(); return { prev: r('#prevV'), plate: r('.g-plate') }; });
+    expect(g.prev.bottom).toBeLessThanOrEqual(g.plate.top + 1);
+    expectNoErrors(errors);
+  });
+
+  test('pantalla final y ranking entran en celular; un toque recién aparecida no rearranca', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 360, height: 640 });
+    const { errors } = await openGame(page, 'turbo_furia.html?test=1');
+    await page.waitForFunction(() => window.__turbo && window.__turbo.state === 'garage', null, { timeout: 60_000 });
+    await page.locator('#rankBtn').tap();
+    const rk = await page.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(); return { card: r('.rk-card'), bar: r('.mla-bar'), close: r('#rkClose') }; });
+    expect(rk.card.top).toBeGreaterThanOrEqual(rk.bar.bottom);
+    expect(rk.card.bottom).toBeLessThanOrEqual(640);
+    expect(rk.close.height).toBeGreaterThanOrEqual(44);
+    await page.locator('#rkClose').tap();
+    await page.locator('#goBtn').tap();
+    await page.waitForFunction(() => window.__turbo.state === 'playing', null, { timeout: 60_000 });
+    await page.evaluate(() => { const T = window.__turbo; T.forceCrash(); T.forceCrash(); T.forceCrash(); });
+    await page.waitForFunction(() => window.__turbo.state === 'over', null, { timeout: 30_000 });
+    // un dedo que venía apretando y suelta justo sobre «OTRA VEZ» no debe largar otra carrera
+    await page.evaluate(() => document.getElementById('againBtn').click());
+    expect((await T(page)).state).toBe('over');
+    await wait(page, 700);
+    const o = await page.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(); return { again: r('#againBtn'), garage: r('#garageBtn'), sw: document.documentElement.scrollWidth }; });
+    expect(o.sw).toBeLessThanOrEqual(360);
+    expect(o.again.bottom).toBeLessThanOrEqual(640);
+    expect(o.again.height).toBeGreaterThanOrEqual(56);
+    await page.locator('#againBtn').tap();
+    await page.waitForFunction(() => ['countdown', 'playing'].includes(window.__turbo.state));
+    expectNoErrors(errors);
+  });
+
+  test('segundo plano: al ocultarse la pestaña se pausa y el loop se detiene', async ({ page }) => {
+    test.setTimeout(120_000);
+    const { errors } = await openGame(page, 'turbo_furia.html');
+    await startRun(page, true);
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { value: true, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+    expect((await T(page)).paused).toBe(true);
+    const d1 = (await T(page)).dist;
+    await wait(page, 600);
+    expect((await T(page)).dist).toBe(d1);
+    expectNoErrors(errors);
+  });
 });
