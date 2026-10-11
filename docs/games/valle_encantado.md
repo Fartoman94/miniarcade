@@ -306,3 +306,49 @@ Explorar media: 3,2–5,1 fps · 120–129 draw calls · 4,3–7,3 ms. Baja: 4,2
 - Los jefes son esquivables pero no hay prueba automática de "esquivar" (la evitación real se verificó sólo con los avisos/hazards en capturas).
 - `games/registry.js` sigue con la descripción vieja (pedir: mencionar misiones, guardianes y el Rey).
 - Ideas para un three.js nuevo: sombras con `shadowMap.autoUpdate` por zonas, `MeshStandardMaterial` para cristales; no se hizo en esta ronda.
+
+## Móvil
+
+Pasada mobile-first (2026-10-11). Emulación táctil de Chromium/Playwright (isMobile + hasTouch, DPR 2,6–3) con WebGL por SwiftShader. **No se probó en un celular real** (no hay dispositivos disponibles).
+
+Capturas reales (menú, juego, diálogo, diario, cartel, botón 💬 y Proteger) en 360×640, 390×844, 412×915, 915×412 y 844×390:
+- antes: `.perf/mobile-valle/before/<tamaño>-{menu,play,dialog,journal,after}.png` (+ `report.json` con rectángulos)
+- después: `.perf/mobile-valle/after/<tamaño>-{menu,play,dialog,journal,banner,prompt,mission}.png` (+ `report.json`)
+- auditoría central previa: `.perf/mobile-audit/valle_encantado-*.png`
+
+### Problemas encontrados → arreglo
+
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| Menú: en 360×640 / 390×844 / 412×915 los modos quedaban debajo de una pantalla y media de texto; en 844×390 / 915×412 hacía falta desplazar para ver «Explorar». El chip superior quedaba bajo la barra del arcade (botones de 44 px) | Menú compacto: relleno superior de 60 px + safe-area, chip de teclado oculto en táctil, chip de "mundo de cuentos" oculto en pantallas chicas, historia y descripciones de modos recortadas a 3/2 líneas. Apaisado bajo: dos columnas (título a la izquierda, modos a la derecha bajo la barra). «Explorar» queda a la vista sin desplazar en los 5 tamaños |
+| «Abrir el diario (Q)» 86×29 (todos los verticales), ✕ del diario 43×38 | Diario ≥ 44 px de alto y ancho, con feedback al tocar; ✕ 44×44 |
+| `#fragWrap`/`#waveWrap`/`#heartWrap` en `top:50px` se metían 6 px bajo la barra del arcade (bar 0–56 px) en vertical | Fila de arriba = corazones + barra; placas desde 62 px (+ safe-area); pista/jefe desde 142 px |
+| Apaisado (844×390, 915×412): la pista de misión centrada (`max-width:70vw`) pisaba la placa de fragmentos | Pista anclada entre corazones/diario y la barra (`left:140px`, ancho máx. `100vw − 430px`); placas compactas |
+| Textos de 9–10 px en juego (rótulo de fragmentos/corazón, habitantes, diablillos, pista 11 px) y firma de 8 px | Rótulos 11 px, datos de juego 12 px, pista 12 px, firma 11 px sin cortar línea |
+| Diálogo: en vertical el cuadro tapaba el botón ⚔️ (360×640: 536–628 vs 522–614) y en apaisado lo pisaba (102–742 vs 730–822) | ⚔️ se oculta mientras hay diálogo o diario (no se puede golpear igual); diálogo más compacto (relleno y alto mínimo menores; en apaisado 72 vw) |
+| Botón 💬 HABLAR (~40 px de alto) sobre las misiones compartidas en vertical (bottom 118 px vs chips desde H−127) | 48 px de alto, sube a bottom 140 px (132 en apaisado), con elipsis si el nombre es largo |
+| Carteles grandes (36–70 px) encima de la pista en vertical | 30 px (20 px los largos) al 36 % de alto en vertical; 34/22 px en apaisado |
+| Vertical: FOV 60° vertical = ~36° horizontal, las criaturas de costado no se veían | FOV vertical adaptativo en pantallas más altas que anchas (mantiene ~54° horizontales, tope 78°); apaisado y escritorio siguen en 60°. Se recalcula al rotar |
+| **Bug**: mover con el joystick y deslizar la cámara con el otro pulgar contaba como "pellizco": soltaba el joystick y el personaje se frenaba | El pellizco sólo se arma con dos dedos del lado de la cámara; joystick + cámara (+ zoom) funcionan a la vez |
+| Joystick: la perilla aparecía un instante en la posición del toque anterior | Se centra al apoyar el dedo |
+| Golpear con el joystick era impreciso | Asistencia de apuntado sólo en el botón ⚔️ táctil: gira hacia la criatura/jefe más cercano al alcance. Teclado y mouse sin cambios |
+| `maximum-scale=1, user-scalable=no` | Quitado; el canvas y los botones usan `touch-action:none`, el menú `pan-y` (sin zoom por pellizco ni doble toque, se desplaza con el dedo) |
+| ⚔️ sin respetar notch/barra de inicio | Posiciones con `env(safe-area-inset-*)` en botones y HUD; vibración corta al tocar ⚔️ (se desactiva con "reducir movimiento") |
+| Diario con scroll interno sin aviso | Degradé inferior mientras queda contenido abajo |
+
+Sin cambios necesarios: pausa al pasar a segundo plano (la hace el SDK por `visibilitychange`, probado), audio sólo tras un toque, `resize` ajusta renderer/cámara (barras del navegador), calidad automática en táctil = media (pixel ratio 1,5, sin sombras). Ambas orientaciones son jugables, por eso no hay aviso de "girá el teléfono".
+
+### Pruebas nuevas (proyecto `mobile`, Pixel 7)
+
+- Matriz 360×640 · 390×844 · 412×915 · 915×412 · 844×390: menú sin scroll horizontal, «Explorar» visible sin desplazar (≥ 56 px) y fuera de la barra; partida con toques: HUD/⚔️/diario/misiones/barra/firma dentro de la pantalla y sin solaparse, diario ≥ 44 px, ⚔️ ≥ 56 px y golpea, 💬 ≥ 44 px sin pisar misiones/⚔️/pista, diálogo dentro de la pantalla y ⚔️ oculto, diario dentro de la pantalla con ✕ ≥ 44 px.
+- Proteger en 360×640 / 412×915 / 844×390 (rotando a mitad de partida): placas sin solapes, textos ≥ 12/11 px.
+- Joystick + cámara simultáneos (sin pellizco) y pellizco con dos dedos de cámara.
+- Asistencia de ⚔️: el teclado no pega a una criatura detrás; el toque sí.
+- Gestos/orientación: viewport sin `user-scalable`, `touch-action`, el menú se desplaza con un arrastre táctil real (CDP) sin zoom, FOV > 70° en vertical → 60° al rotar sin perder progreso, pausa al ir a segundo plano.
+
+Resultados: `valle_encantado.spec.js` 27 pruebas por proyecto — desktop 21 pasan / 6 omitidas (sólo móvil), mobile 26 pasan / 1 omitida (sólo escritorio), con `ML_WORKERS=1` (12,8 min) y con `ML_WORKERS=4` (9,4 min): 47 pasan, 7 omitidas, 0 fallas en ambas corridas.
+
+### Pendiente
+
+- Probar en celulares reales (iOS Safari: safe-area, vibración no soportada, audio).
+- Con WebGL por CPU la animación de entrada del diálogo tarda; en GPU real no debería notarse.
