@@ -1,0 +1,17 @@
+{
+  "schema": "mateo-world-clock-v2",
+  "note": "Adaptado del kit (docs/kit_v2/data/ciclo_dia_noche.json). El reloj sólo avanza jugando (pausa, menús, tiendas y pestaña oculta lo detienen).",
+  "cycleRealMinutes": 24,
+  "startHour": 10,
+  "segments": [
+    { "id": "dawn", "from": 5, "to": 7 },
+    { "id": "day", "from": 7, "to": 17 },
+    { "id": "sunset", "from": 17, "to": 20 },
+    { "id": "night", "from": 20, "to": 24 },
+    { "id": "night_pre", "from": 0, "to": 5 }
+  ],
+  "lights": { "streetOnHour": 18.5, "streetOffHour": 6.5 },
+  "fixedHours": { "dia": 12, "atardecer": 18.6, "noche": 23 },
+  "trafficNightFactor": 0.6,
+  "mustPauseOn": ["pause_menu", "document_hidden", "save_migration", "shop_screen"]
+}

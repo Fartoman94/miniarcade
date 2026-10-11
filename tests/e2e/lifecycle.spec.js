@@ -26,6 +26,9 @@ const START = {
   cocina_caos: async p => { await p.keyboard.press('Enter'); },
   corsarios_abismo: async p => { await p.click('#ca-menu [data-go]'); },
   portales_imposibles: async p => { await p.click('#pi-menu [data-go]'); },
+  // Mateo usa su propia pausa (la del SDK está desactivada): los reinicios se prueban en su repo
+  // (tools/soak.mjs, 10 min). Acá queda cubierto por «portal ↔ juego 10 veces».
+  mateo_ciudad: null,
 };
 
 /** Cuenta callbacks de rAF por segundo para detectar loops duplicados. */
@@ -53,7 +56,7 @@ test.describe('ciclo de vida', () => {
   test.skip(({ browserName, isMobile }) => browserName !== 'chromium' || !!isMobile, 'CDP sólo en escritorio Chromium');
 
   test('portal ↔ juego 10 veces por juego: el portal no acumula memoria', async ({ page }) => {
-    test.setTimeout(600_000);
+    test.setTimeout(2_400_000); // 21 juegos × 10 vueltas de páginas 3D: sólo se corre localmente
     await page.addInitScript(RAF_PROBE);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Performance.enable');
@@ -78,6 +81,7 @@ test.describe('ciclo de vida', () => {
 
   for (const g of GAMES) {
     test(`${g.id}: 10 reinicios sin loops duplicados ni memoria creciente`, async ({ page }) => {
+      test.skip(START[g.id] === null, 'el juego no usa la pausa/reinicio del SDK');
       test.setTimeout(240_000);
       await page.addInitScript(RAF_PROBE);
       const cdp = await page.context().newCDPSession(page);
