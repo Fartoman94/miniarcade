@@ -19,14 +19,17 @@ let panelClose = /** @type {(()=>void)|null} */ (null);
 let panelRender = /** @type {(()=>{title:string, intro?:string, rows:Row[], foot?:string})|null} */ (null);
 export function openPanel(render, onClose) {
   panelRender = render; panelClose = onClose;
-  renderPanel();
   show('panel', true);
+  renderPanel(false);
   const b = /** @type {HTMLElement|null} */ ($('panel').querySelector('.gr-row button:not([disabled]), .gr-x'));
   b && b.focus({ preventScroll: true });
 }
-export function renderPanel() {
+export function renderPanel(keepScroll = true) {
   if (!panelRender) return;
   const p = panelRender();
+  // conservar el desplazamiento al re-dibujar (comprar algo abajo de la lista no vuelve arriba)
+  const old = /** @type {HTMLElement|null} */ ($('panel').querySelector('.gr-rows'));
+  const keep = old && keepScroll ? old.scrollTop : 0;
   $('panel').innerHTML = `<div class="gr-card" role="dialog" aria-modal="true" aria-labelledby="grPT">
     <div class="gr-head"><h2 id="grPT">${esc(p.title)}</h2><button type="button" class="gr-x" aria-label="Cerrar">✕</button></div>
     ${p.intro ? `<p class="gr-intro">${p.intro}</p>` : ''}
@@ -35,6 +38,11 @@ export function renderPanel() {
       ${r.btn ? `<button type="button" data-i="${i}" ${r.ok === false ? 'disabled' : ''}>${esc(r.btn)}</button>` : ''}</div>`).join('')}</div>
     ${p.foot ? `<div class="gr-foot">${p.foot}</div>` : ''}</div>`;
   /** @type {any} */ ($('panel'))._rows = p.rows;
+  const rows = /** @type {HTMLElement} */ ($('panel').querySelector('.gr-rows'));
+  rows.scrollTop = keep;
+  const more = () => rows.classList.toggle('more', rows.scrollTop + rows.clientHeight < rows.scrollHeight - 4);
+  rows.addEventListener('scroll', more, { passive: true });
+  more();
 }
 export function closePanel() {
   if ($('panel').hidden) return;

@@ -40,6 +40,7 @@ G.D = D.DIFFICULTY[G.diffKey] || D.DIFFICULTY.normal;
 /* ======================= motor ======================= */
 const HELP = [
   'Moverte: WASD / flechas · Táctil: joystick · También: clic/toque en el suelo o en un objeto para ir y usarlo',
+  'Táctil: deslizá el dedo de costado sobre el campo para girar la cámara · tocá la misión para ver el detalle',
   'Usar / interactuar: E o Espacio (botón USAR) · mantené apretado para calmar espíritus',
   'Semilla: Q o Tab (botón 🌱) · 1-5 elige directo · Cámara: Z / X (botón ⟲) · Diario: J (📖)',
   'Gamepad: stick mover · A usar · X semilla · LB/RB cámara · Y diario · Start pausa',
@@ -702,6 +703,7 @@ function openControls(fromMenu = false) {
   const render = () => ({ title: '⌨ Controles', intro: 'Tocá «Cambiar» y apretá la tecla nueva. Siempre funcionan también: Espacio (usar), Tab (semilla), , y . (cámara), I (diario), WASD/flechas.',
     rows: Object.keys(KEYLBL).map(k => ({ icon: '⌨', title: KEYLBL[k], sub: rebinding === k ? 'Apretá una tecla…' : `Tecla: ${keyName(S.keys[k])}`, btn: rebinding === k ? 'Esperando…' : 'Cambiar', id: 'tecla_' + k, fn: () => { rebinding = k; } }))
       .concat([{ icon: '🎥', title: 'Sensibilidad de cámara', sub: `${({ 0.6: 'Baja (giro de 27°)', 1: 'Media (giro de 45°)', 1.5: 'Alta (giro de 68°)' })[S.sens]}`, btn: 'Cambiar', id: 'sensibilidad', fn: () => { S.sens = S.sens === 0.6 ? 1 : S.sens === 1 ? 1.5 : 0.6; flush(); } },
+        ...(COARSE && navigator.vibrate ? [{ icon: '📳', title: 'Vibración al tocar botones', sub: vibOn ? 'Activada' : 'Desactivada', btn: vibOn ? 'Apagar' : 'Encender', id: 'vibracion', fn: () => { vibOn = !vibOn; try { localStorage.setItem('granja_runas:vib', vibOn ? '1' : '0'); } catch (e) { /* nada */ } buzz(15); } }] : []),
         { icon: '↺', title: 'Restaurar teclas por defecto', btn: 'Restaurar', id: 'teclas_def', fn: () => { S.keys = { ...D.defaults().keys }; flush(); } }]) });
   if (fromMenu) { UI.openPanel(render, () => { rebinding = ''; flush(); }); return; }
   openPanel(render);
@@ -743,6 +745,9 @@ function tickTransition(dt) {
   const tr = G.trans; tr.t += dt;
   if (tr.t >= (REDUCED ? 0 : 0.35) && !tr.swapped) {
     tr.swapped = true; setScene(tr.to, tr.from); flush(); UI.fade(false, REDUCED);
+    // Si se sigue apretando la dirección (tecla o joystick) al entrar, no se camina hasta soltarla:
+    // en el escenario nuevo la cámara mira para otro lado y esa misma dirección llevaba de vuelta a la salida.
+    G.moveLatch = true;
     UI.banner('', G.scene.title, 1600);
     if (tr.to === 'bosque') tip('bosque', 'En el bosque: fragmentos ✨ en arbustos brillantes, leña 🪵, cristal 💎 y una cabrita perdida…');
     if (tr.to === 'mercado') tip('mercado', 'Mercado: semillas en los estantes de Don Tito, venta en el almacén de Tomás, pedidos en el tablero y la feria en la carpa.');
@@ -764,7 +769,13 @@ function updateCam(dt) {
   G.cam.x += (tx - G.cam.x) * k; G.cam.z += (tz - G.cam.z) * k; G.cam.y += (ty - G.cam.y) * k;
   G.cam.shake = Math.max(0, G.cam.shake - dt);
 }
+/** En vertical el campo horizontal es muy angosto: se abre el FOV para ver los surcos de al lado. */
+function fitFov() {
+  const fov = innerWidth < innerHeight ? 60 : 50;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+}
 function applyCam() {
+  fitFov();
   const o = G.camOverride;
   if (o) { camera.position.set(o.x, o.y, o.z); camera.lookAt(o.lx, o.ly, o.lz); return; }
   const sh = G.cam.shake > 0 ? G.cam.shake * 0.6 : 0;
@@ -774,12 +785,21 @@ function applyCam() {
 
 /* ======================= entrada: tocar/clic para ir y usar ======================= */
 let pd = null;
-g.root.addEventListener('pointerdown', e => { pd = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }; });
-g.root.addEventListener('pointerup', e => {
-  if (!pd || pd.id !== e.pointerId) return;
-  const moved = Math.hypot(e.clientX - pd.x, e.clientY - pd.y), dt = performance.now() - pd.t; pd = null;
-  if (moved < 14 && dt < 600) tapAt(e.clientX, e.clientY, e.pointerType === 'touch');
+g.root.addEventListener('pointerdown', e => { if (pd && pd.id !== e.pointerId) return; pd = { x: e.clientX, y: e.clientY, lx: e.clientX, t: performance.now(), id: e.pointerId, drag: false }; });
+// táctil: deslizar el dedo en horizontal sobre el campo gira la cámara de a 45° (un toque quieto sigue siendo «ir y usar»)
+const SWIPE_STEP = 70;
+g.root.addEventListener('pointermove', e => {
+  if (!pd || pd.id !== e.pointerId || e.pointerType !== 'touch' || G.mode !== 'play') return;
+  if (Math.hypot(e.clientX - pd.x, e.clientY - pd.y) >= 14) pd.drag = true;
+  const dx = e.clientX - pd.lx;
+  if (Math.abs(dx) >= SWIPE_STEP) { G.cam.yawT -= Math.sign(dx) * Math.PI / 4 * S.sens; pd.lx = e.clientX; buzz(6); G.emitLocal('camSwipe', Math.sign(dx)); }
 });
+const pend = e => {
+  if (!pd || pd.id !== e.pointerId) return;
+  const moved = Math.hypot(e.clientX - pd.x, e.clientY - pd.y), dt = performance.now() - pd.t, drag = pd.drag; pd = null;
+  if (e.type === 'pointerup' && !drag && moved < 14 && dt < 600) tapAt(e.clientX, e.clientY, e.pointerType === 'touch');
+};
+g.root.addEventListener('pointerup', pend); g.root.addEventListener('pointercancel', pend);
 const raycaster = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
 function tapAt(cx, cy, touch) {
   if (G.mode !== 'play') return;
@@ -858,12 +878,18 @@ function update(dt) {
   input.endStep();
 }
 
+// soltar cualquier tecla de movimiento o el joystick libera el bloqueo de entrada a un escenario
+// (por evento, no por cuadro: si se suelta y se vuelve a apretar entre dos cuadros también cuenta)
+const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+addEventListener('keyup', e => { if (MOVE_KEYS.includes(e.code)) G.moveLatch = false; });
+for (const t of ['pointerup', 'pointercancel']) { const j = document.querySelector('.k3-joy'); j && j.addEventListener(t, () => { G.moveLatch = false; }); }
 function playerControl(dt) {
   const P = G.player;
   P.stun = Math.max(0, P.stun - dt);
   P.actT = Math.max(0, P.actT - dt);
   let ax = 0, az = 0;
-  const a = input.axis();
+  let a = input.axis();
+  if (G.moveLatch) { if (a.x || a.y) a = { x: 0, y: 0 }; else G.moveLatch = false; }
   if (P.stun <= 0 && P.actT <= 0) {
     if (a.x || a.y) { G.auto = null; G.moveTo = null; walkMark.visible = false; }
     const yaw = G.cam.yaw;
@@ -991,6 +1017,50 @@ function render() {
   if (now - hudT > 120) { hudT = now; updateHUD(); }
 }
 const hasTouch = input.isTouch;
+/* ---------- disposición del HUD según la barra del SDK y la orientación ---------- */
+const COARSE = matchMedia('(pointer: coarse)').matches;
+const css = (el, k, v) => { if (el.style[k] !== v) el.style[k] = v; };
+/** Ubica placa de estado, misión, tutorial y avisos de tormenta sin pisar la barra del SDK ni los controles táctiles. */
+function layoutHud() {
+  const safe = $('grSafe').getBoundingClientRect();
+  const bar = /** @type {HTMLElement|null} */ (document.querySelector('.mla-bar'));
+  const br = bar ? bar.getBoundingClientRect() : null; // (fixed: offsetParent siempre es null)
+  const barL = br && br.width ? br.left : innerWidth, barB = br && br.width ? br.bottom : safe.top;
+  const L = safe.left, land = innerWidth > innerHeight;
+  // placa de estado: a la izquierda de la barra si entra; si no (celular angosto), debajo y a lo ancho
+  const free = barL - L - 10;
+  const below = free < 180;
+  const sw = below ? Math.min(330, innerWidth - L - (innerWidth - safe.right)) : Math.min(250, free);
+  const sTop = below ? barB + 6 : safe.top;
+  const st = $('stat'); css(st, 'top', sTop + 'px'); css(st, 'width', sw + 'px'); css(st, 'minWidth', '0');
+  const sb = st.getBoundingClientRect();
+  // misión/tutorial: en táctil apaisado van a la derecha de la placa (abajo están el joystick y los botones)
+  const sideW = Math.min(340, barL - sb.right - 18);
+  const side = COARSE && land && sideW >= 200;
+  const panelW = side ? sideW : Math.min(below ? sw : 340, innerWidth - L * 2);
+  for (const id of ['quest', 'coach']) {
+    const el = $(id);
+    css(el, 'left', (side ? sb.right + 8 : L) + 'px');
+    css(el, 'top', (side ? safe.top : sb.bottom + 6) + 'px');
+    css(el, 'width', (id === 'quest' && !side ? Math.min(sw, panelW) : panelW) + 'px');
+    css(el, 'minWidth', '0');
+  }
+  // tormenta arriba (PC y apaisado): centrada en el hueco entre la placa y la barra
+  const sh = $('stormHud');
+  if (!COARSE || land) {
+    const gap = barL - sb.right - 16;
+    css(sh, 'left', Math.round(sb.right + 8 + gap / 2) + 'px'); css(sh, 'width', Math.max(200, Math.min(COARSE ? 340 : 380, gap)) + 'px'); css(sh, 'minWidth', '0');
+  } else { css(sh, 'left', ''); css(sh, 'width', ''); css(sh, 'minWidth', ''); }
+  // los paneles (tienda, diario…) arrancan debajo de la barra del SDK
+  const pt = Math.round(Math.max(safe.top, barB + 6)) + 'px', pn = $('panel');
+  if (pn.style.getPropertyValue('--gr-top') !== pt) pn.style.setProperty('--gr-top', pt);
+}
+addEventListener('resize', () => layoutHud());
+/* ---------- vibración corta opcional (se apaga en ⌨ Controles; por defecto apagada si se pide menos movimiento) ---------- */
+let vibOn = !REDUCED;
+try { const v = localStorage.getItem('granja_runas:vib'); if (v !== null) vibOn = v === '1'; } catch (e) { /* sin almacenamiento */ }
+function buzz(ms) { if (vibOn && COARSE && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) { /* nada */ } }
+for (const el of document.querySelectorAll('.k3-btn')) el.addEventListener('pointerdown', () => buzz(10));
 function updateHUD() {
   const se = D.SEASONS[D.seasonOf(S.day)];
   UI.setText('hDay', `Día ${S.day} · ${se.icon} ${se.name}`);
@@ -1001,9 +1071,7 @@ function updateHUD() {
   UI.setText('hSeed', `${D.ITEMS[sd][1]} ${D.CROPS[sd].name} ×${S.seeds[sd]}`);
   const e = $('hEnergy'); e.style.width = `${Math.round(S.energy)}%`; e.classList.toggle('low', S.energy < 25);
   UI.setText('hEnTx', `⚡ ${Math.round(S.energy)}`);
-  // misión y tutorial siempre debajo de la placa de estado (su alto cambia según el ancho)
-  const top = Math.round($('stat').getBoundingClientRect().bottom + 6) + 'px';
-  if ($('quest').style.top !== top) { $('quest').style.top = top; $('coach').style.top = top; }
+  layoutHud();
   // misión actual
   const main = mainMissions().find(m => !m.done);
   const side = sideMissions().filter(m => m.done).length;
@@ -1017,7 +1085,7 @@ function updateHUD() {
     const k = hasTouch ? 'USAR' : keyName(S.keys.usar);
     pr = `<span class="key">${k}</span> ${UI.esc(G.focusLabel)}`;
     if (G.focus.hold) pr += `<span class="hold"><i style="width:${Math.round((G.focus.holdLevel() || 0) * 100)}%"></i></span>`;
-  } else if (G.mode === 'play') {
+  } else if (G.mode === 'play' && !storm.S.active) {
     for (const ex of G.scene.exits) if (Math.hypot(G.player.x - ex.x, G.player.z - ex.z) < 6) { pr = `➜ ${UI.esc(ex.label)}`; break; }
   }
   UI.setHTML('prompt', pr); UI.show('prompt', !!pr);
@@ -1123,7 +1191,7 @@ const menu = screen('', { accent: ACCENT, id: 'grMenu' });
 function menuHTML() {
   const best = SDK.scores.best(D.GAME_ID);
   const cont = hasProgress();
-  return `<span class="k3-kicker">MATELABS PRESENTA</span><h1>Granja de<br>Runas</h1>
+  return `<span class="k3-kicker">MATELABS PRESENTA</span><h1>Granja de <br>Runas</h1>
     <p>Plantá, regá y cosechá en tu granja mágica. Vendé en el mercado del pueblo, buscá semillas raras en el bosque, ganá la Feria de Cosechas y sobreviví a la Estación de Tormentas para construir el invernadero de runas.</p>
     <div class="k3-btnrow">
       ${cont ? `<button class="k3-b" data-go="cont">▶ Continuar · Día ${S.day}</button><button class="k3-b alt" data-go="new">🌱 Nueva granja</button>` : '<button class="k3-b" data-go="new">▶ Jugar</button>'}
@@ -1253,6 +1321,9 @@ function endTut() { S.tutorial.done = true; S.tutorial.step = TUT.length; UI.sho
 $('coachSkip').addEventListener('click', e => { e.stopPropagation(); endTut(); });
 for (const t of ['pointerdown', 'mousedown', 'touchstart']) { $('coach').addEventListener(t, e => e.stopPropagation()); $('bDiary').addEventListener(t, e => e.stopPropagation()); $('bSeed').addEventListener(t, e => e.stopPropagation()); }
 $('bDiary').addEventListener('click', () => { if (G.mode === 'play') openDiary(); });
+// misión plegable en táctil: tocarla muestra/oculta el detalle (no hace caminar)
+for (const t of ['pointerdown', 'mousedown', 'touchstart']) $('quest').addEventListener(t, e => { if (COARSE) e.stopPropagation(); });
+$('quest').addEventListener('click', () => { if (!COARSE) return; $('quest').classList.toggle('open'); layoutHud(); });
 $('bSeed').addEventListener('click', () => { if (G.mode === 'play') cycleSeed(1); });
 
 /* ======================= arranque ======================= */
@@ -1261,6 +1332,7 @@ applyQuality(SDK.quality());
 refreshAll();
 addEventListener('pagehide', () => { if (G.mode !== 'menu' && G.mode !== 'loading') { S.px = G.player.x; S.pz = G.player.z; flush(); } });
 showMenu();
+layoutHud();
 g.start();
 document.documentElement.dataset.ready = '1';
 

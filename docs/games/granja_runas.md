@@ -18,7 +18,7 @@ Heredaste la granja de la Abuela Runa, comida por la maleza. Bucle: **limpiar �
 | Usar / interactuar | **E** (siempre también Espacio/Enter) | botón **USAR** | A |
 | Calmar espíritu | mantener E | mantener USAR | mantener A |
 | Cambiar semilla | **Q** (también Tab, 1–5 directo) | 🌱 | X |
-| Girar cámara | **Z / X** (también , y .) | ⟲ | LB / RB |
+| Girar cámara | **Z / X** (también , y .) | ⟲ o deslizar el dedo de costado sobre el campo | LB / RB |
 | Diario y misiones | **J** (también I), botón 📖 | 📖 | Y |
 | Pausa | Esc / P / ⏸ | ⏸ | Start |
 
@@ -121,6 +121,37 @@ Resultados: ver «RESULTADOS» al final.
 ## Rendimiento
 
 Ver «RESULTADOS» al final (SwiftShader por CPU en headless: sirve para comparar, no son FPS reales).
+
+## Móvil
+
+Pasada mobile-first (2026-10-11). Capturas reales (Chromium headless + SwiftShader, táctil emulado, DPR 2.6–3) en
+`.perf/mobile-audit/granja_runas-before/` (antes) y `.perf/mobile-audit/granja_runas-after/` (después), para 360×640, 390×844, 412×915, 915×412 y 844×390:
+`<tamaño>-{menu,play,prompt,diary,shop,orders,decor,storm}.png` + `report.json` (blancos < 44 px, texto < 12 px, salidas de pantalla).
+
+| Problema (antes) | Dónde | Arreglo |
+|---|---|---|
+| La placa de estado tapaba el botón ⌂ / ⏸ de la barra del SDK | 360×640, 390×844 | `layoutHud()` mide la barra (`.mla-bar`) y las zonas seguras (`#grSafe`, `env(safe-area-inset-*)`): si no entra a la izquierda de la barra, la placa baja y ocupa el ancho (fila única de monedas/agua/semilla) |
+| Tarjeta de tutorial encima del joystick | 844×390, 915×412 | en táctil apaisado tutorial y misión van arriba, a la derecha de la placa |
+| Misión oculta en apaisado; en vertical ocupaba ⅓ de la pantalla | todos | misión plegable en táctil (título; se toca para ver el detalle, ▾/▴), visible también en apaisado |
+| Aviso de tormenta en apaisado se pisaba 6 px con la placa | 844×390 | centrado en el hueco entre placa y barra |
+| Menú cortado (dificultad, Cómo jugar, Controles fuera de pantalla) | 844×390, 915×412 | menú compacto para alturas ≤ 520 px (título en una línea, textos más chicos); todo entra sin desplazar |
+| «Saltar tutorial» 107×30, ✕ de paneles 36×36, «Comprar»/«Entregar» 85×38, «Cómo jugar»/«Controles» 38 de alto | todos | ≥ 44 px; «▶ Jugar»/«Continuar» y el primario de fin ≥ 56 px en táctil; feedback `:active` |
+| Texto «⚡ 100» de 8 px, «TUTORIAL»/«MISIÓN» de 9 px | todos | 11 px (barra de energía más alta) |
+| Paneles (tienda, pedidos, diario, decoración) arrancaban debajo de la barra del SDK | 844×390, 360×640 | el panel empieza debajo de la barra (`--gr-top`), respeta zonas seguras, se desplaza con `overscroll-behavior:contain` y muestra un degradé abajo cuando hay más filas |
+| Comprar/entregar algo abajo de una lista larga volvía el panel arriba (**bug**) | todos | `renderPanel` conserva el desplazamiento al re-dibujar |
+| En vertical (FOV horizontal ~29°) se veían 2 surcos de ancho | vertical | FOV 60° en vertical (50° en apaisado/PC), se recalcula al rotar |
+| Ninguna forma táctil fluida de girar la cámara (sólo ⟲ de a 45°) | todos | deslizar el dedo de costado sobre el campo gira 45° cada 70 px; un toque quieto sigue siendo «ir y usar» (el arrastre ya no cuenta como toque) |
+| Cartel «➜ Al mercado» durante la tormenta (las salidas están cerradas) | todos | ya no se muestra con tormenta activa |
+
+Bug funcional (PC y táctil) — **rebote en las salidas**: al entrar a un escenario con la dirección todavía apretada, como la cámara del escenario nuevo mira al revés, la misma dirección llevaba de vuelta a la salida y se volvía al escenario anterior. Ésa era la causa de la prueba inestable en CI «escenarios: granja → mercado → …» (dependía de cuánto tardaba el `keyup`). Arreglo: al cambiar de escenario el movimiento queda bloqueado hasta soltar la tecla/joystick (`G.moveLatch`, se libera por evento `keyup`/`pointerup` o con un cuadro sin dirección). La prueba ahora avanza la simulación a mano (`simulate`) y sigue apretando 1,5 s después de entrar; verifiqué que, con el arreglo desactivado, falla con «no rebota a la salida».
+
+Otros: vibración corta opcional (`navigator.vibrate`, 10 ms) al tocar los botones táctiles, apagable en ⌨ Controles («📳 Vibración»), apagada por defecto con `prefers-reduced-motion`. Pausa al ir a segundo plano, audio tras gesto, calidad automática «media» en táctil y DPR tope 1.5 vienen del SDK/Kit3D (no cambié nada ahí). La partida se juega en las dos orientaciones; no hace falta aviso de girar.
+
+Pruebas nuevas (proyecto `mobile`, Pixel 7): matriz de 5 tamaños (menú: «Jugar» visible, ≥ 56 px, sin tapar y menú sin cortes; en partida con tutorial y con misión: sin solapes entre HUD, joystick, botones y barra del SDK, nada fuera de pantalla, blancos ≥ 44 px; diario abierto debajo de la barra; rotación en partida sin perder estado y USAR por toque limpia maleza) · multitáctil real por CDP (joystick + 🌱 a la vez) y deslizar gira la cámara sin caminar · panel largo en 844×390: desplaza, avisa que hay más y comprar no vuelve arriba.
+
+Resultados: `ML_WORKERS=4`: 42 pasan, 4 omitidas (las sólo-móvil en escritorio), 6.1 min. `ML_WORKERS=1`: 42 pasan, 4 omitidas, 10.3 min (escritorio 21 + móvil 21; las 4 omitidas son las sólo-móvil en escritorio).
+
+No probado en teléfonos reales (sólo emulación); notch/home bar real no verificado más allá de `env(safe-area-inset-*)`.
 
 ## Pendientes / NO PROBADO
 
