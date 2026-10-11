@@ -150,6 +150,54 @@ En juego (gancho `__mareas_profundas.perf`, 1280×800):
 
 Sin asignaciones por cuadro en los bucles calientes (vectores reutilizados, partículas en pool, instancias), recursos de cada zona liberados al cambiar de zona y al salir.
 
+## Móvil
+
+Pasada mobile-first (2026-10-11). Probado sólo con emulación (Chromium headless + SwiftShader, touch emulado por CDP, DPR 2,
+perfil Pixel 7); **NO PROBADO en teléfonos reales**. Capturas reales: `.perf/mobile-audit/mareas_profundas/antes/before-*.png` y
+`.perf/mobile-audit/mareas_profundas/despues/after-*.png` (360×640, 390×844, 412×915, 915×412, 844×390; menú, opciones, ayuda,
+partida con consejo, aviso USAR, peligro y jefe).
+
+Problemas encontrados → arreglos:
+- **Joystick encima de los botones** (360×640: joystick 20–156 px vs LUZ/SONAR desde 120 px; 390×844: 6 px de choque). Ahora los 6
+  botones van en una grilla 3×2 fija (LUZ·FOTO·SUBIR / SONAR·USAR·BAJAR: SUBIR y BAJAR en la columna del pulgar derecho), de 56 px
+  en vertical ≤ 400 px, 64 px en vertical ancho y 62 px en horizontal; USAR con borde más grueso, realce al apretar y safe-area.
+  En horizontal bajo (≤ 480 px) el joystick baja a 120 px para no tocar el HUD.
+- **HUD vertical gigante:** se veían las 7 misiones (3 principales + 4 secundarias) y el panel izquierdo ocupaba ~350 px de 640,
+  pisando consejo y título. En vertical táctil sólo se ven las principales, y se ocultan mientras hay un consejo o durante el jefe
+  (la barra del Leviatán quedaba encima del panel de misiones en 360 px).
+- **Radar y panel bajo la barra del SDK** (la barra mide 58 px con su relleno; radar y panel empezaban en 48–52 px): bajados a
+  barra + 54 px.
+- **Consejo, aviso USAR y alerta de peligro:** se apilan sobre los controles en vertical (aviso → alerta → consejo), sin pisarse
+  con el joystick (antes el aviso tocaba el joystick en 360 y 390 px); la alerta de peligro estaba arriba al centro, sobre la barra
+  del SDK, ahora va abajo (y en horizontal sobre el aviso, lejos del consejo). El aviso en horizontal ya no se mete debajo de los
+  botones en 844 px. Botones del consejo de 34 → 44 px. Avisos breves (toasts) movidos al centro (44–48 %) para no tapar el HUD.
+- **Textos:** medidores, profundidad, objetivo, consejo y aviso ≥ 12 px en táctil; chips de misión ≥ 11 px (antes 10 px en
+  horizontal); etiqueta «TUTORIAL» 11 px. Título de zona ya no se desborda en 360 px.
+- **Menú:** «Comenzar inmersión» de 48 px (40 px en horizontal) → 56 px; botones secundarios ≥ 48 px; entra sin scroll en los 5
+  tamaños (en horizontal bajo se oculta sólo el crédito). En vertical, las pantallas dejan libre la franja de la barra del SDK.
+- **Opciones y ayuda:** en horizontal tenían 230–250 px de contenido extra y «Listo/Volver» fuera de pantalla; ahora la botonera
+  queda fija abajo mientras el texto scrollea. En táctil se quitan las 6 filas de teclas (no hay teclado) y se agrega **Vibración**
+  (`navigator.vibrate`: 8 ms por botón, 25–35 ms en choques y golpes; apagable).
+- **Cámara vertical:** FOV fijo de 62° vertical daba ~37° horizontales en 360×640 (túnel). Ahora el FOV se abre para conservar ~62°
+  horizontales (hasta 86° vertical) y el punto de mira baja un poco para que el submarino suba hacia el centro, lejos de los
+  pulgares. Horizontal/PC sin cambios (62°).
+- **Asistencia táctil:** el cono para escanear fauna es algo más ancho en táctil (cos 0,80 en vez de 0,86). PC sin cambios.
+- **Orientación:** se juega en ambas; en vertical aparece una vez un aviso suave «con el teléfono horizontal ves más océano» (no
+  bloquea). Rotar en plena inmersión reacomoda HUD, controles y FOV sin perder estado (probado).
+- Ya estaban bien y se verificaron: calidad automática en táctil = media, sin sombras, DPR ≤ 1,5; pausa al ir a segundo plano
+  (SDK); `touch-action:none` en la superficie de juego; sin scroll horizontal; viewport sin `user-scalable=no`.
+
+Pruebas móviles nuevas (proyecto `mobile`): matriz de 5 viewports (menú sin scroll ni choques con la barra, botones ≥ 44 px,
+Comenzar ≥ 56 px, textos ≥ 11/12 px, HUD sin superposiciones en juego+consejo / aviso USAR / peligro / jefe, botones ≥ 56 px en
+zona del pulgar, joystick ≥ 120 px, partida sólo táctil: joystick adelante + SONAR); multitáctil (joystick + SUBIR a la vez),
+arrastre de cámara y escaneo manteniendo USAR; rotación a mitad de inmersión + calidad + pausa en segundo plano; opciones táctiles
++ vibración + botonera de ayuda alcanzable.
+
+Resultados (2026-10-11, suite completa de 23 pruebas × 2 proyectos): `ML_WORKERS=1` → 35 passed, 11 skipped (desktop 18 ✓ / 5
+sólo-celular saltadas; mobile 17 ✓ / 6 saltadas: recorridos idénticos a escritorio); `ML_WORKERS=4` → igual, 35 passed, 11 skipped.
+`lifecycle.spec.js -g mareas`: 1 passed, 1 skipped. `npm run typecheck`: sin errores en los archivos del juego.
+No se encontraron bugs funcionales nuevos (P0/P1) en el recorrido completo con emulación táctil; lo que fallaba era de layout.
+
 ## Pendiente / NO PROBADO
 
 - Los modelos son procedurales en código (geometrías fusionadas con colores por vértice e instancias), no GLB: la spec pide glTF/GLB, pero los GLB del paquete son placeholders genéricos que no encajaban (no hay submarino, corales ni criaturas marinas). Decisión documentada.
