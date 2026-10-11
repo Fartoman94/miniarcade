@@ -21,7 +21,7 @@ la silueta de chatarra ni con las abolladuras por vértice. Todo el audio se sin
 |---|---|---|---|
 | Acelerar | W / ↑ | botón ACEL (o aceleración automática) | RT / stick arriba |
 | Frenar / marcha atrás | S / ↓ | botón FRENO | LT / stick abajo |
-| Girar | A / D, ← / → | VOLANTE (izquierda) | stick / cruceta |
+| Girar | A / D, ← / → | VOLANTE: arrastre horizontal en la mitad izquierda | stick / cruceta |
 | Derrape (freno de mano) | Espacio* | FRENO + girar a velocidad | B |
 | Nitro | Shift* | botón NITRO | A o RB |
 | Usar potenciador | E* | botón PODER (se atenúa si la ranura está vacía) | X |
@@ -157,9 +157,52 @@ en `derby_chatarra:save:corrupto`) y se arranca de cero; forma inválida → `sa
 bloqueado, puntos negativos, teclas inválidas…). Ganar el torneo lo reinicia y conserva victorias, récord, auto desbloqueado,
 opciones y tutorial. Logros y dificultad: `ml:missions` / `ml:difficulty`; récord: `ml:scores`.
 
+## Móvil
+Pasada mobile-first (2026-10-11). Probado sólo con emulación (Chromium headless + SwiftShader, touch emulado, DPR 2, perfil
+Pixel 7); **NO PROBADO en teléfonos reales**. Capturas: `.perf/mobile-audit/derby_chatarra/antes-*.png` y
+`.perf/mobile-audit/derby_chatarra/despues/*.png` (360×640, 390×844, 412×915, 915×412, 844×390; menú, partida, menú con
+torneo en curso, ayuda y opciones en horizontal).
+
+Problemas encontrados → arreglos:
+- **Bug P1 (también PC):** los botones «Controles y opciones» y «Cómo jugar» del menú principal no tenían manejador y no hacían
+  nada. Ahora abren sus pantallas y vuelven al menú (prueba nueva en ambos proyectos).
+- **Volante:** el joystick genérico (132 px, 2D, posición fija, salto al apoyar descentrado, 66 px de recorrido) se reemplazó por
+  un volante propio (`touch.js`): zona grande en la mitad izquierda, dirección relativa al punto donde apoyás (sin salto), sólo eje
+  horizontal, 58 px al tope, zona muerta 5 %, curva suave (^1,25) para correcciones finas, ancla que sigue al dedo (contravolantear es
+  inmediato) y el dibujo aparece bajo el pulgar y gira ±120°. La sensibilidad de Opciones sigue escalándolo.
+- **Pedalera de dos pulgares:** grilla 2×2 abajo a la derecha: ACEL 84 px (esquina, la más alcanzable), FRENO 70 px a su izquierda,
+  NITRO y PODER 64 px arriba; respeta safe-area; realce verde al apretar (antes el color fijo tapaba el estado «presionado»).
+- **HUD vertical:** el panel de estado (diagrama de daño) quedaba debajo de la barra del SDK y la tabla se pisaba con el estado en
+  360 px. Ahora: reloj a la izquierda de la barra, estado + tabla en la segunda fila, una sola misión principal debajo. En
+  horizontal: reloj y tabla bajo la barra (antes la tabla tocaba la barra), una misión visible (antes ninguna), tabla compacta y sólo
+  tu fila durante el jefe. Textos de juego ≥ 12 px (antes 9–10,5 px); etiquetas chicas ≥ 11 px.
+- **Consejos:** encima de la capa táctil (z-index), botones de 44 px; en vertical, sobre los controles; «¡YA!» bajado al 50 % en
+  horizontal para no chocar con el consejo.
+- **Menú:** en horizontal se cortaba (460 px de contenido en 390–412) y «Empezar» medía 38 px; ahora es de dos columnas sin scroll.
+  En vertical el título quedaba bajo la barra y «Cómo jugar» cortado en 360×640: ahora entra completo, garaje → dificultad →
+  **Empezar (56 px, zona del pulgar)**, nombre del auto elegido en la descripción, aviso suave «se juega más cómodo horizontal»
+  (no bloquea). Con torneo en curso también entra sin scroll. Ayuda/opciones/fin: botonera fija abajo mientras el texto scrollea.
+- **Opciones en celular:** sin filas de teclas (no hay teclado), casillas de 26 px y filas de 44 px, nueva opción **Vibración**
+  (`navigator.vibrate`: 8 ms por botón, más larga en choques fuertes; se apaga también con movimiento reducido).
+- **Cámara vertical:** el FOV se abre hasta que el campo horizontal sea ≥ 50° (64–80° vertical; antes 68° fijo ≈ 41° horizontal) y
+  la cámara se acerca un poco (+1,2 en vez de +2,5) para que el auto no quede diminuto. Horizontal/PC sin cambios.
+- Rotar en plena ronda: HUD, controles y cámara se reacomodan sin perder estado (probado). Pausa en segundo plano: la hace el SDK
+  (probado). Calidad automática en táctil: media, sin sombras, DPR ≤ 1,5 (probado).
+
+Pruebas móviles nuevas (proyecto `mobile`): matriz de 5 viewports (menú sin scroll ni choques con la barra, botones ≥ 44 px,
+Empezar ≥ 56 px, textos, HUD sin superposiciones, botones ≥ 56 px / ACEL ≥ 76 px en zonas de pulgar, partida sólo táctil ACEL +
+volante); volante relativo + multitáctil (volante + ACEL + NITRO); rotación a mitad de ronda + calidad + pausa en segundo plano;
+opciones táctiles + vibración + botonera de ayuda alcanzable.
+
+Resultados (2026-10-11, suite completa de 22 pruebas): `ML_WORKERS=1` → 38 passed, 6 skipped (desktop 17 ✓ / 5 sólo-celular
+saltadas; mobile 21 ✓ / 1 saltada: IA de rivales); `ML_WORKERS=4` → igual, 38 passed, 6 skipped. `lifecycle.spec.js -g derby`: 1 passed.
+
+Pendiente: probar en teléfonos reales (latencia táctil, vibración en iOS — Safari no implementa `navigator.vibrate`), y con muescas
+reales (safe-area sólo verificado por CSS).
+
 ## Gancho de pruebas
 `window.__derby_chatarra` (congelado, sólo lectura): `state, scene, arenaId, round, missions, player, hp, maxHp, score,
-tourScore, timeLeft, runTime, simTime, countdown, paused, overlay, tip, big, rivals, stats, standings, result, boss,
+tourScore, timeLeft, runTime, simTime, countdown, paused, overlay, tip, big, touch{isTouch,wheel,wheelActive,steer,fov}, rivals, stats, standings, result, boss,
 interactions{ramps,containers,switches,barriers,towers,pads,mines}, counts, perf, quality, difficulty, save, session`.
 Con `?debug` agrega `debug`: `goto, skipCountdown, simulate, teleport, place, setSpeed, setHP, hurt, rivalHP, give,
 rivalState, freezeAI, god, wreck, setTime, setPoints, spawnBoss, skipCut, bossPhase, bossHit, bossCharge, bossAttack,
