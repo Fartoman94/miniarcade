@@ -294,5 +294,46 @@ Lectura honesta: el JS por cuadro quedó igual (≈0,6–0,9 ms). En media/alta 
 - Los pollos de los niveles 2, 6 y 8 (soltar ▶ en el aire sobre el trampolín) se verificaron por cálculo de la trayectoria, no con un test; sí hay test del pollo del nivel 1 y de los de las rutas del 7 y el 9.
 - Con `prefers-reduced-motion` se apagan sacudón y temblor, pero no hay test automático de eso.
 - Récord único para todas las dificultades (no por dificultad).
-- En celular apaisado las misiones (abajo a la izquierda) tapan un poco del piso del borde izquierdo.
+- ~~En celular apaisado las misiones (abajo a la izquierda) tapan un poco del piso del borde izquierdo.~~ Resuelto en la pasada móvil (ver «## Móvil»).
 - Sigue sin sprite de muerte propio para Mati (ragdoll con su paleta).
+
+## Móvil
+
+Pasada mobile-first (oct 2026). Emulación táctil de Chromium headless (isMobile + hasTouch, DPR 2–3) en 360×640, 390×844, 412×915, 915×412 y 844×390. **No probado en teléfonos reales.**
+
+Capturas (antes/después, mismas condiciones): `.perf/mobile-muerte_gloriosa/{before,after}-<ancho>x<alto>-{menu,play}.png`; además `after-*-hud-boss-narr.png` (nombre de nivel + barra del jefe + narrador a la vez), `after-{360x640,844x390}-{card,over}.png`. Auditoría previa central: `.perf/mobile-audit/muerte_gloriosa-*.png`.
+
+### Problemas encontrados → arreglo
+
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| **Apaisado (915×412, 844×390): el jugador quedaba detrás de ◀ ▶ y de los chips de misiones**; el piso caía 22–25 px por debajo del borde superior de los botones y las trampas que venían quedaban detrás de SALTAR. | `resize()` reserva la franja de los botones en táctil (`BAND` = botón SALTAR + margen inferior/safe-area): si el piso cae detrás, se achica la escala hasta que el piso quede justo arriba (VS 0,736→0,668 en 915×412; 0,696→0,622 en 844×390). Además, en apaisado táctil la cámara puede ir a x negativa (`CAM_MIN`) para que al arrancar el nivel el jugador quede a la derecha de ◀ ▶. Las misiones suben arriba a la izquierda, bajo el nombre del nivel. |
+| Apaisado: el narrador, la meta y la barra del jefe podían pisar las misiones. | En apaisado bajo: meta compacta centrada arriba («🏁 14 m»), barra del jefe debajo, narrador más angosto (`100vw − 400px`) y más chico. |
+| Vertical 360×640: el nombre del nivel quedaba debajo de la barra del SDK (ahora de 44 px); el título del menú también. | Nombre del nivel, meta, jefe y narrador bajan una fila en vertical angosto; el menú tiene `padding-top` para la barra. |
+| Narrador cortado en 3 renglones de 180 px en vertical (pasaba también en escritorio). | `#narr{width:max-content}` (con `left:50%` el ancho disponible era la mitad). |
+| Menú apaisado con scroll (423/412 y 479/390 px). | Layout compacto en apaisado bajo: título en una línea, sin el párrafo ni la ayuda de controles (la ayuda sigue en ⚙ del SDK). Ahora entra justo (412/412, 390/390). En vertical 360×640 el menú scrollea (JUGAR queda arriba del pliegue y las tarjetas cortadas abajo indican que sigue). |
+| JUGAR medía 50 px de alto en 360×640 y en apaisado. | `body.touch .btn{min-height:56px}`. |
+| Pantalla final cortada abajo (700/640 en 360×640, 452/390 en 844×390); el trofeo debajo de la barra del SDK. | Versión compacta del cartel final en celular (stats en una fila, márgenes menores); ahora entra en ambos. |
+| Textos de 9–10 px en el menú («ELEGÍ TU VÍCTIMA», «DIFICULTAD», «CREADO POR») y chips de misiones. | 12 px (11 px en la etiqueta «CREADO POR»); chips a 12 px en táctil. |
+| El lienzo no tenía `touch-action:none` (sólo los botones). | `#cv` y `#tc` con `touch-action:none`. |
+| Cartel de muerte decía «TOCÁ O APRETÁ CUALQUIER TECLA» en táctil. | «TOCÁ PARA SEGUIR». |
+
+Ergonomía: el pulgar puede deslizarse de ◀ a ▶ sin levantarlo (antes quedaba «pegado» al primero); SALTAR vibra 8 ms (`navigator.vibrate`, apagado con `prefers-reduced-motion`); los botones siguen con realce al apretar. En vertical se muestra en el menú un aviso suave, no bloqueante: «📱↻ Mejor con el teléfono acostado» (el juego se puede jugar igual en vertical: el piso queda muy por encima de los botones).
+
+Sin cambios (ya estaban bien): calidad automática en táctil = media (el SDK ya no elige alta en pantallas táctiles), tope de DPR por calidad (1/1,5/2), pausa al ir a segundo plano (SDK), audio reanudado sólo tras un gesto, multitáctil con mapa de punteros, salto con búfer de 0,12 s al tocar.
+
+### Pruebas móviles (`tests/e2e/muerte_gloriosa.spec.js`, describe «MUERTE GLORIOSA · móvil», proyecto mobile)
+
+- **Matriz de tamaños** (5 tamaños, también prueba rotación entre ellos): sin scroll horizontal, botones del menú ≥ 44 px, JUGAR ≥ 56 px y visible, nada del menú bajo la barra del SDK, sin texto < 11 px; en partida (niveles 1, 3 y 9, con barra de jefe y narrador forzados) ningún elemento del HUD/misiones/◀ ▶ SALTAR se pisa entre sí ni con la barra del SDK ni sale de pantalla, botones ≥ 56 px, el piso queda arriba de los botones y, en apaisado, el jugador arranca a la derecha de ▶.
+- **Partida sólo táctil**: JUGAR con toque, deslizar ◀→▶ con el mismo dedo, caminar, saltar con un segundo dedo (toque real) mientras el primero sigue, tocar el lienzo también salta, sin scroll ni zoom.
+- **Rotar a mitad de partida**: nivel y estado se conservan; vista y botones se reacomodan.
+- **Pantalla final y cartel**: entran sin cortes en 360×640 y 844×390.
+
+### Pendiente
+
+- No probado en teléfonos reales (notch real, barras del navegador iOS/Android apareciendo, vibración real).
+- El menú en 360×640 y 390×844 sigue necesitando scroll para ver las estadísticas (JUGAR está siempre visible arriba).
+- En apaisado la vista es algo más chica (el personaje mide ≈ 33 px en 844×390 en vez de ≈ 38 px) a cambio de que nada quede detrás de los botones.
+
+
+Resultado de la spec completa (`tests/e2e/muerte_gloriosa.spec.js`, ambos proyectos): con `ML_WORKERS=1` 51 pasan / 11 saltean / 0 fallan (10,4 min); con `ML_WORKERS=4` también 51 / 11 / 0 (desktop 26 pasan + 5 saltean, mobile 25 pasan + 6 saltean; 9,4 min). Se saltean, por diseño: en desktop las 4 nuevas de móvil + la táctil previa; en mobile las de teclado sólo-escritorio y los 2 recorridos en Extremo.
