@@ -52,7 +52,7 @@ export const SAVE_DEFAULTS = {
   started: false,
   wins: 0,
   tutorial: { off: false, seen: /** @type {Record<string, boolean>} */ ({}) },
-  opts: { sens: 1, invert: false, motion: 'auto', binds: { jump: 'Space', use: 'KeyE', eco: 'KeyF' } },
+  opts: { sens: 1, invert: false, motion: 'auto', haptics: true, binds: { jump: 'Space', use: 'KeyE', eco: 'KeyF' } },
 };
 
 /** Etiqueta legible de un código de tecla. @param {string} code */

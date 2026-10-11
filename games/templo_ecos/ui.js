@@ -23,7 +23,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#fff;-webki
 #te-tip button{appearance:none;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:9px;padding:6px 10px;font:700 12px system-ui;cursor:pointer;min-height:32px}
 #te-tip button.pri{background:#3fe8d6;color:#062220;border-color:#3fe8d6}
 #te-obj{padding:6px 10px;border-radius:10px;background:rgba(14,10,6,.6);font:700 12px/1.35 system-ui;color:#ffe9c2}
-#te-obj:empty{display:none}
+#te-obj:empty,#te-side.tight #te-obj{display:none}
 #te-prompt{left:50%;transform:translateX(-50%);bottom:max(28px,env(safe-area-inset-bottom));padding:9px 16px;border-radius:999px;background:rgba(14,10,6,.85);
   border:1.5px solid #f5b84a;font:800 14px system-ui,sans-serif;white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
 #te-prompt kbd{display:inline-block;min-width:20px;padding:1px 6px;margin-right:6px;border-radius:6px;background:#f5b84a;color:#1a1206;font:900 12px system-ui;text-align:center}
@@ -59,6 +59,43 @@ body.te-touch #te-text{bottom:auto;top:max(160px,env(safe-area-inset-top))}
 .k3-panel h1{font-size:clamp(28px,7vw,56px)!important}
 @media (max-height:480px){#te-tip:not([hidden]) ~ #te-obj{display:none}.k3-panel h1{font-size:30px!important}.k3-panel{gap:7px!important}.k3-panel p{font-size:13px}.k3-b{padding:10px 16px!important}.te-dtab{display:none}}
 @media (prefers-reduced-motion:reduce){#te-title,#te-fade,#te-flash,#te-note{transition:none!important}}
+/* ---------- táctil (celulares): todo se ubica con medidas reales (variables --te-* que calcula layout()) ---------- */
+body.te-touch .te-hud{touch-action:none}
+body.te-touch #te-status{max-width:var(--te-status-w,calc(100vw - 240px));height:auto;flex-wrap:wrap;row-gap:4px;gap:5px;overflow:visible}
+body.te-touch .te-chip{padding:4px 7px;height:26px}
+body.te-touch #te-side{top:var(--te-side-t,64px);width:var(--te-side-w,min(320px,44vw));max-height:var(--te-side-h,none);overflow:hidden}
+body.te-touch #te-tip{padding:8px 10px;font:600 13px/1.35 system-ui,sans-serif}
+body.te-touch #te-tip .te-tip-k{font-size:11px}
+body.te-touch #te-tip button{min-height:44px;padding:8px 12px;font-size:13px;flex:1 1 auto}
+body.te-touch #te-tip .te-tip-row{flex-wrap:wrap}
+body.te-touch #te-boss small{font-size:12px}
+body.te-touch #te-obj{font-size:12.5px}
+body.te-touch .mlm-hud.tl{top:var(--te-mh-t,calc(60px + env(safe-area-inset-top)));left:max(8px,env(safe-area-inset-left));max-width:var(--te-mh-w,min(300px,46vw))}
+body.te-touch .mlm-m{font-size:12px}
+body.te-touch #te-prompt{pointer-events:auto;min-height:44px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;bottom:var(--te-prompt-b,calc(196px + env(safe-area-inset-bottom)));max-width:var(--te-prompt-w,calc(100vw - 32px))}
+body.te-touch #te-prompt.on{background:rgba(245,184,74,.45);transform:translateX(-50%) scale(.96)}
+body.te-touch #te-prompt::after{content:'  👆';font-size:12px;opacity:.85;white-space:pre}
+body.te-touch #te-text{top:var(--te-side-t,64px);bottom:auto;z-index:31;max-height:var(--te-text-h,60vh);overflow:auto}
+body.te-touch #te-text button{width:44px;height:44px;top:4px;right:4px}
+body.te-touch #te-text h3{padding-right:46px}
+body.te-touch .k3-toast{top:var(--te-toast-t,18%);z-index:2147481200;width:max-content;max-width:calc(100vw - 24px);box-sizing:border-box;font-size:14px;padding:9px 14px}
+body.te-touch .mlm-toast{top:calc(var(--te-toast-t,18%) + 72px);max-width:calc(100vw - 24px);box-sizing:border-box}
+#te-rot{left:50%;transform:translateX(-50%);bottom:var(--te-rot-b,260px);pointer-events:auto;padding:10px 14px;min-height:44px;box-sizing:border-box;border-radius:999px;
+  background:rgba(14,10,6,.85);border:1px solid rgba(245,184,74,.6);color:#ffe9c2;font:700 13px system-ui;white-space:nowrap;display:flex;align-items:center;gap:6px}
+/* apaisado: los tres botones en fila para liberar el costado derecho */
+@media (orientation:landscape){
+  body.te-touch .k3-btns{max-width:none;flex-wrap:nowrap}
+  body.te-touch .k3-btn[aria-label="eco"]{order:-1}
+  body.te-touch .k3-toast{top:auto;bottom:var(--te-toast-b,70px)}
+}
+/* menús en pantallas táctiles: objetivos grandes y el principal ≥ 56 px */
+body.te-touch .k3-screen .k3-b{min-height:48px}
+body.te-touch #te-menu [data-go],body.te-touch #te-end .k3-b:not(.alt){min-height:56px}
+body.te-touch .te-opts select,body.te-touch .te-bind button{min-height:44px;min-width:64px}
+body.te-touch .te-opts input[type=checkbox]{width:26px;height:26px}
+body.te-touch .te-opts input[type=range]{height:32px}
+body.te-touch #te-help .k3-btnrow,body.te-touch #te-opts .k3-btnrow{position:sticky;bottom:-16px;padding:10px 0 12px;background:linear-gradient(180deg,transparent,rgba(2,4,8,.95) 30%)}
+@media (max-height:480px){body.te-touch #te-menu .k3-panel>p{display:none}body.te-touch #te-menu .k3-panel{gap:6px!important}body.te-touch #te-menu .k3-b{padding:8px 16px!important}}
 `;
 
 /** @param {string} s */
@@ -81,11 +118,79 @@ export function createUI() {
   /** @type {((a:string)=>void)|null} */ let tipHandler = null;
   tip.addEventListener('click', e => { const b = /** @type {HTMLElement} */ (e.target).closest('[data-t]'); if (b && tipHandler) tipHandler(/** @type {string} */ (/** @type {HTMLElement} */ (b).dataset.t)); });
   text.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).closest('button')) { text.hidden = true; } });
+  // aviso suave para girar el teléfono (no bloquea nada; se cierra solo o con un toque)
+  const rot = mk('te-rot'); rot.hidden = true; rot.setAttribute('role', 'status');
+  rot.innerHTML = '<span aria-hidden="true">📱↻</span> Apaisado se ve más del templo';
+  let rotT = 0;
+  rot.addEventListener('pointerdown', e => { e.stopPropagation(); rot.hidden = true; });
+  // tocar el aviso de interacción equivale a USAR (blanco grande y justo donde se mira)
+  /** @type {(()=>void)|null} */ let promptHandler = null;
+  prompt.addEventListener('pointerdown', e => {
+    if (!touch || !promptHandler || prompt.hidden) return;
+    e.stopPropagation(); e.preventDefault();
+    prompt.classList.add('on'); setTimeout(() => prompt.classList.remove('on'), 120);
+    promptHandler();
+  });
+
+  /* ---------- distribución táctil con medidas reales ---------- */
+  let touch = false, layoutRaf = 0;
+  const root = document.documentElement.style;
+  const rectOf = (/** @type {string} */ sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return r.width && r.height ? r : null; };
+  const setVar = (/** @type {string} */ k, /** @type {number} */ v) => root.setProperty(k, Math.round(v) + 'px');
+  function layout() {
+    layoutRaf = 0;
+    if (!touch) return;
+    const vw = innerWidth, vh = innerHeight, land = vw > vh;
+    const bar = rectOf('.mla-bar');
+    const barL = bar ? bar.left : vw - 230, barB = bar ? bar.bottom : 58;
+    setVar('--te-status-w', Math.max(120, barL - 16));
+    const st = status.hidden ? null : status.getBoundingClientRect();
+    const stB = st && st.height ? st.bottom : 40;
+    const mhW = land ? Math.min(260, vw * 0.3) : Math.min(200, vw * 0.46);
+    // las misiones bajan por debajo de la barra del SDK si no entran a su izquierda
+    setVar('--te-mh-t', (mhW + 8 > barL ? Math.max(stB, barB) : stB) + 6);
+    setVar('--te-mh-w', mhW);
+    const sideW = land ? Math.min(340, vw * 0.4) : Math.max(150, Math.min(340, vw - mhW - 24));
+    setVar('--te-side-w', sideW);
+    const sideT = Math.max(barB, land ? 0 : 0) + 6;
+    setVar('--te-side-t', sideT);
+    const btns = rectOf('.k3-btns'), joy = rectOf('.k3-joy');
+    const btnsT = btns ? btns.top : vh - (land ? 110 : 190), joyT = joy ? joy.top : vh - 160;
+    const joyR = joy ? joy.right : 160, btnsL = btns ? btns.left : vw - 250;
+    setVar('--te-side-h', Math.max(90, btnsT - sideT - 8));
+    setVar('--te-text-h', Math.max(110, Math.min(btnsT, joyT) - sideT - 10));
+    let pb, pw;
+    if (land) { pb = Math.max(18, vh - (joy ? joy.bottom : vh - 24)); pw = 2 * Math.min(vw / 2 - joyR - 8, btnsL - 8 - vw / 2); }
+    else { pb = vh - Math.min(btnsT, joyT) + 10; pw = vw - 32; }
+    setVar('--te-prompt-b', pb); setVar('--te-prompt-w', Math.max(140, pw));
+    setVar('--te-rot-b', pb);
+    setVar('--te-toast-t', Math.max(barB, stB) + 4);
+    setVar('--te-toast-b', pb + 52);
+    // si no entra todo en la columna derecha, el objetivo (lo menos urgente) cede lugar al tutorial/jefe
+    side.classList.remove('tight');
+    if (!side.hidden && side.scrollHeight > side.clientHeight + 1) side.classList.add('tight');
+    if (!land) rot.hidden = rot.hidden || !prompt.hidden; else rot.hidden = true;
+  }
+  const relayout = () => { if (touch && !layoutRaf) layoutRaf = requestAnimationFrame(layout); };
+  addEventListener('resize', relayout);
+  addEventListener('orientationchange', relayout);
+  if (window.visualViewport) visualViewport.addEventListener('resize', relayout);
+  if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(relayout); ro.observe(status); ro.observe(side); }
 
   return {
-    els: { status, side, prompt, title, flash, fade, text, note, boss, tip, obj },
+    els: { status, side, prompt, title, flash, fade, text, note, boss, tip, obj, rot },
+    /** Activa la distribución táctil. @param {()=>void} onPromptTap */
+    setTouch(onPromptTap) { touch = true; promptHandler = onPromptTap; document.body.classList.add('te-touch'); relayout(); },
+    relayout,
+    /** Recalcula ya (pruebas y cambios de orientación). */
+    layoutNow() { if (layoutRaf) cancelAnimationFrame(layoutRaf); layout(); },
+    /** Aviso suave de girar el teléfono (sólo vertical táctil, una vez por partida). */
+    rotateHint() {
+      if (!touch || innerWidth > innerHeight) return;
+      rot.hidden = false; clearTimeout(rotT); rotT = window.setTimeout(() => { rot.hidden = true; }, 5000); relayout();
+    },
     /** @param {boolean} v */
-    show(v) { status.hidden = side.hidden = !v; if (!v) { prompt.hidden = true; text.hidden = true; } },
+    show(v) { status.hidden = side.hidden = !v; if (!v) { prompt.hidden = true; text.hidden = true; rot.hidden = true; } relayout(); },
     /** @param {{hp:number,maxHp:number,flames:number,integrity:number|null,score:number,eco:number|null,ecoKey:string}} s */
     status(s) {
       let h = '<span class="te-chip" aria-label="vida">';
@@ -99,21 +204,21 @@ export function createUI() {
     /** @param {string|null} key @param {string|null} label */
     prompt(key, label) {
       const h = label ? `${key ? `<kbd>${esc(key)}</kbd>` : ''}${esc(label)}` : '';
-      if (h !== last.prompt) { prompt.innerHTML = h; prompt.hidden = !h; last.prompt = h; }
+      if (h !== last.prompt) { prompt.innerHTML = h; prompt.hidden = !h; last.prompt = h; if (h) rot.hidden = true; }
     },
     /** @param {{label:string, frac:number}|null} b */
     boss(b) {
       const h = b ? `<b>GUARDIÁN ECO</b><small>${esc(b.label)}</small><div class="te-bar"><i style="width:${Math.round(b.frac * 100)}%"></i></div>` : '';
-      if (h !== last.boss) { boss.innerHTML = h; boss.hidden = !b; last.boss = h; }
+      if (h !== last.boss) { const was = boss.hidden; boss.innerHTML = h; boss.hidden = !b; last.boss = h; if (was !== boss.hidden) relayout(); }
     },
     /** @param {string} s */
     objective(s) { if (s !== last.obj) { obj.textContent = s; last.obj = s; } },
     /** @param {string|null} html @param {(a:string)=>void} [onAction] */
     tip(html, onAction) {
       tipHandler = onAction || null;
-      if (!html) { tip.hidden = true; tip.innerHTML = ''; return; }
+      if (!html) { tip.hidden = true; tip.innerHTML = ''; relayout(); return; }
       tip.innerHTML = `<div class="te-tip-k">TUTORIAL</div><div>${html}</div><div class="te-tip-row"><button type="button" data-t="skip">Saltar tutorial</button><button type="button" class="pri" data-t="ok">Entendido</button></div>`;
-      tip.hidden = false;
+      tip.hidden = false; relayout();
     },
     get tipVisible() { return !tip.hidden; },
     /** @param {string} name @param {string} sub */
