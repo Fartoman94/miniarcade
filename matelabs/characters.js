@@ -162,6 +162,7 @@
   .mlc-anim{align-self:flex-start;background:none;border:none;color:#fff;opacity:.7;font:600 11px system-ui,sans-serif;cursor:pointer;padding:2px 0;text-decoration:underline}
   .mlc-anim:focus-visible{outline:2px solid #2ee6e6}
   .mlc-err{font-size:11px;color:#ffb4b4}
+  @media (pointer:coarse){.mlc-anim{min-height:44px;padding:10px 4px;font-size:12px}.mlc-card{min-height:52px}.mlc-card small{font-size:11px}.mlc-title{font-size:11px}}
   `;
   document.head.appendChild(css);
 

@@ -282,3 +282,48 @@ Lectura honesta: las escenas no son iguales entre corridas (aleatoriedad), así 
 - Las evoluciones no tienen sprite propio más allá de color/tamaño (Anillo de plasma) o radio/frecuencia.
 - Sonido nuevo (aviso, pisotón, rayo, pulso, objeto, élite) sintetizado y sin revisar con oído humano.
 - Balance de las familias nuevas en Normal ajustado a ojo; Normal mantiene exactamente las fórmulas originales para los 3 enemigos de siempre, pero la partida igual es distinta porque aparecen familias nuevas desde 0:30.
+
+## Móvil
+
+Pasada mobile-first (sin cambiar mecánicas ni arte). Verificado con emulación táctil de Playwright (Chromium, `isMobile` + `hasTouch`) en 360×640 y 390×844 (DPR 3), 412×915 (DPR 2,625) vertical, y 915×412 (DPR 2,625) y 844×390 (DPR 3) apaisado. **No probado en celulares físicos** (no hay disponibles): Safari/iOS real, vibración real, barra del navegador que aparece/desaparece y muescas reales quedan sin verificar.
+
+Capturas (mismo script, antes y después; `menu`, `start` = arranque con la pista, `boss`, `levelup` por tamaño):
+- Antes: `.perf/mobile/neon_survivor/before/<tamaño>-{menu,start,boss,levelup}.png` + `report.json`
+- Después: `.perf/mobile/neon_survivor/after/<tamaño>-{menu,start,boss,levelup}.png` + `report.json`
+- Auditoría central previa: `.perf/mobile-audit/neon_survivor-{chico,vertical,apaisado}-{menu,play}.png`
+
+### Problemas encontrados → arreglo
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| El joystick flotante no se descubría: sólo un texto en el menú (todas las medidas) | Pista animada al empezar (sólo `pointer:coarse`): joystick fantasma punteado con la perilla girando + «Arrastrá en cualquier lado para moverte», en la zona del pulgar (vertical: abajo al centro, encima de misiones y barra; apaisado: tercio izquierdo). Se va con el primer toque o a los 7 s de juego. |
+| Panel de subir de nivel: las misiones del SDK (z 2147481000) quedaban **encima** de las tarjetas (844×390, 915×412) | `#levelUp` sube a z 2147481100 (sobre las misiones, debajo de la barra y la pausa del SDK) y reserva abajo el alto de la barra. |
+| Tarjetas de mejora en apaisado: 223–232 px de alto, al límite de la pantalla (844×390) | Con alto ≤ 500 px: fila de tarjetas compactas (140 px), sin el «1/2/3» de teclado en táctil, `:active` con feedback. |
+| Menú en 360×640: el crédito «CREADO POR MATELABS» quedaba debajo de la barra del SDK (con botones de 44 px) | El menú reserva 64 px + zona segura abajo en táctil; menú vertical compacto con alto ≤ 760 px. |
+| Menú apaisado: una sola columna larga, JUGAR 120×38 px | Dos columnas (título/textos | personaje/dificultad/JUGAR) con alto ≤ 500 px; JUGAR ≥ 56 px de alto y 200 de ancho en táctil. |
+| Botones de dificultad 33 px y «Detener giro de la vista previa» 23 px (selectores compartidos) | Override en esta página (`pointer:coarse`): 44 px mínimos; títulos de 10 → 11 px. |
+| Misiones a 10 px en apaisado (regla `max-height:480px` del SDK) | 11 px en esta página. |
+| Misiones a `bottom:56px` = mismo borde que la barra de 44 px; con zona segura de iPhone (34 px) se habrían pisado (360×640: x 148–174 compartido) | `bottom: calc(62px + env(safe-area-inset-bottom))`. |
+| El dedo del joystick tapa las misiones (abajo a la izquierda, justo la zona del pulgar) | Mientras el dedo está encima (o cerca), las misiones bajan a 25 % de opacidad. |
+| Vertical estrecho: el mundo medía 360 u de ancho; los carriles de embestida (230 u) y del Coloso (300 u) cruzaban casi toda la pantalla y los enemigos de los costados entraban a 180 u del jugador | **Cámara**: si el lado corto de la pantalla mide < 440 px, la vista se aleja para que el lado corto del mundo mida 440 u (360×640 → escala 0,82, mundo 440×782; 844×390 → 0,89). Joystick, pista, barra del Coloso y avisos se dibujan en px de pantalla (no se achican). En PC (≥ 440 px) la escala es 1: idéntico a antes. |
+| Barra del Coloso con posición fija (y = 16 o 92) y texto de 11 px | Se ubica midiendo el HUD real (incluye zona segura): fila superior si entra entre vida y reloj, si no, debajo del HUD; texto 12–13 px. |
+| Girar el teléfono en plena partida sólo recortaba al jugador contra los bordes | Todo (jugador, enemigos, orbes, balas, disparos, avisos, partículas, estela) conserva su posición relativa; el joystick se suelta si cambia la orientación; la barra del Coloso se recalcula. |
+| Audio en iOS: sólo se desbloqueaba en `pointerdown` | También en `touchend` (iOS sólo reanuda el AudioContext ahí o en click). |
+| Sin respuesta háptica | `navigator.vibrate` corto al recibir daño (30 ms) y al subir de nivel (20 ms), sólo táctil, con tope de frecuencia y nunca con «reducir movimiento». |
+
+Ya estaba bien y se mantuvo: `touch-action:none` + `overscroll-behavior:none` en el juego (sin zoom ni recarga por gesto; el viewport no usa `user-scalable=no`), multitáctil (el joystick sigue al primer dedo; un segundo dedo no lo roba), pausa al pasar a segundo plano (SDK), calidad automática «media» en táctil (DPR tope 1,5), disparo automático al más cercano (no hace falta asistencia de puntería). No se puso aviso de «girá el teléfono»: el juego es cómodo en ambas orientaciones.
+
+### Pruebas nuevas (`Neon Survivor — móvil`)
+- **Matriz de tamaños** (mobile, Pixel 7 con `setViewportSize` a los 5 tamaños): sin scroll horizontal; nada de la UI propia fuera de pantalla ni bajo la barra del SDK; todos los botones ≥ 44 px; JUGAR ≥ 56 px y es lo que recibe el toque en su centro; HUD/misiones/reloj sin pisarse; pista del joystick en pantalla y sin pisar HUD/misiones/barra; mundo ≥ 440 u; barra del Coloso dentro de pantalla y sin pisar HUD/misiones/barra; tarjetas de mejora enteras, por encima de las misiones, y se eligen tocando.
+- **Partida sólo táctil**: pista visible → arrastre real (CDP) mueve al jugador; un segundo dedo a mitad de camino no roba el joystick; la pista desaparece; el disparo automático mata a un enemigo (simulación determinista con `step()`).
+- **Girar en plena partida** (390×844 → 844×390): sigue en juego, canvas 844 px, posición relativa conservada, barra del Coloso pasa a la fila superior, sin superposiciones.
+- **Misiones atenuadas** con el dedo encima, y vuelven al soltar.
+- **PC**: escala de cámara 1 (mundo 1280×800) y sin pista táctil.
+- Ajuste: «cambiar a viewport de celular…» compara `px/py` contra el tamaño del mundo (`__neon.view`) y espera a que el juego procese el resize (antes 300 ms fijos: falló una vez por carga).
+
+Hook nuevo de sólo lectura: `__neon.view` (`vs, W, H, SW, SH`), `__neon.hint`, `__neon.bossBar`, `__neon.joy`.
+
+**Resultado real** (`npx playwright test tests/e2e/neon_survivor.spec.js`, load average del equipo 40–50 por otros agentes): `ML_WORKERS=1` → **53 pasaron, 7 omitidas, 0 fallaron** (desktop 25 + 5 omitidas, mobile 28 + 2 omitidas); `ML_WORKERS=4` → **53 pasaron, 7 omitidas, 0 fallaron**. Las omitidas son las de sólo-táctil en desktop y sólo-teclado/PC en mobile.
+
+### Pendiente
+- Probar en celulares reales (iOS Safari: audio, vibración —iOS no la soporta—, muesca y barra inferior; Android Chrome con la barra de direcciones que se oculta).
+- Los objetivos de 44 px de los selectores de dificultad/personaje se forzaron sólo en esta página: convendría llevarlos a `matelabs/missions.js` y `matelabs/characters.js` (archivos compartidos) para todos los juegos, igual que el tamaño de 10 px de las misiones en apaisado y su `bottom:56px` que no suma la zona segura.

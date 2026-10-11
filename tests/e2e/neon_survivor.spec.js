@@ -234,7 +234,9 @@ test.describe('Neon Survivor', () => {
     const { errors } = await openGame(page, FILE);
     await start(page, hasTouch);
     await page.setViewportSize({ width: 360, height: 640 });
-    await wait(page, 300);
+    // con la CPU cargada el evento resize puede tardar: esperar a que el juego lo procese
+    await expect.poll(() => page.evaluate(() => /** @type {any} */ (window).__neon.view.SW), { timeout: 15000 }).toBe(360);
+    await wait(page, 100);
     const m = await page.evaluate(() => {
       const c = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
       const ui = document.getElementById('ui').getBoundingClientRect(), tm = document.getElementById('timer').getBoundingClientRect();
@@ -246,8 +248,11 @@ test.describe('Neon Survivor', () => {
     expect(m.cssH).toBe(640);
     expect(m.scrollW).toBeLessThanOrEqual(360);
     expect(m.uiRight).toBeLessThan(m.timerLeft); // HUD izquierdo y reloj no se pisan
-    expect(m.px).toBeLessThanOrEqual(360);
-    expect(m.py).toBeLessThanOrEqual(640);
+    // px/py son coordenadas del MUNDO: en pantallas chicas la cámara se aleja (mundo ≥ 440 u de lado corto)
+    const v = await page.evaluate(() => /** @type {any} */ (window).__neon.view);
+    expect(Math.min(v.W, v.H)).toBeGreaterThanOrEqual(439.5);
+    expect(m.px).toBeLessThanOrEqual(v.W);
+    expect(m.py).toBeLessThanOrEqual(v.H);
     // la barra del SDK queda dentro de la pantalla
     const bar = await page.locator('.mla-bar').boundingBox();
     expect(bar && bar.x + bar.width).toBeLessThanOrEqual(361);
@@ -653,6 +658,183 @@ test.describe('Neon Survivor — MiniArcade 3.0', () => {
     // 12 + oleada marcas (15); cada una se convierte en un enemigo del enjambre
     await expect.poll(() => H(page, '__neon.warns.filter(w => w.type === "spawn" && w.kind === "swarm").length + __neon.kinds.swarm'), { timeout: 20000 }).toBe(15);
     await expect.poll(() => H(page, '__neon.kinds.swarm'), { timeout: 20000 }).toBe(15);
+    expectNoErrors(errors);
+  });
+});
+
+/* ======================= Móvil ======================= */
+const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+/** Mide la UI propia del juego contra la pantalla, la barra del SDK y el HUD (todo en px CSS). */
+const layout = page => page.evaluate(() => {
+  const vw = innerWidth, vh = innerHeight;
+  const vis = e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0 && !e.closest('[hidden]'); };
+  const box = e => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
+  const hit = (a, b) => a.l < b.r - .5 && a.r > b.l + .5 && a.t < b.b - .5 && a.b > b.t + .5;
+  const name = e => e.id || String(e.className || e.tagName).split(' ')[0];
+  const toolbar = [...document.querySelectorAll('.mla-bar .mla-btn')].filter(vis).map(box);
+  const own = [...document.querySelectorAll('#overlay .ov-col > *, #overlay > .ml-credit, #levelUp h2, #levelUp .card, #levelUp .sub, #ui, #timer, #score, #wave, .mlm-hud, #charToast')].filter(vis);
+  const outside = [], onToolbar = [], small = [];
+  for (const e of own) {
+    const b = box(e);
+    if (b.l < -1 || b.t < -1 || b.r > vw + 1 || b.b > vh + 1) outside.push(name(e));
+    if (toolbar.some(t => hit(b, t))) onToolbar.push(name(e));
+  }
+  for (const e of document.querySelectorAll('#overlay button, #levelUp button, .mla-bar .mla-btn')) {
+    if (!vis(e)) continue; const b = box(e);
+    if (b.w < 44 || b.h < 44) small.push(`${(e.textContent || '').trim().slice(0, 20)} ${Math.round(b.w)}×${Math.round(b.h)}`);
+  }
+  const hud = ['ui', 'timer', 'score', 'wave'].map(id => document.getElementById(id)).filter(vis).map(box);
+  const missions = [...document.querySelectorAll('.mlm-hud')].filter(vis).map(box);
+  const hudClash = [];
+  for (const m of missions) if (hud.some(h => hit(m, h))) hudClash.push('misiones/HUD');
+  if (hud.length === 4 && hit(hud[0], hud[1])) hudClash.push('vida/reloj');
+  return { vw, vh, scrollX: document.documentElement.scrollWidth > vw + 1, outside, onToolbar, small, hudClash, toolbar, hud, missions };
+});
+
+test.describe('Neon Survivor — móvil', () => {
+  test.describe.configure({ timeout: 240000 });
+
+  test('matriz de tamaños: menú, juego, Coloso y subir de nivel entran sin pisar la barra ni el HUD', async ({ page, hasTouch }) => {
+    test.skip(!hasTouch, 'sólo móvil');
+    for (const [w, h] of SIZES) {
+      const tag = `${w}×${h}`;
+      await page.setViewportSize({ width: w, height: h });
+      const { errors } = await openGame(page, DBG);
+      await ready(page);
+      // menú
+      let L = await layout(page);
+      expect(L.scrollX, tag).toBe(false);
+      expect(L.outside, tag + ' menú fuera de pantalla').toEqual([]);
+      expect(L.onToolbar, tag + ' menú bajo la barra').toEqual([]);
+      expect(L.small, tag + ' objetivos táctiles < 44 px').toEqual([]);
+      const pb = await page.locator('#playBtn').boundingBox();
+      expect(pb && pb.height, tag).toBeGreaterThanOrEqual(56);
+      expect(pb && pb.y + pb.height, tag).toBeLessThanOrEqual(h);
+      // el botón es lo que realmente recibe el toque en su centro
+      expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.id, [pb.x + pb.width / 2, pb.y + pb.height / 2]), tag).toBe('playBtn');
+      await page.tap('#playBtn');
+      await expect.poll(async () => (await N(page)).state, { timeout: 20000 }).toBe('play');
+      await H(page, '__neon.dbg.god(); __neon.dbg.calm();');
+      // juego: HUD, misiones y barra del SDK sin superponerse; pista del joystick visible y en pantalla
+      L = await layout(page);
+      expect(L.onToolbar, tag + ' HUD/misiones bajo la barra').toEqual([]);
+      expect(L.hudClash, tag).toEqual([]);
+      const hint = await H(page, '__neon.hint');
+      expect(hint, tag + ' pista del joystick').not.toBeNull();
+      expect(hint.x - 55).toBeGreaterThanOrEqual(0); expect(hint.x + 55).toBeLessThanOrEqual(w);
+      expect(hint.y + 55, tag).toBeLessThanOrEqual(h);
+      const ring = { l: hint.x - 55, t: hint.y - 55, r: hint.x + 55, b: hint.y + 55 };
+      for (const o of [...L.hud, ...L.missions, ...L.toolbar]) {
+        expect(ring.l < o.r && ring.r > o.l && ring.t < o.b && ring.b > o.t, `${tag} pista vs ${JSON.stringify(o)}`).toBe(false);
+      }
+      // cámara: el lado corto del mundo nunca baja de 440 u
+      const v = await H(page, '__neon.view');
+      expect(Math.min(v.W, v.H), tag).toBeGreaterThanOrEqual(439.5);
+      // barra del Coloso: entra en pantalla y no pisa el HUD, las misiones ni la barra del SDK
+      await H(page, '__neon.dbg.boss(W / 2, H / 3)');
+      const bb = await H(page, '__neon.bossBar');
+      const bossBox = { l: bb.x - 4, t: bb.y - 4, r: bb.x + bb.bw + 4, b: bb.y - 4 + bb.h };
+      expect(bossBox.l, tag).toBeGreaterThanOrEqual(0); expect(bossBox.r, tag).toBeLessThanOrEqual(w);
+      for (const o of [...L.hud, ...L.missions, ...L.toolbar]) {
+        const clash = bossBox.l < o.r && bossBox.r > o.l && bossBox.t < o.b && bossBox.b > o.t;
+        expect(clash, `${tag} barra del Coloso vs ${JSON.stringify(o)}`).toBe(false);
+      }
+      // subir de nivel: tarjetas enteras en pantalla, sobre las misiones y fuera de la barra
+      await H(page, 'orbs.push({ x: player.x, y: player.y, vx: 0, vy: 0, value: 8, r: 5, dead: false })');
+      await expect.poll(async () => (await N(page)).state, { timeout: 20000 }).toBe('levelup');
+      L = await layout(page);
+      expect(L.outside, tag + ' tarjetas fuera de pantalla').toEqual([]);
+      expect(L.onToolbar, tag + ' tarjetas bajo la barra').toEqual([]);
+      expect(L.small, tag).toEqual([]);
+      for (const m of L.missions) {
+        const top = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('#levelUp'), [(m.l + m.r) / 2, (m.t + m.b) / 2]);
+        expect(top, tag + ' el panel de mejoras tapa las misiones').toBe(true);
+      }
+      await wait(page, 350);
+      await page.locator('#cards .card').first().tap();
+      await expect.poll(async () => (await N(page)).state, { timeout: 20000 }).toBe('play');
+      expectNoErrors(errors);
+    }
+  });
+
+  test('partida sólo táctil: la pista guía, el joystick mueve, el disparo automático mata y el multitáctil no roba el control', async ({ page, hasTouch }) => {
+    test.skip(!hasTouch, 'sólo móvil');
+    const { errors } = await openGame(page, DBG);
+    await start(page, true);
+    await H(page, '__neon.dbg.god(); __neon.dbg.calm();');
+    expect(await H(page, '__neon.hint')).not.toBeNull();
+    const a = await N(page);
+    // dedo 1 arrastra a la derecha; a mitad de camino apoya un dedo 2 que tira para el otro lado
+    const cdp = await page.context().newCDPSession(page);
+    const T = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
+    await T('touchStart', [{ x: 150, y: 500, id: 1 }]);
+    for (let i = 1; i <= 6; i++) { await T('touchMove', [{ x: 150 + i * 12, y: 500, id: 1 }]); await wait(page, 30); }
+    await T('touchStart', [{ x: 222, y: 500, id: 1 }, { x: 300, y: 300, id: 2 }]);
+    for (let i = 1; i <= 5; i++) { await T('touchMove', [{ x: 222, y: 500, id: 1 }, { x: 300 - i * 20, y: 300, id: 2 }]); await wait(page, 30); }
+    await wait(page, 300);
+    expect(await H(page, '__neon.joy')).toBe(true);
+    await T('touchEnd', [{ x: 222, y: 500, id: 1 }]);
+    await T('touchEnd', []);
+    const b = await N(page);
+    expect(b.px - a.px).toBeGreaterThan(30);         // siguió mandando el primer dedo
+    expect(await H(page, '__neon.hint')).toBeNull();  // la pista se fue al encontrar el control
+    expect(await H(page, '__neon.joy')).toBe(false);
+    // acción principal: disparo automático al enemigo más cercano (simulación determinista)
+    const k = await H(page, `(() => { stopLoop(); const id = __neon.dbg.spawn('grunt', player.x + 120, player.y);
+      let n = 0; while (__neon.kills < 1 && n++ < 900) step(); startLoop(); return { kills: __neon.kills, steps: n }; })()`);
+    expect(k.kills).toBe(1);
+    expectNoErrors(errors);
+  });
+
+  test('girar el teléfono en plena partida: sigue jugando, conserva la posición relativa y reubica la UI', async ({ page, hasTouch }) => {
+    test.skip(!hasTouch, 'sólo móvil');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const { errors } = await openGame(page, DBG);
+    await start(page, true);
+    await H(page, '__neon.dbg.god(); __neon.dbg.calm(); __neon.dbg.boss(W / 2, H / 4); stopLoop(); player.x = W * .25; player.y = H * .75; draw();');
+    const before = await H(page, '({ v: __neon.view, rx: __neon.px / __neon.view.W, ry: __neon.py / __neon.view.H, t: __neon.time })');
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect.poll(() => H(page, '__neon.view.SW'), { timeout: 15000 }).toBe(844);
+    await wait(page, 100);
+    const after = await H(page, '({ v: __neon.view, rx: __neon.px / __neon.view.W, ry: __neon.py / __neon.view.H, st: __neon.state, cw: document.getElementById("game").getBoundingClientRect().width, bb: __neon.bossBar })');
+    expect(after.st).toBe('play');
+    expect(after.cw).toBe(844);
+    expect(after.v.SW).toBe(844);
+    expect(Math.min(after.v.W, after.v.H)).toBeGreaterThanOrEqual(439.5);
+    expect(after.rx).toBeCloseTo(before.rx, 2); expect(after.ry).toBeCloseTo(before.ry, 2);
+    // la barra del Coloso pasó a la fila superior (hay lugar entre la vida y el reloj)
+    expect(after.bb.y).toBeLessThan(40);
+    const L = await layout(page);
+    expect(L.onToolbar).toEqual([]); expect(L.hudClash).toEqual([]);
+    await H(page, 'startLoop()');
+    await expect.poll(async () => (await N(page)).time, { timeout: 15000 }).toBeGreaterThan(before.t + 0.3); // el reloj sigue corriendo
+    expectNoErrors(errors);
+  });
+
+  test('las misiones se atenúan si el dedo del joystick pasa por encima', async ({ page, hasTouch }) => {
+    test.skip(!hasTouch, 'sólo móvil');
+    const { errors } = await openGame(page, DBG);
+    await start(page, true);
+    await H(page, '__neon.dbg.god(); __neon.dbg.calm();');
+    const m = await page.locator('.mlm-hud').boundingBox();
+    expect(m).not.toBeNull();
+    const cdp = await page.context().newCDPSession(page);
+    const x = m.x + m.width / 2, y = m.y + m.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 10, y }] });
+    await expect(page.locator('.mlm-hud')).toHaveClass(/ns-dim/);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(page.locator('.mlm-hud')).not.toHaveClass(/ns-dim/);
+    expectNoErrors(errors);
+  });
+
+  test('PC: la cámara no cambia (escala 1) y no hay pista táctil', async ({ page, hasTouch }) => {
+    test.skip(hasTouch, 'sólo PC');
+    const { errors } = await openGame(page, FILE);
+    await start(page, false);
+    const v = await H(page, '__neon.view');
+    expect(v).toMatchObject({ vs: 1, W: 1280, H: 800 });
+    expect(await H(page, '__neon.hint')).toBeNull();
     expectNoErrors(errors);
   });
 });
