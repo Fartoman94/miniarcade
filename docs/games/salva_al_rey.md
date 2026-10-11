@@ -249,3 +249,43 @@ Con los monstruos lejos (aparición normal a ~50 u): 111 → 127 (Media) / 115 (
 - El modo paseo no recibió contenido nuevo (sólo lo visual: pasto, luz de contorno, calidad).
 - El piloto de balance no esquiva como una persona: sus números de supervivencia del héroe no son representativos; los del portón sirven para comparar.
 - Para cuando se actualice three.js (no en esta ronda): `MeshStandardMaterial`, frustum culling por lote en `InstancedMesh`.
+
+## Móvil
+
+Pasada mobile-first (2026-10-11). Probado sólo con emulación táctil de Chromium (Playwright, `hasTouch`/`isMobile`, DPR 2–3) en 360×640, 390×844, 412×915, 915×412 y 844×390. **No se probó en teléfonos reales** (ni iOS/Safari): safe-areas con muesca, vibración y rendimiento con GPU real quedan sin verificar.
+
+Capturas (tomadas con `?debug=1`, por eso aparece el contador de fps arriba): `.perf/mobile-salva/antes-<ancho>x<alto>-{menu,play}.png` y `.perf/mobile-salva/despues-<ancho>x<alto>-{menu,play}.png`, más `despues-360x640-over.png` y `despues-844x390-over.png` (fin de partida).
+
+### Problemas encontrados → corrección
+| Problema (dónde se vio) | Corrección |
+|---|---|
+| Menú vertical larguísimo: «Defender el reino» en y≈967 en 360×640 (scroll de 1566 px) y y≈890 en 390×844 | Menú compacto en ≤560 px: título en una línea, sin texto de historia, sin chips de teclado/controles (están en la ayuda), sin pie; descripciones de modo ocultas si la altura ≤760. Ahora el botón queda en y≈479 (360×640) y y≈432 (390×844), entero y fuera de la barra |
+| Menú apaisado (844×390, 915×412): la columna derecha cortada arriba y abajo, el selector de héroe debajo de la barra del arcade | Dos columnas compactas (sin descripciones ni encabezado, título en una línea, `align-items:safe center`, margen inferior para la barra): entra todo sin desplazar |
+| Placa de fin de partida tocando la barra del arcade (360×640 llegaba a y=596, la barra empieza en 584; esquina pisada en 844×390) | Relleno inferior y placa compacta en celular |
+| Pellizco espurio: mover con el joystick y girar la cámara con el otro pulgar se tomaba como pellizco (zoom), **soltaba el joystick y el héroe se frenaba** | El pellizco sólo se arma con dos dedos del lado de la cámara; joystick + cámara funcionan a la vez |
+| Por lectura de código (no reproducido): tocar el lado de la cámara o el joystick podía disparar además un golpe por el `mousedown` de compatibilidad | `preventDefault` en el `pointerdown` táctil del canvas |
+| Chips de misiones abajo a la izquierda, justo donde apoya el pulgar del joystick | En táctil: vertical, debajo de las barras del rey/portón (y más abajo si hay jefe, clase `boss-on`); apaisado, debajo del marcador de la izquierda |
+| Celular vertical: FOV de 60° vertical = ~36° horizontales, los monstruos de los costados no se veían | En pantallas más altas que anchas el FOV se abre hasta 80° (~50° horizontales) y la cámara mira hasta 3 u por delante del héroe (queda más abajo, se ve más camino). Apaisado y PC: sin cambios (60°) |
+| Flechas de amenaza (💀🆘🪵🚪👑) con límites fijos: podían quedar debajo de la barra del jefe, las misiones o la barra del arcade | Los límites se calculan con lo que realmente ocupa cada elemento en esa columna (cacheado cada 0,5 s y al cambiar de tamaño/jefe) |
+| Marca «CREADO POR MATELABS» abajo al centro, debajo del ⚔️ en vertical | En táctil va a la izquierda, arriba de la barra |
+| Textos de 8–10 px (EL REY, PORTÓN, MONSTRUOS, FASE, SALTO, marca, «CREADO POR») | ≥11 px en táctil |
+| Aro del joystick cortado si el dedo apoya contra el borde | El aro se dibuja entero dentro de la pantalla (la dirección sigue midiéndose desde donde apoyó el dedo) |
+| Botones ⚔️/⬆️ sin margen para muesca/barra de inicio | `env(safe-area-inset-*)` en sus posiciones |
+| `maximum-scale=1, user-scalable=no` en el viewport | Quitado; el canvas y el `body` tienen `touch-action:none`, los menús `pan-y` (se desplazan sin zoom) |
+| Asistencia de apuntado con radio 3,8 < alcance del golpe 4,3: un enemigo a ~4 m no giraba al héroe y el golpe fallaba | El radio es el alcance real (más el radio del jefe); sólo táctil, PC sin cambios |
+| Hay que machacar ⚔️ | ⚔️ mantenido = golpe continuo (respeta la recarga de 0,45 s); sólo táctil |
+| Rotar a mitad de partida | `orientationchange` suelta joystick/cámara; el resize reajusta FOV, flechas y controles sin tocar el estado |
+
+Otros: aviso suave y no bloqueante «📱↻ Girá el teléfono: se ve más» en el menú, sólo en táctil vertical (el juego sigue siendo jugable en vertical). La vibración se apaga con «reducir movimiento». La pausa al ir al fondo la hace el SDK (`visibilitychange`), y el `AudioContext` se suspende/reanuda en `onPause`/`onResume` (reanudar es un toque). Calidad automática en táctil = Media (la resuelve el SDK, DPR tope 1,25); sin cambios.
+
+### Pruebas (`describe('móvil')`, sólo proyecto mobile)
+- Matriz 360×640 / 390×844 / 412×915 / 915×412 / 844×390: sin scroll horizontal; «Defender el reino» entero en pantalla, ≥56 px de alto y fuera de la barra; en apaisado todo el menú dentro y sin pisar la barra; objetivos táctiles ≥44 px (dificultad, modos, héroe, barra); aviso de giro sólo en vertical; partida arrancada con un toque; con jefe en pantalla, HUD, barra del jefe, misiones, ⚔️, ⬆️ y barra del arcade dentro de la pantalla y sin superponerse de a pares; textos ≥11 px; FOV >70 en vertical y 60 en apaisado; joystick mueve y ⚔️ golpea sólo con toques; la placa de fin de partida entra y no la tapa la barra.
+- Multitáctil: joystick + girar cámara a la vez (el joystick sigue activo, la cámara gira, no hay zoom, el héroe se mueve).
+- ⚔️ mantenido golpea 2+ veces a un ogro de costado (la asistencia lo gira).
+- Girar el teléfono en plena partida mantiene estado y reacomoda; ir al fondo pausa.
+
+Resultado: `ML_WORKERS=1` → 59 passed, 5 skipped (7.3 min); `ML_WORKERS=4` → 59 passed, 5 skipped (6.1 min). Escritorio 27 passed + 5 skipped (los táctiles); móvil 32 de 32 passed.
+
+### Pendientes
+- Probar en teléfonos reales (Android e iOS), en especial muesca/safe-area, vibración y fps con GPU real.
+- El selector de héroe (compartido, `matelabs/characters.js`) deja un hueco vacío grande debajo de las tarjetas en celular: lo resolvería un cambio en el archivo compartido.

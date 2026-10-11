@@ -231,3 +231,39 @@ Con 60 cuadros por segundo de página, el garaje dibuja unos 30 por segundo en m
 - El récord global sigue siendo uno solo (no por dificultad); la separación está en el ranking local.
 - Idea para cuando se actualice three.js (no en esta ronda): `MeshStandardMaterial` + PMREM para la pintura e `InstancedMesh` para el tráfico.
 - El modo Duelo es siempre contra EL CÓNDOR a 3 km; no hay selector de pista (cada modo arranca en su bioma).
+
+## Móvil
+
+Pasada mobile-first (11/10/2026). Todo verificado con Chromium headless + emulación táctil (DPR 2) y en el proyecto `mobile` (Pixel 7). **No probado en teléfonos reales.**
+
+Capturas antes/después (garaje, ranking, carrera y pantalla final) en `.perf/mobile-turbo_furia/{before,after}-<ancho>x<alto>-{menu,rank,play,over}.png` para 360×640, 390×844, 412×915, 915×412 y 844×390; además `after-{360x640,844x390}-play-{contrarreloj,duelo}.png`.
+
+### Problemas encontrados → arreglo
+
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| Garaje 360×640: la ficha tapaba el crédito MateLabs y medio título; las flechas ‹ › quedaban encima de la ficha; el vehículo no se veía | Vertical bajo: título y crédito en una fila, sin descripción ni ayuda de teclado; `layoutGarage()` mide el hueco real entre título y ficha y ubica ahí flechas y vehículo (cámara con `setViewOffset` + zoom) — se recalcula con `ResizeObserver` (cambia con modo, bloqueo, fuentes, rotación) |
+| Garaje en vertical ≤ 500 px: la etiqueta «CARRERAS 3D · PC + CELULAR» quedaba debajo de la barra del arcade | Se oculta en pantallas angostas; el bloque del título baja a 56 px |
+| Garaje apaisado 844×390 / 915×412: «¡A LA RUTA!» cortado al fondo de la ficha (había que scrollear para largar) | Barras de stats en una fila, ficha más compacta; además los botones van `position:sticky` al pie de la ficha, así el principal siempre está a la vista aunque la ficha scrollee (vehículo bloqueado) |
+| Botones de modo 37 px, dificultad sin entrar en una fila a 360, botón principal 40–49 px | Táctil: modos 44 px, principal 56 px (garaje y pantalla final), secundarios 48 px; dificultad en una fila a 360 |
+| Carrera vertical: las 3 fichas de misiones pisaban «PUNTOS» (todas las alturas en vertical) y el bioma se metía debajo de las fichas a 360 | `layoutHud()` pone los puntos/reloj/duelo debajo de las fichas reales (`ResizeObserver`); bioma con menos espaciado en angosto. «CASI ×n» y el aviso de obras bajan a 31 %/39 % en vertical |
+| Dirección táctil absoluta: el auto saltaba a la posición del dedo; con un pulgar en NITRO no se podía llegar al otro lado; apoyar el dedo sin querer cambiaba de carril | Dirección **relativa**: se mueve lo que se desliza el dedo desde donde apoyó (todo el ancho de la ruta ≈ 60 % del lado corto de la pantalla), re-ancla al tocar el borde; un toque quieto no mueve el auto; un solo dedo dirige |
+| No había ayuda táctil (los chips de controles están ocultos en celular) | Aviso «👆 DESLIZÁ EL DEDO PARA DOBLAR» en las 3 primeras carreras táctiles (se va al tocar o 1,8 s después del ¡YA!) y texto de ayuda táctil en el garaje |
+| Viewport con `maximum-scale=1, user-scalable=no` | Quitado; el cuerpo ya tiene `touch-action:none` y la ficha/ranking/pantalla final usan `pan-y` (scroll interno sin zoom) |
+| Pedales sin margen para notch/barra de inicio | `env(safe-area-inset-*)` en pedales, velocímetro y ficha; vibración corta (8 ms) al apretar FRENO/NITRO salvo con «reducir movimiento» |
+| Dedo que seguía sobre NITRO/FRENO al chocar podía disparar «OTRA VEZ»/«GARAJE» al aparecer la pantalla final; quedaba el pedal encendido | Esos botones ignoran toques durante 600 ms; `releaseInput()` al terminar |
+| Ranking a 360×640 tocaba la barra del arcade | Margen superior de 64 px |
+| Texto chico: marca 8 px, bioma/NITRO 10 px, etiquetas del garaje 9–10 px | 11 px mínimo; descripciones/ayuda 12 px |
+
+Sin cambios porque ya estaba bien: cámara vertical (`fitCamera` ya abre el FOV y aleja la cámara; los 4 carriles se ven), pausa en segundo plano (el SDK pausa con `visibilitychange`, el loop se detiene y el audio se suspende; se reanuda tras gesto), calidad automática (el SDK elige «media» en táctil, DPR ≤ 1,5; sin sombras), rotación a mitad de carrera (ya redimensionaba; ahora también re-ubica garaje y HUD). Ambas orientaciones son jugables: no hay aviso de girar el teléfono (apaisado muestra más ruta, vertical más hacia adelante).
+
+### Pruebas
+
+Nuevo bloque `TURBO FURIA · móvil` (sólo proyecto `mobile`): matriz de 5 tamaños (sin scroll, UI propia dentro de la pantalla y sin pisar la barra del arcade ni las misiones, flechas fuera de la ficha, objetivos ≥ 44 px, pedales y botón principal ≥ 56 px, `elementFromPoint` del principal es el botón, largada sólo con toques, doblar deslizando + NITRO con un segundo dedo a la vez), gestos (sin `user-scalable=no`, `touch-action:none`, toque quieto no dobla, sin scroll/zoom), rotación a mitad de carrera, pantalla final y ranking a 360×640 con el bloqueo de toques recién aparecida, segundo plano. La prueba táctil existente pasó a deslizar (antes mantenía el dedo quieto en el borde).
+
+Spec completo (11/10/2026): `ML_WORKERS=1` → **48 passed, 10 skipped (9,5 min)**; `ML_WORKERS=4` → **48 passed, 10 skipped (5,1 min)**. Desktop 19 passed + 10 skipped (las táctiles/móvil), mobile 29 passed.
+
+### Pendientes / NO PROBADO (móvil)
+
+- Sin teléfono real: notch/safe-area, vibración, rendimiento con GPU de celular y comodidad real de la sensibilidad de dirección (≈ 216 px de deslizamiento para todo el ancho a 360 px) sólo se verificaron en emulación.
+- En la costa de día, «RÉCORD» y la línea de modo en apaisado se leen con poco contraste sobre arena/cielo claros (sombra de texto solamente).

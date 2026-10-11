@@ -17,7 +17,7 @@
   html,body{height:100%;overflow:hidden}
   body{background:#87ceeb;font-family:'Nunito',system-ui,sans-serif;color:#20344a;
        user-select:none;-webkit-user-select:none;cursor:default}
-  #cv{position:fixed;inset:0;display:block}
+  #cv{position:fixed;inset:0;display:block;touch-action:none}
 
   #hud{position:fixed;inset:0;pointer-events:none;z-index:5;display:none}
   #hud.show{display:block}
@@ -174,14 +174,65 @@
        background:rgba(160,40,30,.72);padding:5px 14px;border-radius:999px;letter-spacing:.05em;white-space:nowrap;display:none}
   #bossBar.show{display:block}
   /* misiones (matelabs/missions.js) abajo a la izquierda; en táctil, arriba de los botones ◀ ▶ */
-  body.touch .mlm-hud.bl{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 92px)}
-  @media (max-height:430px){body.touch .mlm-hud.bl{bottom:84px}}
+  body.touch .mlm-hud.bl{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 92px);left:max(14px,env(safe-area-inset-left))}
   @media (max-width:760px){#bossBar{left:16px;top:100px;transform:none;font-size:12px}
     body.boss-on #narr{top:140px}}
   @media (max-width:500px){.mWrap{gap:10px}.mStats{gap:6px}.mStat{padding:4px 10px;font-size:10px}.mStat b{font-size:15px}
     .mTitle{font-size:clamp(48px,14vw,80px)}.btn{padding:13px 26px;font-size:20px}}
   @media (max-height:430px){.mPicks{gap:4px 16px}#diffPick .mlm-diff button{padding:4px 10px;font-size:11px}#diffNote{display:none}
     #diffPick .mlm-diff{gap:3px}}
+
+  /* ---------- MÓVIL (pasada mobile-first) ----------
+     Apaisado bajo: el lienzo reserva la franja de los botones (ver resize()), así el piso, el jugador y
+     las trampas quedan ARRIBA de ◀ ▶ / SALTAR. Las misiones suben a la izquierda bajo el nombre del nivel
+     (abajo tapaban al jugador) y el narrador se angosta para no pisarlas ni al contador de muertes. */
+  #narr{width:max-content} /* con left:50% el ancho disponible era la mitad: cortaba en 3 renglones */
+  #charPick .mlc-title,#diffPick .mlm-diff-t{font-size:12px}
+  .mCredit small{font-size:11px}
+  body.touch .mlm-m{font-size:12px}
+  .tcB{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .06s,background-color .06s}
+  #tc{touch-action:none}
+  body.touch .btn{min-height:56px}
+  .mRot{display:none;font-size:12px;font-weight:800;color:#2c4a66;background:rgba(255,255,255,.6);border-radius:999px;padding:4px 12px}
+  @media (orientation:portrait){body.touch .mRot{display:block}}
+  @media (max-width:600px){body.touch .mWrap{padding-top:62px}}
+  /* vertical angosto: la barra del SDK (4 botones de 44 px) ocupa la primera franja: el nombre del nivel,
+     la meta, el jefe y el narrador bajan una fila para no quedar debajo de ella */
+  @media (max-width:600px){
+    body.touch .hud-l{top:calc(max(6px,env(safe-area-inset-top)) + 54px);max-width:calc(100vw - 150px)}
+    body.touch #goal{top:calc(max(6px,env(safe-area-inset-top)) + 112px)}
+    body.touch #bossBar{top:calc(max(6px,env(safe-area-inset-top)) + 150px)}
+    body.touch #narr{top:calc(max(6px,env(safe-area-inset-top)) + 160px)}
+    body.touch.boss-on #narr{top:calc(max(6px,env(safe-area-inset-top)) + 190px)}
+  }
+  /* pantalla final: compacta en celular (antes se cortaba abajo en 360×640 y en apaisado) */
+  @media (max-width:600px){
+    body.touch #over{padding-top:58px}
+    #over .cardP{padding:16px 16px}#over .cardP .em{font-size:44px}
+    #over .stats{gap:6px;margin:10px 0 2px}#over .st{min-width:0;flex:1 1 0;padding:6px 6px}#over .st b{font-size:19px}
+    #over .btns{gap:8px;margin-top:10px}
+  }
+  @media (max-height:500px) and (orientation:landscape){
+    #over .cardP{padding:10px 22px;max-width:min(92vw,640px)}#over .cardP .em{font-size:34px}
+    #over .cardP h2{font-size:clamp(24px,7vh,32px);margin:2px 0}#over .cardP p{font-size:13px;max-width:60ch}
+    #over .stats{margin:6px 0 2px}#over .st{padding:4px 12px}#over .st b{font-size:18px}
+    #over .btns{margin-top:8px}#over .creditFoot{margin-top:6px}
+  }
+  @media (max-width:500px) and (max-height:720px){.mTag{font-size:13px;line-height:1.4}.mWrap{gap:8px}}
+  @media (max-height:500px) and (orientation:landscape){
+    body.touch .mlm-hud.bl{top:calc(max(10px,env(safe-area-inset-top)) + 54px);bottom:auto}
+    body.touch .hud-l{left:max(16px,env(safe-area-inset-left))}
+    #goal{left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);font-size:14px;padding:5px 14px}
+    #goal .gl{display:none}
+    #lvlName{font-size:20px}#lvlSub{font-size:11px}
+    #bossBar{left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 36px);transform:translateX(-50%);font-size:12px}
+    #narr,body.boss-on #narr{top:calc(max(10px,env(safe-area-inset-top)) + 70px);font-size:clamp(18px,3vw,26px);max-width:calc(100vw - 400px)}
+    .mTag,body.touch .mTouch{display:none}
+    .mTitle br{display:none}.mTitle em::before{content:"\a0"}.mTitle{font-size:clamp(34px,10vh,56px);margin:4px 0 6px}
+    .mBadge{font-size:11px;padding:4px 14px}
+    #menu .mWrap{gap:6px;padding:8px 12px}
+    .mCredit{margin-top:0}.mBadge{margin-top:2px}
+  }
 
   #nogl{position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;
        padding:30px;text-align:center;font-size:15px;line-height:1.8;background:#87ceeb;font-weight:700}
@@ -193,7 +244,7 @@
 
 <div id="hud">
   <div class="hud-l"><div id="lvlName">NIVEL 1</div><div id="lvlSub">EL PASEO INOCENTE</div></div>
-  <div id="goal">🏁 LLEGÁ A LA META · <b id="goalD">0 m</b></div>
+  <div id="goal">🏁 <span class="gl">LLEGÁ A LA META · </span><b id="goalD">0 m</b></div>
   <div id="bossBar"></div>
   <div class="hud-r"><div id="deathCt">💀 <b id="dN">0</b></div><div id="best">RÉCORD: 0/6</div><div id="extra"></div></div>
   <div id="ctrl">⬅➡ / A D — caminar · ESPACIO / ⬆ / W — saltar · R — reiniciar</div>
@@ -218,6 +269,7 @@
       <button class="btn o" id="act2Btn" type="button" hidden>🔥 ACTO 2</button>
       <button class="btn b" id="muteBtn" type="button">🔊 SONIDO: SÍ</button>
     </div>
+    <div class="mRot" id="mRot">📱↻ Mejor con el teléfono acostado</div>
     <div class="mPicks"><div id="charPick"></div><div id="diffPick"><div id="diffNote"></div></div></div>
     <div class="mStats">
       <div class="mStat">RÉCORD<b id="mBest">0/6</b></div>
@@ -280,13 +332,31 @@ let QC=QCFG[Q];
    el horizonte (OFFY) para no dejar media pantalla de tierra. W/H = tamaño de la vista en
    unidades de mundo; la vista cubre y ∈ [TOP, BOT]. El lienzo respeta devicePixelRatio (tope según calidad). */
 let SW=innerWidth,SH=innerHeight,DPR=1,VS=1,OFFY=0,W=SW,H=SH,TOP=0,BOT=SH;
+/* Táctil: BAND = alto (px) de la franja de botones ◀ ▶ / SALTAR; CAM_MIN = tope izquierdo de la cámara
+   (negativo en apaisado táctil: al arrancar el nivel el jugador no queda encima de ◀ ▶). */
+let BAND=0,CAM_MIN=0;
+const isTouch=()=>document.body.classList.contains('touch');
+const pm=(a,m)=>((a%m)+m)%m; // módulo positivo (la cámara puede ser negativa)
 function applyView(){ctx.setTransform(DPR*VS,0,0,DPR*VS,0,DPR*VS*OFFY);}
 function resize(){
   SW=innerWidth;SH=innerHeight;DPR=Math.min(QC.dpr,window.devicePixelRatio||1);
   cv.width=Math.round(SW*DPR);cv.height=Math.round(SH*DPR);
   cv.style.width=SW+'px';cv.style.height=SH+'px';
   VS=Math.max(.4,Math.min(1,SH/560,SW/700));
-  W=SW/VS;H=SH/VS;OFFY=Math.max(0,(H-600)*.5);TOP=-OFFY;BOT=H-OFFY;
+  OFFY=Math.max(0,(SH/VS-600)*.5);
+  BAND=0;CAM_MIN=0;
+  if(isTouch()){
+    /* mismo tamaño que el CSS de .tcB.j (88 px; 74 px con alto ≤ 430) + margen inferior (safe area) */
+    let pad=14;try{pad=parseFloat(getComputedStyle($('tc')).paddingBottom)||14;}catch(e){}
+    BAND=(SH<=430?74:88)+pad+6;
+    /* si el piso cae detrás de los botones (celular apaisado), se achica la vista hasta que entre arriba */
+    if((GY+OFFY)*VS>SH-BAND){
+      VS=Math.max(.4,Math.min(VS,(SH-BAND)/(GY+6)));OFFY=0;
+      const leftClear=14+(SH<=430?62:74)*2+12+24; // ◀ ▶ + separación
+      CAM_MIN=Math.min(0,120-leftClear/VS);
+    }
+  }
+  W=SW/VS;H=SH/VS;TOP=-OFFY;BOT=H-OFFY;
   skyCache.key='';
   applyView();
 }
@@ -728,7 +798,7 @@ function buildLevel(i){
   clearParts();floats=[];
   shake=0;slow=1;slowT=0;
   resetPlayer(cpX||120);
-  camX=clamp(P.x-W*.36,0,Math.max(0,lvlEnd(L)+300-W));lookX=0;
+  camX=clamp(P.x-W*.36,CAM_MIN,Math.max(0,lvlEnd(L)+300-W));lookX=0;
   $('lvlName').textContent='NIVEL '+(i+1);
   $('lvlSub').textContent=L.name;
   $('goalD').textContent=Math.round((goalX-P.x)/100)+' m';
@@ -1184,7 +1254,7 @@ function updateParts(dt){
 function updateCam(dt){
   const L=LEVELS[lvlIdx];
   if(!P.dead){const want=P.face*Math.min(W*.08,90)*clamp(Math.abs(P.vx)/200,0,1);lookX+=(want-lookX)*Math.min(1,dt*2.2);}
-  const tx=clamp(P.x-W*.36+lookX,0,Math.max(0,lvlEnd(L)+300-W));
+  const tx=clamp(P.x-W*.36+lookX,CAM_MIN,Math.max(0,lvlEnd(L)+300-W));
   camX+=(tx-camX)*Math.min(1,dt*6);
   shake=Math.max(0,shake-dt*40);
 }
@@ -1241,7 +1311,7 @@ function getLayers(name){
 let layersDrawn=0;
 function drawLayer(L,k){
   const img=L[k];if(!img)return;
-  let x=-((camX*PAR[k])%LW);
+  let x=-pm(camX*PAR[k],LW);
   for(;x<W;x+=LW){ctx.drawImage(img,x,GY+2-LH,LW,LH);layersDrawn++;}
 }
 /* brillos pre-dibujados (sol, faroles): sin gradientes nuevos por cuadro */
@@ -1313,7 +1383,7 @@ function drawGround(th,gapList){
   ctx.fillRect(0,GY+34,W,BOT-GY-34);
   /* textura */
   ctx.fillStyle='rgba(0,0,0,.08)';
-  for(let x=-((camX*.99)%60);x<W;x+=60)ctx.fillRect(x,GY+14,30,6);
+  for(let x=-pm(camX*.99,60);x<W;x+=60)ctx.fillRect(x,GY+14,30,6);
   /* decoración por tema */
   if(th.deco==='arboles'){
     for(let i=0;i<8;i++){
@@ -1916,8 +1986,11 @@ addEventListener('keyup',e=>{
   if(e.code==='Space'||e.key==='ArrowUp'||e.key==='w'||e.key==='W')keys.jump=false;
 });
 addEventListener('blur',clearInput);
-function markTouch(e){if(e.pointerType==='touch'||e.pointerType==='pen')document.body.classList.add('touch');}
-if(matchMedia('(pointer:coarse)').matches)document.body.classList.add('touch');
+function setTouchUI(){document.body.classList.add('touch');const t=document.querySelector('#card .tip');if(t)t.textContent='TOCÁ PARA SEGUIR';resize();}
+function markTouch(e){if((e.pointerType==='touch'||e.pointerType==='pen')&&!isTouch())setTouchUI();}
+if(matchMedia('(pointer:coarse)').matches)setTouchUI();
+/* vibración corta opcional (no con «reducir movimiento») */
+const buzz=ms=>{if(reduceMotion||!navigator.vibrate)return;try{navigator.vibrate(ms);}catch(e){}};
 cv.addEventListener('pointerdown',e=>{
   audio();markTouch(e);
   if(state==='card'){dismissCard();return;}
@@ -1934,11 +2007,18 @@ for(const [id,z] of [['tcL','L'],['tcR','R'],['tcJ','J']]){
   b.addEventListener('pointerdown',e=>{
     e.preventDefault();audio();
     if(state==='card'){dismissCard();return;}
-    ptrs.set(e.pointerId,z);syncPtrs();if(z==='J')jumpBuf=.12;
+    ptrs.set(e.pointerId,z);syncPtrs();if(z==='J'){jumpBuf=.12;buzz(8);}
   });
   b.addEventListener('contextmenu',e=>e.preventDefault());
 }
 const ptrUp=e=>{if(ptrs.delete(e.pointerId))syncPtrs();};
+/* el pulgar puede deslizarse de ◀ a ▶ (y al revés) sin levantar el dedo */
+addEventListener('pointermove',e=>{
+  const z=ptrs.get(e.pointerId);if(z!=='L'&&z!=='R')return;
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const nz=el&&el.id==='tcL'?'L':el&&el.id==='tcR'?'R':z;
+  if(nz!==z){ptrs.set(e.pointerId,nz);syncPtrs();}
+});
 addEventListener('pointerup',ptrUp);
 addEventListener('pointercancel',ptrUp);
 
@@ -2032,7 +2112,7 @@ if(ML){
 addEventListener('pageshow',e=>{if(e.persisted&&exited){exited=false;last=performance.now();loop();}});
 const hook={get state(){return state;},get lvl(){return lvlIdx;},get deaths(){return deaths;},
   get best(){return best;},get best2(){return best2;},get act(){return act;},get paused(){return paused;},get muted(){return muted;},P,
-  get goal(){return goalX;},get traps(){return traps;},get view(){return {VS,W,H,OFFY,DPR};},get time(){return time;},
+  get goal(){return goalX;},get traps(){return traps;},get view(){return {VS,W,H,OFFY,DPR,BAND,CAM_MIN};},get camX(){return camX;},get time(){return time;},
   /* personaje (sólo lectura): elegido, el que realmente se dibuja, pose visible y estado lógico */
   get char(){return charSel;},get charDrawn(){return useMati()?'mati':'clasico';},get charLoad(){return matiState;},
   get pose(){return pose;},get poseState(){return poseState;},get collider(){return {w:P.w,h:P.h};},

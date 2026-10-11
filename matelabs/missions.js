@@ -104,8 +104,8 @@
   .mlm-m .p{opacity:.8;font-variant-numeric:tabular-nums}
   .mlm-m.done{background:rgba(26,90,40,.7);border-color:#6be38a}
   .mlm-m.failed{opacity:.45;text-decoration:line-through}
-  .mlm-toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-8px);z-index:2147481500;pointer-events:none;opacity:0;
-    padding:10px 16px;border-radius:14px;background:linear-gradient(180deg,#1d4a2a,#0f2a18);border:1.5px solid #6be38a;color:#eaffef;
+  .mlm-toast{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top));transform:translate(-50%,-8px);max-width:min(86vw,360px);z-index:2147481500;pointer-events:none;opacity:0;
+    padding:8px 14px;border-radius:14px;background:linear-gradient(180deg,#1d4a2a,#0f2a18);border:1.5px solid #6be38a;color:#eaffef;
     font:800 14px system-ui,sans-serif;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.45);transition:opacity .25s,transform .25s}
   .mlm-toast.on{opacity:1;transform:translate(-50%,0)}
   .mlm-toast small{display:block;font-size:10px;letter-spacing:.2em;opacity:.8}

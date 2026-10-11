@@ -520,3 +520,157 @@ test.describe('MUERTE GLORIOSA', () => {
     expectNoErrors(errors);
   });
 });
+
+/* ---------- MÓVIL: matriz de tamaños + partida sólo táctil (proyecto mobile, Pixel 7) ---------- */
+test.describe('MUERTE GLORIOSA · móvil', () => {
+  test.describe.configure({ timeout: 180_000 });
+  test.beforeEach(async ({ page }) => { await page.addInitScript(() => { try { Object.defineProperty(navigator, 'getGamepads', { value: () => [], configurable: true }); } catch (e) {} }); });
+  const DBG = FILE + '?debug=1';
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+
+  test('matriz de tamaños: menú entra, toques ≥ 44 px, HUD/misiones/botones sin pisarse y el piso arriba de los botones', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo proyecto mobile (táctil)');
+    const { errors } = await openGame(page, DBG);
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 250);
+      const m = await page.evaluate(() => {
+        const R = e => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
+        const vis = e => { const cs = getComputedStyle(e); const r = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+        const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+        document.getElementById('menu').scrollTop = 0;
+        const sdk = [...document.querySelectorAll('.mla-bar button')].filter(vis).map(R);
+        const small = [...document.querySelectorAll('#menu button')].filter(vis).map(b => ({ id: b.id || b.textContent.trim().slice(0, 20), ...R(b) }))
+          .filter(b => b.h < 44 || b.w < 44).map(b => `${b.id} ${Math.round(b.w)}×${Math.round(b.h)}`);
+        const own = ['.mBadge', '.mTitle', '#playBtn'].map(q => document.querySelector(q)).filter(vis).map(e => ({ q: e.className || e.id, ...R(e) }));
+        const underBar = own.filter(o => sdk.some(s => hit(o, s))).map(o => o.q);
+        const play = R(document.getElementById('playBtn'));
+        const tiny = [...document.querySelectorAll('#menu *')].filter(e => vis(e) && e.childElementCount === 0 && e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 11).map(e => e.textContent.trim().slice(0, 20));
+        return { small, underBar, play, H: innerHeight, W: innerWidth, sw: document.documentElement.scrollWidth, tiny };
+      });
+      const tag = `${w}×${h}`;
+      expect(m.sw, tag + ' scroll horizontal').toBeLessThanOrEqual(m.W);
+      expect(m.small, tag + ' botones chicos').toEqual([]);
+      expect(m.tiny, tag + ' texto < 11px').toEqual([]);
+      expect(m.underBar, tag + ' menú bajo la barra del SDK').toEqual([]);
+      expect(m.play.b, tag + ' JUGAR visible').toBeLessThanOrEqual(m.H);
+      expect(m.play.h, tag + ' alto de JUGAR').toBeGreaterThanOrEqual(56);
+      // JUGAR con un toque real
+      // (bajo carga el primer toque puede llegar antes de que el menú termine de acomodarse: se reintenta)
+      await expect.poll(async () => { if ((await mg(page)).state === 'menu') await page.locator('#playBtn').tap(); return (await mg(page)).state; }, { timeout: 20000 }).toBe('play');
+      // cada nombre de nivel + barra del jefe + narrador visibles a la vez: nada se pisa
+      for (const lvl of [0, 2, 8]) {
+        await page.evaluate(l => { const g = /** @type {any} */ (window).__mg; g.debug.goto(l); g.debug.god(true); }, lvl);
+        await wait(page, 120);
+        const r = await page.evaluate(() => {
+          const R = e => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
+          const vis = e => { const cs = getComputedStyle(e); const r = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+          const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+          const bb = document.getElementById('bossBar'); bb.textContent = '🏗️ LA GRÚA LOCA · FASE 1/3 · apagala al final'; bb.classList.add('show'); document.body.classList.add('boss-on');
+          const nr = document.getElementById('narr'); nr.textContent = 'NIVEL 9 — LA FÁBRICA DE PRENSAS'; nr.style.animation = 'none'; // sin el zoom de entrada (transitorio)
+          const els = { hudL: '.hud-l', goal: '#goal', hudR: '.hud-r', boss: '#bossBar', narr: '#narr', chips: '.mlm-hud', tcL: '#tcL', tcR: '#tcR', tcJ: '#tcJ' };
+          const rr = {};
+          for (const [k, q] of Object.entries(els)) { const e = document.querySelector(q); if (e && vis(e)) rr[k] = R(e); }
+          const sdk = [...document.querySelectorAll('.mla-bar button')].filter(vis).map(R);
+          const keys = Object.keys(rr), bad = [];
+          for (let i = 0; i < keys.length; i++) {
+            const a = rr[keys[i]];
+            if (a.l < -1 || a.t < -1 || a.r > innerWidth + 1 || a.b > innerHeight + 1) bad.push(keys[i] + ' fuera de pantalla');
+            if (sdk.some(s => hit(a, s))) bad.push(keys[i] + ' × barra SDK');
+            for (let j = i + 1; j < keys.length; j++) if (hit(a, rr[keys[j]])) bad.push(keys[i] + ' × ' + keys[j]);
+          }
+          bb.classList.remove('show'); document.body.classList.remove('boss-on'); nr.textContent = ''; nr.style.animation = '';
+          const g = /** @type {any} */ (window).__mg, v = g.view;
+          const groundY = (470 + v.OFFY) * v.VS;
+          const btnTop = Math.min(rr.tcL.t, rr.tcR.t, rr.tcJ.t);
+          const sizes = ['tcL', 'tcR', 'tcJ'].map(k => Math.min(rr[k].w, rr[k].h));
+          return { bad, groundY, btnTop, sizes, sw: document.documentElement.scrollWidth, W: innerWidth };
+        });
+        const t2 = `${tag} nivel ${lvl + 1}`;
+        expect(r.bad, t2).toEqual([]);
+        expect(r.groundY, t2 + ' piso arriba de los botones').toBeLessThanOrEqual(r.btnTop);
+        expect(Math.min(...r.sizes), t2).toBeGreaterThanOrEqual(56);
+        expect(r.sw).toBeLessThanOrEqual(r.W);
+      }
+      // en apaisado el jugador arranca a la derecha de ◀ ▶ (antes quedaba detrás)
+      await page.evaluate(() => /** @type {any} */ (window).__mg.debug.goto(0));
+      await wait(page, 150);
+      const px = await page.evaluate(() => { const g = /** @type {any} */ (window).__mg, v = g.view; return { x: (g.P.x - g.camX) * v.VS, r: document.getElementById('tcR').getBoundingClientRect().right }; });
+      if (w > h) expect(px.x, tag + ' jugador detrás de ◀ ▶').toBeGreaterThan(px.r);
+      await page.goto('/' + DBG);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('partida sólo táctil: caminar, saltar, deslizar ◀→▶ y sin zoom/scroll del lienzo', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo proyecto mobile (táctil)');
+    const { errors } = await openGame(page, DBG);
+    await page.locator('#playBtn').tap();
+    await expect.poll(async () => (await mg(page)).state).toBe('play');
+    expect(await page.evaluate(() => getComputedStyle(document.getElementById('cv')).touchAction)).toBe('none');
+    expect(await page.evaluate(() => document.body.classList.contains('touch'))).toBe(true);
+    // mantener ◀ y deslizar el mismo dedo hasta ▶: pasa a caminar a la derecha sin levantarlo
+    const L = await page.locator('#tcL').boundingBox(), Rb = await page.locator('#tcR').boundingBox();
+    const at = b => ({ clientX: b.x + b.width / 2, clientY: b.y + b.height / 2 });
+    await page.dispatchEvent('#tcL', 'pointerdown', { pointerId: 21, pointerType: 'touch', isPrimary: true, bubbles: true, ...at(L) });
+    await expect(page.locator('#tcL')).toHaveClass(/\bon\b/);
+    await page.evaluate(([x, y]) => dispatchEvent(new PointerEvent('pointermove', { pointerId: 21, pointerType: 'touch', clientX: x, clientY: y, bubbles: true })), [at(Rb).clientX, at(Rb).clientY]);
+    await expect(page.locator('#tcR')).toHaveClass(/\bon\b/);
+    await expect(page.locator('#tcL')).not.toHaveClass(/\bon\b/);
+    const x0 = (await mg(page)).x;
+    await expect.poll(async () => (await mg(page)).x, { timeout: 10000 }).toBeGreaterThan(x0 + 40);
+    // saltar con un segundo dedo mientras el primero sigue en ▶ (multitáctil), con un toque real
+    const J = await page.locator('#tcJ').boundingBox();
+    await page.touchscreen.tap(J.x + J.width / 2, J.y + J.height / 2);
+    await expect.poll(async () => (await mg(page)).y).toBeLessThan(460);
+    expect(await page.evaluate(() => /** @type {any} */ (window).__mg.P.vx)).toBeGreaterThan(0);
+    await page.dispatchEvent('#tcR', 'pointerup', { pointerId: 21, pointerType: 'touch', bubbles: true });
+    // tocar el lienzo (fuera de los botones) también salta
+    await expect.poll(async () => (await mg(page)).y, { timeout: 5000 }).toBe(470);
+    await page.touchscreen.tap(200, 200);
+    await expect.poll(async () => (await mg(page)).y).toBeLessThan(460);
+    // nada scrolleó ni hizo zoom
+    const vp = await page.evaluate(() => ({ sx: scrollX, sy: scrollY, z: window.visualViewport ? visualViewport.scale : 1 }));
+    expect(vp).toEqual({ sx: 0, sy: 0, z: 1 });
+    expectNoErrors(errors);
+  });
+
+  test('rotar a mitad de partida: la vista y los botones se reacomodan sin perder el estado', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo proyecto mobile (táctil)');
+    const { errors } = await openGame(page, DBG);
+    await page.locator('#playBtn').tap();
+    await expect.poll(async () => (await mg(page)).state).toBe('play');
+    await page.evaluate(() => { const g = /** @type {any} */ (window).__mg; g.debug.goto(2); g.P.x = 900; });
+    for (const [w, h] of [[844, 390], [390, 844], [915, 412]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 200);
+      const s = await page.evaluate(() => { const g = /** @type {any} */ (window).__mg, v = g.view; const cv = document.getElementById('cv');
+        return { lvl: g.lvl, state: g.state, cssW: cv.clientWidth, groundY: (470 + v.OFFY) * v.VS, btnTop: document.getElementById('tcJ').getBoundingClientRect().top }; });
+      expect(s.lvl).toBe(2);
+      expect(s.state).toBe('play');
+      expect(s.cssW).toBe(w);
+      expect(s.groundY).toBeLessThanOrEqual(s.btnTop);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('pantalla final y cartel de muerte entran en 360×640 y 844×390 (botones ≥ 56 px, sin cortes)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo proyecto mobile (táctil)');
+    const { errors } = await openGame(page, DBG);
+    await expect.poll(async () => { if ((await mg(page)).state === 'menu') await page.locator('#playBtn').tap(); return (await mg(page)).state; }, { timeout: 20000 }).toBe('play');
+    await expect(page.locator('#card .tip')).toHaveText('TOCÁ PARA SEGUIR');
+    await page.evaluate(() => { const g = /** @type {any} */ (window).__mg; g.debug.goto(5); g.debug.god(true); g.P.x = g.goal + 5; });
+    await expect.poll(async () => (await mg(page)).state, { timeout: 20000 }).toBe('over');
+    for (const [w, h] of [[360, 640], [844, 390]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 600);
+      const r = await page.evaluate(() => { const o = document.getElementById('over');
+        const bs = [...o.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.getBoundingClientRect());
+        return { sh: o.scrollHeight, ch: o.clientHeight, minH: Math.min(...bs.map(b => b.height)), maxB: Math.max(...bs.map(b => b.bottom)), H: innerHeight }; });
+      expect(r.sh, `${w}×${h}`).toBeLessThanOrEqual(r.ch + 1);
+      expect(r.maxB).toBeLessThanOrEqual(r.H);
+      expect(r.minH).toBeGreaterThanOrEqual(56);
+    }
+    expectNoErrors(errors);
+  });
+});

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1c14">
 <title>¡Salva al Rey! — creado por MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E">
@@ -18,7 +18,7 @@
   body{background:#0e1c14;font-family:'Nunito',system-ui,sans-serif;color:#fff;
        touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none;
        -webkit-tap-highlight-color:transparent}
-  #c{position:fixed;inset:0;display:block}
+  #c{position:fixed;inset:0;display:block;touch-action:none}
   .vignette{position:fixed;inset:0;pointer-events:none;z-index:1;
        background:radial-gradient(130% 100% at 50% 42%,transparent 52%,rgba(6,10,14,.55))}
   #hurt{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;
@@ -38,6 +38,7 @@
   .hud-c{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:min(52vw,360px);
        padding:8px 14px;display:flex;flex-direction:column;gap:6px}
   .bar-row{display:flex;align-items:center;gap:8px}
+  #rotHint{display:none}
   .bar-row .ic{font-size:15px}
   .bar-row .nm{font-size:9px;font-weight:800;letter-spacing:.18em;color:#ffd97a;width:56px}
   .bar{flex:1;height:11px;border-radius:6px;background:rgba(0,0,0,.5);overflow:hidden}
@@ -84,6 +85,8 @@
 
   .overlay{position:fixed;inset:0;z-index:10;transition:opacity .45s,visibility .45s}
   .overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
+  /* los menús se desplazan con el dedo (sólo vertical: sin zoom ni gestos del navegador) */
+  #menu,#over{touch-action:pan-y;overscroll-behavior:contain}
   #menu{display:flex;align-items:center;justify-content:space-between;gap:34px;padding:5vh 5vw;flex-wrap:wrap;
        background:linear-gradient(100deg,rgba(8,12,10,.88) 0%,rgba(8,12,10,.55) 52%,rgba(8,12,10,.2) 100%)}
   .m-left{max-width:560px;display:flex;flex-direction:column;gap:15px;align-items:flex-start}
@@ -204,6 +207,66 @@
   .o-mis .ok{color:#8ae69a}.o-mis .ko{color:rgba(232,224,200,.5)}
   @media (max-height:540px) and (min-width:561px){#diffPick{padding:5px 10px}#diffPick .mlm-diff button{padding:5px 10px}}
   @media (max-width:560px){body.playing .mlm-hud.bl{bottom:calc(74px + env(safe-area-inset-bottom))}#bossBar{top:calc(150px + env(safe-area-inset-top));width:min(84vw,330px)}}
+  /* ================= MÓVIL =================
+     Menú compacto en celular vertical: el título en una línea, sin texto de historia ni atajos de teclado
+     (están en la ayuda), y «Defender el reino» visible sin desplazar en 360×640. */
+  @media (max-width:560px){
+    #menu{gap:14px;padding:max(14px,env(safe-area-inset-top)) 16px calc(72px + env(safe-area-inset-bottom))}
+    .m-left{gap:10px;width:100%}
+    .m-left>.kicker,.overTitle,.flourish,.tag,.m-ctrl,.m-right h2,.m-foot{display:none}
+    .title{font-size:clamp(38px,12vw,50px)}
+    .title br{display:none}.title em::before{content:" "}
+    .credit{padding:6px 14px}.credit-n{font-size:16px}
+    .m-right{gap:10px;width:100%}
+    .mode{padding:12px 16px;gap:14px}.mode .em{font-size:32px}.mode .tt{font-size:20px}
+  }
+  @media (max-width:560px) and (max-height:760px){.mode .dd{display:none}}
+  /* fin de partida: la placa no baja hasta la barra del arcade */
+  @media (max-width:560px){#over{padding:16px 16px calc(66px + env(safe-area-inset-bottom))}.o-plate{padding:20px 16px 18px}}
+  @media (max-height:540px) and (min-width:561px){#over{padding:10px 16px calc(64px + env(safe-area-inset-bottom))}
+    .o-title{font-size:32px;margin:4px 0 2px}.o-foot{display:none}.o-stats{margin:8px 0 10px}.o-mis{margin:-2px 0 10px}}
+  /* celular apaisado: dos columnas que entran sin desplazar y sin pisar la barra del arcade */
+  @media (max-height:540px) and (min-width:561px){
+    #menu{align-items:safe center;padding:max(10px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(62px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+    .m-left>.kicker,.m-right h2,.mode .dd{display:none}
+    .title{font-size:clamp(30px,9vh,46px)}
+    .title br{display:none}.title em::before{content:" "}
+    .mode{padding:9px 14px}.mode .em{font-size:26px}.mode .tt{font-size:18px}
+    .m-right{gap:8px}
+  }
+  @media (pointer:coarse) and (orientation:portrait){
+    #rotHint{display:block;align-self:center;font-size:12px;font-weight:800;color:#ffd97a;padding:6px 12px;border-radius:999px;
+      background:rgba(14,20,15,.7);border:1.5px solid rgba(201,162,75,.45)}
+  }
+  @media (pointer:coarse){
+    /* textos de juego legibles en celular */
+    .bar-row .nm{font-size:11px;width:62px;letter-spacing:.12em}
+    #foeInfo{font-size:11px}#bossPhase,.bar-row .atk{font-size:11px}
+    .credit-k,.m-foot,.o-foot{font-size:11px}
+    #jumpBtn small{font-size:11px}
+    /* la marca pasa arriba de la barra del arcade, a la izquierda (abajo al centro quedaba debajo del ⚔️) */
+    .wm{font-size:11px;letter-spacing:.24em;left:max(10px,env(safe-area-inset-left));transform:none;
+        bottom:calc(60px + env(safe-area-inset-bottom))}
+    /* botones de acción respetando la muesca / barra de inicio */
+    #atkBtn{right:calc(20px + env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom))}
+    #jumpBtn{right:calc(38px + env(safe-area-inset-right));bottom:calc(134px + env(safe-area-inset-bottom))}
+    .pbtn{touch-action:none}
+    #charMsg{left:max(10px,env(safe-area-inset-left));max-width:calc(100vw - 160px);transform:translateY(20px);
+        bottom:calc(64px + env(safe-area-inset-bottom))}
+    #charMsg.show{transform:none}
+    /* chips de misiones arriba (abajo a la izquierda quedaban debajo del pulgar del joystick) */
+    body.playing .mlm-hud.bl{bottom:auto}
+  }
+  @media (pointer:coarse) and (orientation:portrait){
+    .hud-c{top:calc(84px + env(safe-area-inset-top));width:calc(100vw - 20px);max-width:380px}
+    #bossBar{top:calc(150px + env(safe-area-inset-top));width:calc(100vw - 20px);max-width:380px}
+    body.playing .mlm-hud.bl{top:calc(152px + env(safe-area-inset-top));max-width:calc(100vw - 20px)}
+    body.playing.boss-on .mlm-hud.bl{top:calc(206px + env(safe-area-inset-top))}
+  }
+  @media (pointer:coarse) and (orientation:landscape){
+    body.playing .mlm-hud.bl{top:calc(108px + env(safe-area-inset-top));max-width:min(240px,28vw)}
+    #bossBar{width:min(40vw,380px)}
+  }
   @media (prefers-reduced-motion:reduce){.bar-row.hit,.num.pop,.hearts b.bye{animation:none}}
 </style>
 </head>
@@ -235,7 +298,8 @@
 
 <div class="overlay" id="menu">
   <div class="m-left">
-    <div class="chip">🏰 PUEBLO MEDIEVAL EN 3D · PC + CELULAR</div>
+    <div id="rotHint">📱↻ Girá el teléfono: se ve más</div>
+    <div class="chip kicker">🏰 PUEBLO MEDIEVAL EN 3D · PC + CELULAR</div>
     <div>
       <div class="overTitle">✦ UNA NOCHE · UN REINO · UN HÉROE ✦</div>
       <h1 class="title">¡Salva<br><em>al Rey!</em></h1>
@@ -311,7 +375,8 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const pick=a=>a[(Math.random()*a.length)|0];
 const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
-const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
+/* vibración corta en táctil; se apaga con «reducir movimiento» */
+const buzz=p=>{if(RM)return;try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
 function lerpAng(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return a+d*Math.min(1,t);}
 
 /* ================= TERRENO ================= */
@@ -339,6 +404,18 @@ canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();setTimeout(()=
 const scene=new THREE.Scene();
 scene.fog=new THREE.Fog(0xf0c0a0,45,200);
 const camera=new THREE.PerspectiveCamera(60,W/H,0.1,900);
+/* celular vertical: con 60° verticales el ángulo horizontal quedaba en ~36° y los monstruos de los costados
+   no se veían. En pantallas más altas que anchas se abre el FOV (hasta 80°, ~50° horizontales) y la
+   cámara mira un poco por delante del héroe, así queda más abajo y se ve más camino por donde vienen. */
+let lookAhead=0;
+function fitCamera(){
+  const asp=W/H;
+  camera.aspect=asp;
+  camera.fov=asp<1?clamp(2*Math.atan(Math.tan(29*Math.PI/180)/asp)*180/Math.PI,60,80):60;
+  lookAhead=asp<1?clamp((1-asp)*6,0,3):0;
+  camera.updateProjectionMatrix();
+}
+fitCamera();
 
 /* cielo con degradado animable */
 const skyUni={top:{value:new THREE.Color('#4a7fb5')},mid:{value:new THREE.Color('#f5c8a0')},bot:{value:new THREE.Color('#ffe3ae')}};
@@ -1404,9 +1481,10 @@ function attack(){
   /* asistencia de apuntado SÓLO en táctil: si no hay nadie delante, gira hacia el más cercano a tiro.
      En PC el golpe sale exactamente hacia donde mira el héroe, como siempre. */
   if(esMovil||botOn){
-    let f=forward(),ahead=false,best=null,bd=3.8;
-    for(const e of enemies){if(e.dead)continue;const dx=e.x-px,dz=e.z-pz,d=Math.hypot(dx,dz);
-      if(d<4.3&&(dx*f.x+dz*f.z)/(d||1)>0.2)ahead=true;if(d<bd){bd=d;best=e;}}
+    /* radio = alcance real del golpe (antes 3,8: un enemigo a 4 m no giraba al héroe y el golpe fallaba) */
+    let f=forward(),ahead=false,best=null,bd=1e9;
+    for(const e of enemies){if(e.dead)continue;const dx=e.x-px,dz=e.z-pz,d=Math.hypot(dx,dz),reach=4.3+(e.isBoss?e.T.r-.5:0);
+      if(d<reach&&(dx*f.x+dz*f.z)/(d||1)>0.2)ahead=true;if(d<reach&&d<bd){bd=d;best=e;}}
     if(!ahead&&best)prot=Math.atan2(best.x-px,best.z-pz);
   }
   spawnArc();
@@ -1789,7 +1867,7 @@ function startMode(m){
   document.querySelector('.hud-tr').style.display=mis?'block':'none';
   exploreHint.style.display=mis?'none':'block';
   heartsEl.parentElement.style.display=mis?'block':'none';
-  state='play';document.body.classList.add('playing');
+  state='play';document.body.classList.add('playing');arrRectsT=-1;
   banner(mis?'¡DEFENDÉ EL REINO! ⚔️':'✨ LA NOCHE CAE SOBRE PIEDRALUNA ✨');
   if(mis&&MM){MM.runStart();misRunning=true;}
   if(window.MLArcade){MLArcade.started();MLArcade.refresh();}
@@ -1860,8 +1938,8 @@ addEventListener('keyup',e=>{
 /* al pausar, perder el foco o terminar, soltar todo: si no, una tecla quedaba "apretada" */
 function clearInput(){
   for(const k in keys)keys[k]=false;
-  joyId=null;camId=null;ptrs.clear();pinchD=0;joyX=joyY=0;camDrag=false;
-  joyEl.style.display='none';atkBtn.classList.remove('on');jumpBtn.classList.remove('on');
+  joyId=null;camId=null;ptrs.clear();pinchD=0;pinchB=null;joyX=joyY=0;camDrag=false;
+  joyEl.style.display='none';atkBtn.classList.remove('on');jumpBtn.classList.remove('on');atkHeld=false;
 }
 addEventListener('blur',()=>clearInput());
 function jump(){
@@ -1887,35 +1965,42 @@ canvas.addEventListener('wheel',e=>{e.preventDefault();
 addEventListener('contextmenu',e=>e.preventDefault());
 
 const ptrs=new Map();
-let joyId=null,camId=null,joyOX=0,joyOY=0,pinchD=0,pinchDist=0,joyX=0,joyY=0;
+let joyId=null,camId=null,joyOX=0,joyOY=0,pinchD=0,pinchDist=0,joyX=0,joyY=0,joyRX=0,joyRY=0,atkHeld=false,pinchB=null;
+/* táctil: izquierda = joystick flotante, derecha = girar la cámara. Pellizcar (zoom) sólo con dos dedos
+   que NO sean el del joystick: antes, mover con el joystick y girar la cámara con el otro pulgar se tomaba
+   como pellizco, soltaba el joystick y el héroe se frenaba. */
 canvas.addEventListener('pointerdown',e=>{
   if(state!=='play')return;
+  if(e.pointerType==='touch')e.preventDefault();
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(ptrs.size===2){
-    const a=[...ptrs.values()];
-    pinchD=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);pinchDist=camDist;
-    joyId=null;joyEl.style.display='none';joyX=joyY=0;camId=null;return;
-  }
   if(e.clientX<W*.45&&joyId===null){
     joyId=e.pointerId;joyOX=e.clientX;joyOY=e.clientY;
+    /* el aro se dibuja entero dentro de la pantalla aunque el dedo apoye contra el borde */
+    joyRX=clamp(joyOX,61,W-61);joyRY=clamp(joyOY,61,H-61);
     joyEl.style.display='block';
-    joyEl.style.left=joyOX+'px';joyEl.style.top=joyOY+'px';
+    joyEl.style.left=joyRX+'px';joyEl.style.top=joyRY+'px';
+    joyKEl.style.transform=`translate(calc(-50% + ${joyOX-joyRX}px),calc(-50% + ${joyOY-joyRY}px))`;
   }else if(camId===null)camId=e.pointerId;
+  else{
+    /* segundo dedo del lado de la cámara: pellizco entre los dos dedos de cámara */
+    const a=ptrs.get(camId),b=ptrs.get(e.pointerId);
+    if(a&&b){pinchD=Math.hypot(a.x-b.x,a.y-b.y);pinchDist=camDist;pinchB=e.pointerId;}
+  }
 });
 addEventListener('pointermove',e=>{
   if(!ptrs.has(e.pointerId))return;
   const p=ptrs.get(e.pointerId);
   const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
-  if(ptrs.size===2&&pinchD){
-    const a=[...ptrs.values()];
-    const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
-    camDist=clamp(pinchDist*(pinchD/d),7,18);return;
+  if(pinchD&&(e.pointerId===camId||e.pointerId===pinchB)){
+    const a=ptrs.get(camId),b=ptrs.get(pinchB);
+    if(a&&b){const d=Math.hypot(a.x-b.x,a.y-b.y);camDist=clamp(pinchDist*(pinchD/(d||1)),7,18);}
+    return;
   }
   if(e.pointerId===joyId){
     let jx=e.clientX-joyOX,jy=e.clientY-joyOY;
     const l=Math.hypot(jx,jy);
     if(l>50){jx*=50/l;jy*=50/l;}
-    joyKEl.style.transform=`translate(calc(-50% + ${jx}px),calc(-50% + ${jy}px))`;
+    joyKEl.style.transform=`translate(calc(-50% + ${jx+joyOX-joyRX}px),calc(-50% + ${jy+joyOY-joyRY}px))`;
     joyX=jx/50;joyY=jy/50;
   }else if(e.pointerId===camId){
     camYaw-=dx*.006;
@@ -1925,13 +2010,16 @@ addEventListener('pointermove',e=>{
 const ptrUp=e=>{
   ptrs.delete(e.pointerId);
   if(e.pointerId===joyId){joyId=null;joyEl.style.display='none';joyX=joyY=0;}
+  if(e.pointerId===camId||e.pointerId===pinchB){pinchD=0;pinchB=null;}
   if(e.pointerId===camId)camId=null;
-  if(ptrs.size<2)pinchD=0;
 };
 addEventListener('pointerup',ptrUp);addEventListener('pointercancel',ptrUp);
-atkBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audio();atkBtn.classList.add('on');attack();});
-atkBtn.addEventListener('pointerup',()=>atkBtn.classList.remove('on'));
-atkBtn.addEventListener('pointercancel',()=>atkBtn.classList.remove('on'));
+/* ⚔️ mantenido = golpe continuo (asistencia táctil: sin tener que machacar el botón) */
+const atkUp=()=>{atkHeld=false;atkBtn.classList.remove('on');};
+atkBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audio();atkBtn.classList.add('on');atkHeld=true;attack();});
+atkBtn.addEventListener('pointerup',atkUp);
+atkBtn.addEventListener('pointercancel',atkUp);
+atkBtn.addEventListener('lostpointercapture',atkUp);
 jumpBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audio();jumpBtn.classList.add('on');jump();});
 jumpBtn.addEventListener('pointerup',()=>jumpBtn.classList.remove('on'));
 jumpBtn.addEventListener('pointercancel',()=>jumpBtn.classList.remove('on'));
@@ -2215,7 +2303,7 @@ const bossBarEl=$('bossBar'),bossFill=bossBarEl.querySelector('.bar i');
 let lastBossTxt='',lastBossW=-1,lastBossInv=null,lastBossOn=null;
 function updateBossBar(){
   const on=!!(boss&&!boss.dead&&state!=='menu');
-  if(on!==lastBossOn){lastBossOn=on;bossBarEl.classList.toggle('on',on);}
+  if(on!==lastBossOn){lastBossOn=on;bossBarEl.classList.toggle('on',on);document.body.classList.toggle('boss-on',on);arrRectsT=-1;}
   if(!on)return;
   const ph='FASE '+boss.phase+'/'+boss.D.phases+(boss.inv?' · VELO':boss.chan>0?' · DRENA':'');
   const txt=boss.D.name+'|'+ph;
@@ -2237,14 +2325,31 @@ function arrowTo(x,y,z,icon,help){
   if(behind){sx=-sx;sy=-sy;}
   const m=Math.max(Math.abs(sx),Math.abs(sy))||1;sx/=m;sy/=m;
   const X=clamp((sx*.5+.5)*W,30,W-30);
-  /* en táctil, la esquina inferior derecha es de los botones ⚔️/⬆️: la flecha no baja hasta ahí */
-  const Y=clamp((-sy*.5+.5)*H,W<=560?150:110,esMovil&&X>W-170?H-250:H-90);
+  /* la flecha no se mete debajo del HUD, las misiones, la barra del arcade ni los botones ⚔️/⬆️:
+     se mide lo que realmente ocupa cada uno en su columna (sirve en vertical, apaisado y PC) */
+  const lim=arrLimits(X);
+  const Y=clamp((-sy*.5+.5)*H,lim[0],Math.max(lim[0],lim[1]));
   const A=ARR[nArrows++];
   if(!A.on){A.on=true;A.el.classList.add('on');}
   if(A.icon!==icon){A.icon=icon;A.ic.textContent=icon;}
   if(A.help!==help){A.help=help;A.el.classList.toggle('help',help);}
   A.el.style.transform='translate('+(X-20).toFixed(0)+'px,'+(Y-20).toFixed(0)+'px)';
   A.rot.style.transform='rotate('+Math.atan2(sx,sy).toFixed(2)+'rad)';
+}
+let arrRects=[],arrRectsT=-1;
+const ARR_SEL='.hud-tl,.hud-c,.hud-tr,#bossBar,.mlm-hud,.mla-bar,#atkBtn,#jumpBtn';
+function arrLimits(X){
+  if(arrRectsT<0||time-arrRectsT>.5){
+    arrRectsT=time;arrRects=[];
+    for(const el of document.querySelectorAll(ARR_SEL)){const r=el.getBoundingClientRect();
+      if(r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden')arrRects.push(r);}
+  }
+  let top=30,bot=H-30;
+  for(const r of arrRects){
+    if(r.right<X-26||r.left>X+26)continue;
+    if(r.top+r.height/2<H/2)top=Math.max(top,r.bottom+26);else bot=Math.min(bot,r.top-26);
+  }
+  return [top,bot];
 }
 function updateArrows(){
   nArrows=0;
@@ -2442,6 +2547,7 @@ function update(dt){
   playerG.visible=invuln>0?(Math.floor(time*12)%2===0):true;
   playerG.rotation.x=state==='dying'?-1.2:0;
   atkCd=Math.max(0,atkCd-dt);
+  if(atkHeld&&atkCd<=0&&state==='play')attack();
 
   /* ---- oleadas ---- */
   if(mode==='mision'&&state==='play'){
@@ -2523,7 +2629,7 @@ function update(dt){
   let cz2=pz+cy*cp*cd+rand(-1,1)*sh;
   cy2=Math.max(cy2,groundH(cx2,cz2)+.8);
   camera.position.set(cx2,cy2,cz2);
-  camera.lookAt(px,ty,pz);
+  camera.lookAt(px-sy*lookAhead,ty,pz-cy*lookAhead);
   camera.updateMatrixWorld();
   if(qShadow){sunL.position.set(px+SUN_OFF.x,SUN_OFF.y,pz+SUN_OFF.z);sunL.target.position.set(px,0,pz);sunL.target.updateMatrixWorld();}
 
@@ -2610,11 +2716,12 @@ startLoop();
 function onResize(){
   W=innerWidth;H=innerHeight;
   renderer.setSize(W,H);
-  camera.aspect=W/H;camera.updateProjectionMatrix();
+  fitCamera();arrRectsT=-1;
   if(gamePaused)renderer.render(scene,camera);
 }
 addEventListener('resize',onResize);
-addEventListener('orientationchange',()=>setTimeout(onResize,150));
+/* al girar el teléfono las coordenadas cambian: se sueltan joystick y cámara para no quedar "trabados" */
+addEventListener('orientationchange',()=>{clearInput();setTimeout(onResize,150);});
 
 /* ================= MATELABS ARCADE ================= */
 if(window.MLArcade){
@@ -2694,7 +2801,7 @@ const snap=()=>({state,mode,paused:gamePaused,time,playTime,px,pz,score,kills,he
   rescue:{on:res.on,phase:res.phase,hp:res.hp,x:res.x,z:res.z},
   woods:woods.filter(q=>q.on).map(q=>({x:q.x,z:q.z})),
   arrows:ARR.filter(a=>a.on).map(a=>a.icon),gateAtk:gAtk,
-  waveLog:waveLog.slice(),misRunning,botDbg,camDist:+camDistS.toFixed(2),
+  waveLog:waveLog.slice(),misRunning,botDbg,camDist:+camDistS.toFixed(2),camDistT:camDist,fov:+camera.fov.toFixed(1),
   inst:Object.fromEntries(Object.keys(KITS).map(t=>[t,KITS[t].parts[0].mesh.count]))});
 window.__rey={snap};
 if(/[?&]debug\b/.test(location.search))Object.assign(window.__rey,{
