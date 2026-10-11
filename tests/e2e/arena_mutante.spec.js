@@ -33,7 +33,54 @@ async function startReal(page, mobile) {
 /** Arena lista para probar: director quieto, sin mutantes. */
 async function calm(page) { await D(page, 'freezeDirector', true); await D(page, 'clearEnemies'); }
 
+/** Problemas de distribución en pantalla (táctil): fuera del viewport, superposiciones y objetivos chicos. */
+const layoutProblems = (page) => page.evaluate(() => {
+  const out = [];
+  const W = innerWidth, H = innerHeight;
+  const vis = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' && !el.closest('[hidden]'); };
+  const items = [];
+  const add = (name, el) => { if (vis(el)) items.push({ name, r: el.getBoundingClientRect() }); };
+  add('estado', document.querySelector('.am-status'));
+  add('objetivo', document.querySelector('.am-obj'));
+  add('tutorial', document.querySelector('.am-tut'));
+  add('stick-izq', document.querySelector('.k3-joy'));
+  add('stick-der', document.querySelector('.am-rstick'));
+  document.querySelectorAll('.k3-btn').forEach(b => add('btn-' + b.getAttribute('aria-label'), b));
+  document.querySelectorAll('.mla-bar button, .mla-bar a').forEach((b, i) => add('barra-' + i, b));
+  const ov = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+  for (const it of items) {
+    const r = it.r;
+    if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) out.push(`${it.name} fuera de pantalla`);
+    if (/^(btn|barra)-/.test(it.name) && (r.width < 44 || r.height < 44)) out.push(`${it.name} chico ${Math.round(r.width)}×${Math.round(r.height)}`);
+  }
+  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+    const a = items[i], b = items[j];
+    if (a.name.startsWith('barra-') && b.name.startsWith('barra-')) continue;
+    if (ov(a.r, b.r)) out.push(`${a.name} / ${b.name}`);
+  }
+  const fire = document.querySelector('.k3-btn[aria-label="fire"]');
+  if (vis(fire) && fire.getBoundingClientRect().width < 56) out.push('FUEGO < 56px');
+  const skip = document.querySelector('.am-tut [data-skip]');
+  if (vis(skip) && skip.getBoundingClientRect().height < 44) out.push('Saltar < 44px');
+  if (document.documentElement.scrollWidth > W || document.documentElement.scrollHeight > H) out.push('scroll de página');
+  return out;
+});
+/** El botón principal de una pantalla está visible, dentro del viewport y lejos de la barra del arcade. */
+const primaryOk = (page, sel) => page.evaluate((sel) => {
+  const b = document.querySelector(sel); if (!b) return 'no existe ' + sel;
+  const r = b.getBoundingClientRect();
+  if (r.height < 44) return `${sel} mide ${Math.round(r.height)}px`;
+  if (r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) return `${sel} fuera de pantalla`;
+  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  if (!hit || !b.contains(hit)) return `${sel} tapado por ${hit && hit.className}`;
+  for (const t of document.querySelectorAll('.mla-bar button, .mla-bar a')) { const q = t.getBoundingClientRect(); if (q.width && r.left < q.right && q.left < r.right && r.top < q.bottom && q.top < r.bottom) return `${sel} bajo la barra`; }
+  return '';
+}, sel);
+const SIZES = [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 412, height: 915 }, { width: 915, height: 412 }, { width: 844, height: 390 }];
+
 test.describe('ARENA MUTANTE', () => {
+  // recorridos 3D largos con WebGL por software: en una máquina compartida y cargada 60 s no alcanzan
+  test.describe.configure({ timeout: 150_000 });
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => { try { Object.defineProperty(navigator, 'getGamepads', { value: () => [] }); } catch (e) {} });
   });
@@ -168,7 +215,8 @@ test.describe('ARENA MUTANTE', () => {
     await D(page, 'simulate', 0.2);
     const s = await H(page);
     expect(s.world.crates[idx].opened).toBe(true);
-    expect(s.counts.pickups).toBeGreaterThan(2);
+    // el loop real puede juntar alguna pieza antes de leer (máquina cargada): contar las sueltas + las ya juntadas
+    expect(s.counts.pickups + (s.player.scrap - scrap0)).toBeGreaterThan(2);
     await D(page, 'simulate', 3);
     expect((await H(page)).player.scrap).toBeGreaterThan(scrap0 + 2);
     // ya abierta: no ofrece abrirla otra vez, y sigue abierta tras reintentar
@@ -692,6 +740,110 @@ test.describe('ARENA MUTANTE', () => {
     const roll = await page.locator('.k3-btn[aria-label="roll"]').boundingBox();
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: roll.x + 30, y: roll.y + 30, id: 4 }] });
     await expect.poll(async () => (await H(page)).player.rolls, { timeout: 30_000 }).toBeLessThan(2);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    expectNoErrors(errors);
+  });
+  test('celular (matriz de tamaños): menú, partida táctil, tutorial, banco y opciones sin cortes ni superposiciones', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    test.setTimeout(480_000);
+    // cada carga arranca como la primera vez (con tutorial)
+    await page.addInitScript(() => { try { localStorage.removeItem('arena_mutante:save'); } catch (e) {} });
+    for (const vp of SIZES) {
+      const tag = `${vp.width}×${vp.height}`;
+      await page.setViewportSize(vp);
+      const { errors } = await open(page, '?debug', { tutorial: true });
+      // menú: botón principal visible, tocable y fuera de la barra
+      expect(await primaryOk(page, '#am-menu [data-go]'), tag).toBe('');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tag).toBe(true);
+      // opciones: LISTO visible sin tener que buscarlo (barra fija abajo)
+      await page.locator('#am-menu [data-opts]').tap();
+      expect(await primaryOk(page, '#am-opts [data-back]'), tag + ' opciones').toBe('');
+      await page.locator('#am-opts [data-back]').tap();
+      // partida con toque real; el tutorial aparece la primera vez
+      await startReal(page, true);
+      await expect(page.locator('.am-tut')).toBeVisible();
+      await wait(page, 300);
+      await expect.poll(() => layoutProblems(page), { message: tag + ' con tutorial', timeout: 10_000 }).toEqual([]);
+      await page.locator('.am-tut [data-skip]').tap();
+      await D(page, 'invulnerable', true); await calm(page);
+      await wait(page, 300);
+      await expect.poll(() => layoutProblems(page), { message: tag + ' jugando', timeout: 10_000 }).toEqual([]);
+      // acción central con toque: FUEGO dispara
+      const shots = (await H(page)).player.shots;
+      const fb = await page.locator('.k3-btn[aria-label="fire"]').boundingBox();
+      await page.touchscreen.tap(fb.x + fb.width / 2, fb.y + fb.height / 2);
+      await expect.poll(async () => (await H(page)).player.shots, { timeout: 30_000 }).toBeGreaterThan(shots);
+      // jefe (panel de objetivo más alto)
+      await D(page, 'spawnBoss'); await D(page, 'simulate', 4.5);
+      await wait(page, 300);
+      await expect.poll(() => layoutProblems(page), { message: tag + ' jefe', timeout: 10_000 }).toEqual([]);
+      // banco de trabajo con USAR táctil: tarjetas y LISTO visibles
+      await D(page, 'goto', 0); await D(page, 'invulnerable', true); await calm(page); await D(page, 'setScrap', 40);
+      const wb = (await H(page)).world.workbench;
+      await D(page, 'face', wb.x, wb.z, 1.5); await D(page, 'simulate', 0.2);
+      const ub = await page.locator('.k3-btn[aria-label="use"]').boundingBox();
+      await page.touchscreen.tap(ub.x + ub.width / 2, ub.y + ub.height / 2);
+      await stateIs(page, 'craft', 20_000);
+      expect(await primaryOk(page, '#am-craft [data-close]'), tag + ' banco').toBe('');
+      expect(await primaryOk(page, '#am-craft [data-up="dmg"]'), tag + ' banco tarjeta').toBe('');
+      await page.locator('#am-craft [data-up="dmg"]').tap();
+      expect((await H(page)).player.up.dmg).toBe(1);
+      await page.locator('#am-craft [data-close]').tap();
+      await stateIs(page, 'play');
+      expectNoErrors(errors);
+    }
+  });
+
+  test('celular: girar el teléfono en plena partida reacomoda HUD y controles sin perder el estado', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const { errors } = await open(page);
+    await startReal(page, true);
+    await D(page, 'invulnerable', true); await calm(page);
+    await D(page, 'setScrap', 7); await D(page, 'simulate', 0.5);
+    const a = await H(page);
+    for (const vp of [{ width: 844, height: 390 }, { width: 390, height: 844 }, { width: 915, height: 412 }]) {
+      await page.setViewportSize(vp);
+      await wait(page, 400);
+      await expect.poll(() => layoutProblems(page), { message: `${vp.width}×${vp.height}`, timeout: 10_000 }).toEqual([]);
+      const cam = await page.evaluate(() => { const c = /** @type {any} */ (window).__arena_mutante.debug.three.camera; return { aspect: c.aspect, fov: c.fov }; });
+      expect(cam.aspect).toBeCloseTo(vp.width / vp.height, 2);
+      if (vp.height > vp.width) expect(cam.fov).toBeGreaterThan(70); // vertical: campo de visión más abierto
+    }
+    const b = await H(page);
+    expect(b.state).toBe('play');
+    expect(b.player.scrap).toBe(a.player.scrap);
+    expect(b.hp).toBe(a.hp);
+    expect(Math.hypot(b.player.x - a.player.x, b.player.z - a.player.z)).toBeLessThan(0.5);
+    // el arrastre de cámara no queda trabado tras un toque cancelado por el sistema
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 450, y: 200, id: 7 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    const y0 = (await H(page)).player.yaw;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 450, y: 200, id: 8 }] });
+    for (let i = 1; i <= 6; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 450 + i * 20, y: 200, id: 8 }] });
+    await expect.poll(async () => Math.abs((await H(page)).player.yaw - y0), { timeout: 30_000 }).toBeGreaterThan(0.05);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    expectNoErrors(errors);
+  });
+
+  test('táctil: multitouch — mover con el stick izquierdo mientras se mantiene FUEGO', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    const { errors } = await open(page);
+    await startReal(page, true);
+    await D(page, 'invulnerable', true); await calm(page);
+    const a = await H(page);
+    const cdp = await page.context().newCDPSession(page);
+    const joy = await page.locator('.k3-joy').boundingBox();
+    const fire = await page.locator('.k3-btn[aria-label="fire"]').boundingBox();
+    const jx = joy.x + joy.width / 2, jy = joy.y + joy.height / 2, fx = fire.x + fire.width / 2, fy = fire.y + fire.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy, id: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: jx, y: jy - 50, id: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy - 50, id: 1 }, { x: fx, y: fy, id: 2 }] });
+    await expect(page.locator('.k3-btn[aria-label="fire"]')).toHaveClass(/\bon\b/);
+    await expect.poll(async () => { const p = (await H(page)).player; return p.shots > a.player.shots && Math.hypot(p.x - a.player.x, p.z - a.player.z) > 1; }, { timeout: 30_000 }).toBe(true);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await cdp.detach();
     expectNoErrors(errors);

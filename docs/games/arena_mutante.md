@@ -145,16 +145,18 @@ Clave única `arena_mutante:save` (`createSave`, versión 2):
 
 ## Pruebas
 
-`tests/e2e/arena_mutante.spec.js` (20 pruebas; la táctil sólo en el proyecto móvil). Usa `?debug` y `simulate()` (pasos fijos de 1/60 s) para los recorridos largos, con entrada real para lo que prueba controles (teclado, toque CDP en sticks y botones).
+`tests/e2e/arena_mutante.spec.js` (23 pruebas; las 4 táctiles/de celular —sticks, matriz de tamaños, rotación, multitouch— sólo en el proyecto móvil; tiempo límite de 150 s por prueba por el WebGL por software). Usa `?debug` y `simulate()` (pasos fijos de 1/60 s) para los recorridos largos, con entrada real para lo que prueba controles (teclado, toque CDP en sticks y botones).
 
 Cobertura: carga sin errores y marca · arranque con entrada real (Enter / toque) · movimiento, cámara, disparo, recarga, rodar y pulso con teclado · tutorial (avanza con la acción, se saltea, se reabre desde la pausa) · **puertas con energía** (se energizan, se cierran con E, bloquean, un bruto las rompe, persisten al reintentar) · **generador** (mantener E, progreso parcial) · **cajas** (E, tapa, chatarra, persistencia) · **trampas** (sin energía no; armado → activa → mata → recarga) · barricada que sella una puerta y se daña · banco de trabajo (tecla 1, daño real 14→18 por disparo) · telegrafía y contrajuego de los 4 mutantes (rodar esquiva el salto, blindaje frontal vs. espalda, embestida → aturdido, zona y charco del escupidor, acechador revelado por un tiro) · las 3 arenas encadenadas · misión principal + secundaria persistidas tras recargar · guardado corrupto y migración v1 · dificultad (vida/daño/avisos reales) · calidad (partículas, decorado, luces, sombras, triángulos) · jefe: intro, fase 1, pisotón, rompe la cobertura donde te escondés, fase 2 (marea aviso→tóxico, rayo), fase 3 (salto), muerte · derrota por vida y por baliza destruida · victoria · superviviente (liberar, sigue, salvarlo) y antídoto (romper rejilla) · pausa congela 1 s / reanudar / reiniciar · HUD sin superposición ni scroll en 412×915 y 915×412 · sticks táctiles y botones FUEGO/RODAR.
 
-Resultados reales (2026-10-10, máquina compartida con otros 3 agentes, carga ~35):
+Resultados reales (2026-10-11, máquina compartida con otros agentes, carga ~60):
 
 | Corrida | desktop | mobile (Pixel 7) |
 |---|---|---|
-| `ML_WORKERS=1` | **19 pasan**, 1 omitida (táctil, sólo móvil) | **20 pasan** |
-| `ML_WORKERS=4` (ambos proyectos juntos, simula carga de CI) | 39 pasan, 1 omitida en total | |
+| `ML_WORKERS=1` | **19 pasan**, 4 omitidas (sólo móvil) | **23 pasan** |
+| `ML_WORKERS=4` (ambos proyectos juntos) | 42 pasan, 4 omitidas en total (19 + 23) | |
+
+Con el límite anterior de 60 s, bajo carga ~60 fallaban por tiempo 1–3 recorridos largos de escritorio (mutantes, puerta, derrota); con 150 s no. La prueba de la caja tenía una carrera (el loop real juntaba una pieza antes de leer): ahora cuenta piezas sueltas + chatarra ya juntada.
 
 Las aserciones de juego usan `simulate()` (pasos fijos) y ganchos con `frozen` para mutantes de medición; el daño se mide **por disparo** (el loop real puede disparar de más mientras la tecla está abajo). Las pruebas de controles reales usan `expect.poll` con márgenes amplios.
 
@@ -180,11 +182,42 @@ En partida (gancho `perf`, 8 mutantes vivos; en el laboratorio además el Coloso
 
 El costo de CPU por cuadro es bajo (~2 ms); el FPS headless está limitado por SwiftShader y la carga de la máquina. Medidas de presupuesto: mutantes instanciados por parte (5 draw calls por tipo; se dibujan sólo hasta el último lugar ocupado), pools vacíos ocultos (sin draw call), paredes/piso/coberturas fusionados o instanciados, partículas en 2 `Points`, sombras sólo en alta, luces puntuales 0/2/4, sin asignaciones por cuadro en el bucle caliente. **Degradación para hardware inferior:** calidad baja = DPR 1, sin luces puntuales ni sombras, 220 partículas, decorado ×0,35 y niebla a 46 m.
 
+## Móvil
+
+Pasada mobile-first (2026-10-11). Emulación Playwright con toque (`hasTouch`, `isMobile`, DPR 2–3) en 360×640, 390×844, 412×915 (vertical) y 915×412, 844×390 (apaisado). **No se probó en un teléfono real.** Capturas (locales, `.perf/` no se versiona): antes en `.perf/mobile-audit/arena_mutante/before/`, después en `.perf/mobile-audit/arena_mutante/after/` (`<ancho>x<alto>-{menu,play-tut,play,boss,craft,opts}.png`).
+
+| Problema encontrado | Dónde | Arreglo |
+|---|---|---|
+| El panel de estado (vida/rodar/munición) quedaba debajo de los botones ⌂/⏸ de la barra del arcade | 360×640 y 390×844 (rozaba en 412×915) | `ui.layout()` mide la barra (`.mla-bar`) y achica el panel (modo `tight`, sin puntaje) para que entre a su izquierda; si no entra, lo baja. Se recalcula con `resize`, `orientationchange`, `ResizeObserver` (estado, objetivo, tutorial, barra) y cada 1 s. `box-sizing:border-box` (el ancho calculado no sumaba el padding) |
+| El objetivo/misiones tenían un `top` fijo de 112 px | vertical | el objetivo va justo debajo del estado y de la barra |
+| El tutorial y los avisos tapaban BARR./USAR (y «Saltar» quedaba encima de BARR.) | vertical (todos) | en vertical táctil el tutorial y los avisos van arriba, debajo del objetivo |
+| El tutorial tapaba FUEGO | apaisado 844×390 | se ubica en el hueco entre el stick izquierdo y los botones |
+| Los avisos se partían en una columna de media pantalla y tapaban al personaje | vertical | `width:max-content` + `max-width:calc(100vw - 32px)`, 12 px en vertical |
+| Título y bajada del menú cortados debajo de la barra del arcade | 360×640 | las pantallas (`.am-scr`) reservan la altura de la barra arriba; menú compacto en verticales ≤ 740 px |
+| «3. LABORATORIO» rozaba la barra del arcade y EMPEZAR medía 39 px | 844×390 | reserva arriba en apaisado bajo; EMPEZAR ≥ 50 px, resto ≥ 44 px |
+| Opciones: LISTO fuera de pantalla, tabla de 4 columnas ilegible | 360×640, 915×412 | en táctil la tabla muestra sólo ACCIÓN/TÁCTIL; LISTO (y el del banco) en una barra fija abajo (`position:sticky`) |
+| Objetivos chicos: Dificultad 33 px, slider 16 px, select 31 px, casillas 20 px, «Saltar» ~30 px | todas | ≥ 44 px en `pointer:coarse`; FUEGO 70 px (principal), demás botones 62 px |
+| Textos chicos: «CREADO POR» 9 px, APUNTAR 9 px, botones 10 px | todas | 11 / 10 / 11–12 px |
+| Marcadores (⚡ 📦) quedaban debajo de los pulgares o de los paneles | todas | en táctil se acotan entre el borde inferior de los paneles de arriba y 178 px sobre el borde inferior |
+| Banco de trabajo decía «Teclas 1-4 · E para volver» | táctil | «Tocá un módulo para comprarlo» |
+| Vertical: poca visión lateral | vertical | FOV vertical hasta ×1,5 (antes ×1,42) y la cámara se aleja 1,6 m más (antes 1,2) |
+| Sin vibración | táctil | `navigator.vibrate` corto al recibir daño (22/45 ms) y al rodar (12 ms); se apaga con «Reducir movimiento» o `prefers-reduced-motion`; mínimo 120 ms entre vibraciones |
+| Vertical sin sugerencia de orientación | vertical táctil | aviso no bloqueante una vez por partida: «Se juega mejor con el teléfono acostado (también podés seguir en vertical)» (si no hay tutorial) |
+
+**Bugs funcionales arreglados**
+- **Toque corto de FUEGO perdido (P1, táctil):** el disparo leía sólo «botón apretado» en cada paso; un toque que empieza y termina entre dos cuadros (celular lento) no disparaba. Ahora también cuenta el flanco `btn:fire`. Lo encontró la prueba de la matriz (toque real con `page.touchscreen.tap`).
+- **Arrastre de cámara trabado tras un `pointercancel` (P1, táctil):** si el sistema cancelaba el toque (gesto, barra del navegador) `dragId` quedaba tomado y arrastrar la pantalla ya no giraba la cámara. Se libera en `pointercancel`.
+
+Ya estaba bien y se verificó: `touch-action:none` en el juego y sin `user-scalable=no`; las pantallas superpuestas permiten scroll vertical (`touch-action:pan-y`); multitouch stick + FUEGO; pausa al ocultar la pestaña y audio que sólo vuelve tras un gesto (SDK); calidad automática «media» en táctil con DPR ≤ 1,5 (SDK); rotación en plena partida (cámara, HUD y controles se reacomodan sin perder estado). El juego se puede jugar en las dos orientaciones; apaisado es la recomendada.
+
+**Pruebas móviles nuevas** (sólo proyecto `mobile`): matriz de 5 tamaños (menú: EMPEZAR visible, ≥ 44 px, no tapado y fuera de la barra; opciones: LISTO visible; partida con toque real con tutorial, jugando y con el jefe: nada fuera de pantalla, sin superposiciones entre estado/objetivo/tutorial/sticks/botones/barra, botones ≥ 44 px, FUEGO ≥ 56 px, sin scroll; FUEGO con toque dispara; banco con USAR táctil, compra con toque y LISTO visible) · rotación en plena partida (390×844 → 844×390 → 390×844 → 915×412: sin superposiciones, aspecto de cámara correcto, FOV > 70° en vertical, estado intacto, arrastre de cámara funciona después de un `touchcancel`) · multitouch (stick izquierdo + FUEGO a la vez).
+
 ## Pendiente / NO PROBADO
 
-- **NO PROBADO en hardware real:** gamepad físico (sólo el mapeo; en pruebas los mandos se ocultan) ni celular real (sólo emulación Pixel 7 de Playwright). Bloqueo de puntero (pointer lock) no probado en headless; en `?debug` está desactivado.
+- **NO PROBADO en hardware real:** gamepad físico (sólo el mapeo; en pruebas los mandos se ocultan) ni celular real (sólo emulación de Playwright: Pixel 7 y la matriz de tamaños). Vibración, zonas seguras con notch y rendimiento real en teléfono no verificados. Bloqueo de puntero (pointer lock) no probado en headless; en `?debug` está desactivado.
 - Miniatura `games/thumbs/arena_mutante.webp`: hay que generarla con `node tools/make-thumbs.mjs arena_mutante` después de agregar la entrada al registro (no se puede tocar `games/` fuera de `games/arena_mutante/`).
 - El decorado no tiene colisión (está pegado a las paredes).
 - La partida no se jugó completa a mano de punta a punta con entrada real (sí por ganchos de depuración + simulación); el balance (idle muere en ~20 s en la primera horda/oleada en Normal) es estimado.
 - La cámara en el laboratorio durante el jefe puede quedar cerca del Coloso: hay que mirar hacia arriba para ver los tanques de los hombros.
 - Sin música de fondo (sólo efectos sintetizados).
+- Móvil, cosmético: en vertical un marcador acotado (📦) puede quedar encima de la columna de botones, y el cartel grande de inicio de arena/jefe (2,6 s) pasa por encima de BARR.; los dos son `pointer-events:none`, no bloquean toques.
