@@ -1,0 +1,33 @@
+{
+  "schema": "mateo-shops-v2-juego",
+  "note": "Adaptado del kit (docs/kit_v2/data/comercios.json). Moneda SÓLO de ficción (M): sin dinero real ni compras dentro de la app. «at» = punto aproximado; el juego lo ajusta al frente de local más cercano con esa orientación.",
+  "currency": "M",
+  "startBalance": 300,
+  "items": {
+    "manzana": { "name": "Manzana", "icon": "🍎", "type": "food", "energy": 8 },
+    "sandwich": { "name": "Sándwich", "icon": "🥪", "type": "food", "energy": 17 },
+    "agua": { "name": "Agua", "icon": "💧", "type": "food", "energy": 5 },
+    "jugo": { "name": "Jugo de naranja", "icon": "🧃", "type": "food", "energy": 7 },
+    "fruta_mix": { "name": "Ensalada de frutas", "icon": "🍓", "type": "food", "energy": 12 },
+    "galleta": { "name": "Galletitas", "icon": "🍪", "type": "food", "energy": 4 },
+    "pan": { "name": "Pan casero", "icon": "🥖", "type": "food", "energy": 5 },
+    "alfombra_nube": { "name": "Alfombra nube", "icon": "☁️", "type": "furniture" },
+    "lampara_estrella": { "name": "Lámpara estrella", "icon": "⭐", "type": "furniture" },
+    "planta_maceta": { "name": "Planta en maceta", "icon": "🪴", "type": "furniture" }
+  },
+  "food": { "energyToHealth": 2, "buffSeconds": 120, "buffRegenMultiplier": 3 },
+  "stores": [
+    { "id": "kiosco_centro", "name": "Kiosco de la Plaza", "type": "food", "open": [7, 23], "district": "centro", "at": { "kiosk": true, "x": -26, "z": 50.9, "face": [0, 1] },
+      "products": [ { "sku": "manzana", "price": 12 }, { "sku": "sandwich", "price": 22 }, { "sku": "agua", "price": 8 }, { "sku": "jugo", "price": 14 } ] },
+    { "id": "mercado_prisma", "name": "Mercado Prisma", "type": "food", "open": [8, 22], "district": "centro", "at": { "x": 107, "z": 53, "face": [0, 1] },
+      "products": [ { "sku": "fruta_mix", "price": 18 }, { "sku": "galleta", "price": 10 }, { "sku": "pan", "price": 8 }, { "sku": "sandwich", "price": 22 } ] },
+    { "id": "ropa_urbana", "name": "Ropa de la Ciudad", "type": "wardrobe", "open": [9, 21], "district": "centro", "at": { "x": 116, "z": 32, "face": [1, 0] },
+      "products": [ { "sku": "remera_azul", "price": 80 }, { "sku": "campera_naranja", "price": 140 }, { "sku": "pantalon_gris", "price": 95 }, { "sku": "zapatillas_urbanas", "price": 120 }, { "sku": "mochila_amarilla", "price": 60 } ] },
+    { "id": "decoracion_hogar", "name": "Mi Rinconcito", "type": "decor", "open": [9, 20], "district": "centro", "at": { "x": 107, "z": 11, "face": [0, -1] },
+      "products": [ { "sku": "alfombra_nube", "price": 85 }, { "sku": "lampara_estrella", "price": 95 }, { "sku": "planta_maceta", "price": 40 } ] },
+    { "id": "concesionaria_lumen", "name": "Autos Lumen · Karts", "type": "vehicle", "open": [9, 19], "district": "centro", "at": { "x": 116, "z": -21, "face": [1, 0] },
+      "products": [ { "sku": "kart_lumen", "price": 250 }, { "sku": "kart_prisma", "price": 420 }, { "sku": "rayo_m", "price": 650 } ] },
+    { "id": "taller_urbano", "name": "Taller de la Avenida", "type": "garage", "open": [8, 20], "district": "centro", "at": { "garage": true },
+      "products": [ { "sku": "mejora_frenos", "price": 130 }, { "sku": "mejora_aceleracion", "price": 150 }, { "sku": "pintura_metalizada", "price": 100 }, { "sku": "reparacion", "price": 20 } ] }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "mateo-vehicles-v2-juego",
+  "note": "Adaptado del kit (docs/kit_v2/data/vehiculos.json). Encuadre apto para un protagonista niño: KARTS ELÉCTRICOS DE PASEO (como los de un parque de diversiones), de velocidad limitada, que en la ficción del juego se pueden manejar por la ciudad. Sin marcas reales. Los vecinos nunca son atropellados: el kart frena solo ante peatones y los autos del tránsito frenan ante el kart.",
+  "vehicles": [
+    { "id": "kart_lumen", "name": "Kart Lumen", "price": 250, "speed": 11, "acceleration": 7, "brake": 12, "turn": 1.7, "color": "#e64c57", "style": "compacto", "seats": 1 },
+    { "id": "kart_prisma", "name": "Kart Familiar Prisma", "price": 420, "speed": 10, "acceleration": 6, "brake": 11, "turn": 1.35, "color": "#42b5b1", "style": "familiar", "seats": 2 },
+    { "id": "rayo_m", "name": "Rayo M", "price": 650, "speed": 15, "acceleration": 9, "brake": 14, "turn": 1.8, "color": "#4b78e4", "style": "deportivo", "seats": 1 }
+  ],
+  "mods": [
+    { "sku": "mejora_frenos", "name": "Frenos mejorados", "effect": { "brake": 1.3 } },
+    { "sku": "mejora_aceleracion", "name": "Motor eléctrico mejorado", "effect": { "acceleration": 1.25 } },
+    { "sku": "pintura_metalizada", "name": "Pintura metalizada", "effect": { "metal": 1 } },
+    { "sku": "reparacion", "name": "Reparación completa", "effect": { "repair": 1 } }
+  ],
+  "paints": ["#e64c57", "#42b5b1", "#4b78e4", "#f1c40f", "#8e44ad", "#27ae60"],
+  "garage": { "slots": 3 },
+  "handling": "arcade",
+  "noGraphicPedestrianCollision": true
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "mateo-missions-v2-juego",
+  "note": "Adaptado del kit (docs/kit_v2/data/misiones.json) a la geometría y los sistemas REALES del juego: cada paso tiene un verificador en game/src/campaign.js (evento real o condición del estado). Recompensas en monedas M de FICCIÓN (transacción única 'mis:<id>'), experiencia (puntos) y reputación del distrito. Textos 'tc' = variante táctil.",
+  "reputationTiers": [
+    { "min": 0, "name": "Vecino nuevo" },
+    { "min": 15, "name": "Conocido del barrio" },
+    { "min": 40, "name": "Ayudante de la ciudad" },
+    { "min": 90, "name": "Héroe del barrio" },
+    { "min": 200, "name": "Guardián de Ciudad de Altura" }
+  ],
+  "questline": [
+    {
+      "id": "empezar_en_casa", "title": "Un nuevo día", "mode": "civil", "district": "centro",
+      "intro": "¡Buen día, Mateo! Hoy arranca tu aventura en Ciudad de Altura. Primero, a moverse.",
+      "steps": [
+        { "id": "levantarse_de_cama", "label": "Levantate y caminá un poco", "kb": "WASD o flechas", "tc": "joystick izquierdo", "need": 2.5 },
+        { "id": "mirar_alrededor", "label": "Mirá alrededor con la cámara", "kb": "mové el mouse (clic para capturarlo) o arrastrá con el botón derecho", "tc": "deslizá el dedo en la mitad derecha", "need": 1.0 },
+        { "id": "saltar", "label": "Saltá una vez", "kb": "Espacio", "tc": "botón SALTO" },
+        { "id": "abrir_ropero", "label": "Abrí el ropero y elegí tu ropa", "kb": "E junto al ropero", "tc": "ACCIÓN junto al ropero" },
+        { "id": "salir_del_apartamento", "label": "Salí del departamento por la puerta", "kb": "E en la puerta", "tc": "ACCIÓN en la puerta" }
+      ],
+      "reward": { "credits": 25, "xp": 40, "rep": 1 }, "next": "conocer_plaza"
+    },
+    {
+      "id": "conocer_plaza", "title": "Conocé a tus vecinos", "mode": "civil", "district": "centro",
+      "intro": "La Plaza Mayor queda al oeste por la Avenida Prisma. ¡Seguí la ruta del minimapa!",
+      "steps": [
+        { "id": "correr", "label": "Corré un ratito", "kb": "mantené Shift mientras caminás", "tc": "tocá CORRER y mové el joystick", "need": 1.5 },
+        { "id": "ir_a_la_plaza", "label": "Andá hasta la Plaza Mayor" },
+        { "id": "hablar_con_vecino", "label": "Saludá a un vecino (Don Rulo, en el quiosco)", "kb": "E cerca de un vecino con nombre", "tc": "ACCIÓN cerca de un vecino con nombre" },
+        { "id": "comprar_una_fruta", "label": "Comprá una fruta en el Kiosco de la Plaza", "kb": "E en el kiosco", "tc": "ACCIÓN en el kiosco" }
+      ],
+      "reward": { "credits": 40, "xp": 60, "rep": 2 }, "next": "primera_transformacion"
+    },
+    {
+      "id": "primera_transformacion", "title": "El héroe M", "mode": "hero", "district": "centro",
+      "intro": "Los vecinos hablan de un héroe con una M en el pecho... ¡sos vos! Volvé a casa y ponete el traje.",
+      "steps": [
+        { "id": "regresar_apartamento", "label": "Volvé a tu departamento" },
+        { "id": "equipar_traje_m", "label": "Ponete el traje M", "kb": "T o el ropero", "tc": "botón M o el ropero" },
+        { "id": "hacer_salto_alto", "label": "Afuera, hacé un súper salto", "kb": "quieto: mantené Espacio y soltalo", "tc": "quieto: mantené SALTO y soltalo" },
+        { "id": "balancearse_tres_veces", "label": "Balanceate con el cable 3 veces", "kb": "F o clic apuntando a un edificio alto (aro celeste)", "tc": "CABLE apuntando a un edificio alto (aro celeste)", "need": 3 }
+      ],
+      "reward": { "credits": 75, "xp": 100, "rep": 3 }, "next": "primer_rescate"
+    },
+    {
+      "id": "primer_rescate", "title": "Misión: recuperar la mochila", "mode": "hero", "district": "centro",
+      "intro": "Algo pasa en la Plaza Mayor: alguien pide ayuda. ¡Andá de héroe!",
+      "steps": [
+        { "id": "investigar_incidente", "label": "Investigá el aviso en la Plaza Mayor" },
+        { "id": "perseguir_ladron", "label": "Perseguí al ladrón", "kb": "Shift para correr", "tc": "CORRER" },
+        { "id": "inmovilizar_sin_violencia", "label": "Frenalo sin lastimar", "kb": "E golpes que marean, R patada, F cable", "tc": "GOLPE, PATADA o CABLE" },
+        { "id": "devolver_objeto", "label": "Devolvé la mochila a su dueño", "kb": "E", "tc": "ACCIÓN" }
+      ],
+      "reward": { "credits": 150, "xp": 150, "rep": 6 }, "next": "primer_coche"
+    },
+    {
+      "id": "primer_coche", "title": "Un nuevo recorrido", "mode": "civil", "district": "centro",
+      "intro": "Con un kart vas a llegar a cualquier barrio. Primero, ganá unas monedas ayudando.",
+      "steps": [
+        { "id": "ganar_creditos_actividades", "label": "Hacé un trabajo del barrio (cartelera junto a tu casa)", "kb": "E en la cartelera", "tc": "ACCIÓN en la cartelera" },
+        { "id": "visitar_concesionaria", "label": "Visitá Autos Lumen · Karts" },
+        { "id": "comprar_o_pedir_vehiculo", "label": "Comprá tu primer kart", "kb": "E en la concesionaria", "tc": "ACCIÓN en la concesionaria" },
+        { "id": "conducir_a_casa", "label": "Manejá el kart hasta el Garaje M", "kb": "W/S acelerar y frenar, A/D girar", "tc": "joystick", "need": 20 },
+        { "id": "aparcar_en_garaje", "label": "Estacioná en el Garaje M y bajate", "kb": "frená y E", "tc": "frená y ACCIÓN" }
+      ],
+      "reward": { "credits": 100, "xp": 120, "rep": 2 }, "next": "noche_en_la_ciudad"
+    },
+    {
+      "id": "noche_en_la_ciudad", "title": "Luces de la ciudad", "mode": "hero", "district": "centro",
+      "intro": "De noche la ciudad brilla distinto. Esperá el atardecer (o dormí en tu cama hasta la noche).",
+      "steps": [
+        { "id": "esperar_atardecer", "label": "Esperá el atardecer (o dormí hasta la noche)" },
+        { "id": "recorrer_azoteas", "label": "Recorré 3 azoteas distintas", "kb": "súper salto, cable y paredes", "tc": "súper salto, cable y paredes", "need": 3 },
+        { "id": "resolver_evento_nocturno", "label": "Ayudá a un vecino esta noche" },
+        { "id": "regresar_a_casa", "label": "Volvé a tu departamento" },
+        { "id": "guardar", "label": "Guardá la partida en tu cama", "kb": "E en la cama", "tc": "ACCIÓN en la cama" }
+      ],
+      "reward": { "credits": 175, "xp": 200, "rep": 8 }, "next": null
+    }
+  ]
+}

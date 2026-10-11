@@ -174,6 +174,13 @@ export const GAMES = [
     controls: { pc: 'WASD mover · mouse mirar · clic izq./Q azul · clic der./F naranja · E usar · Espacio saltar · H pista · R sala', touch: 'Joystick · arrastrar para mirar · AZUL/NARANJA o tocá un punto · USAR · SALTO', gamepad: 'Stick mover · LB/RB girar · LT/RT mirar · X azul · Y naranja · B usar · A saltar' },
     score: 'high', scoreLabel: 'puntos', orientation: 'any', heavy: true,
   },
+  {
+    id: 'mateo_ciudad', thumb: 'games/thumbs/mateo_ciudad.webp', file: 'mateo/index.html', title: 'MATEO: CIUDAD DE ALTURA', icon: '🦸', accent: '#ff4d4d',
+    category: 'aventura', tags: ['Mundo abierto 3D', 'Héroe'], tech: 'Three.js 0.186 (WebGL)', added: '2026-10-11',
+    description: 'Mundo abierto 3D: corré, saltá altísimo y balanceate con cables de energía; ayudá a los vecinos, frená robos y manejá tu kart.',
+    controls: { pc: 'WASD mover · mouse cámara · Espacio saltar · F cable · E acción/golpe · Q guardia · M mapa', touch: 'Joystick · SALTO · CABLE · ACCIÓN · deslizá para girar la cámara', gamepad: 'Stick mover · A saltar · X acción · RB cable' },
+    score: 'none', orientation: 'any', heavy: true,
+  },
 ];
 
 /** @param {string} id */

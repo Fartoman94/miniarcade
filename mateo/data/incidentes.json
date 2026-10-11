@@ -1,0 +1,74 @@
+{
+  "schema": "mateo-incidents-v2",
+  "source": "Adaptado de docs/kit_v2/data/incidentes.json: etapas reales del director (game/src/incidents.js), recompensas en puntos y reputación local.",
+  "defaults": {
+    "maxConcurrent": { "low": 1, "medium": 2, "high": 2 },
+    "cooldownSeconds": 120,
+    "firstDelaySeconds": 75,
+    "minimumDistanceFromPlayer": 35,
+    "maximumDistanceFromPlayer": 110,
+    "alertSeconds": 50,
+    "escapeSeconds": 70,
+    "returnSeconds": 120,
+    "cancelDistance": 230,
+    "noSpawnNearInteriorPortal": 14
+  },
+  "events": [
+    {
+      "id": "bolso",
+      "name": "La mochila desaparecida",
+      "villain": "carterista",
+      "victim": "vecino",
+      "item": "mochila",
+      "stages": ["spawn", "approach", "attempt", "alert", "pursuit", "confront", "recover", "return", "complete"],
+      "lines": { "alert": "¡Ayuda! ¡Se llevan mi mochila!", "witness": "¡Por allá, el de gorro rojo!", "thanks": "¡Mi mochila! ¡Gracias, Mateo!", "surrender": "¡Está bien, está bien! Perdón, la devuelvo." },
+      "durationSeconds": 230,
+      "rewardPoints": 55,
+      "reputation": 8,
+      "schedule": "any",
+      "districts": ["centro", "sol"]
+    },
+    {
+      "id": "comercio",
+      "name": "¡Detengan al ladrón!",
+      "villain": "grandote",
+      "victim": "comerciante",
+      "item": "caja",
+      "stages": ["spawn", "approach", "attempt", "alert", "pursuit", "confront", "recover", "return", "complete"],
+      "lines": { "alert": "¡Se llevó la caja del negocio!", "witness": "¡Es ese grandote, va despacio!", "thanks": "¡La caja del negocio! Gracias, Mateo.", "surrender": "Uf... me rindo. Tomá, devolvela." },
+      "durationSeconds": 270,
+      "rewardPoints": 80,
+      "reputation": 10,
+      "schedule": "shop_open",
+      "districts": ["centro"]
+    },
+    {
+      "id": "fuga",
+      "name": "Paquete en fuga",
+      "villain": "corredor",
+      "victim": "vecino",
+      "item": "paquete",
+      "stages": ["spawn", "approach", "attempt", "alert", "pursuit", "confront", "recover", "return", "complete"],
+      "lines": { "alert": "¡Mi paquete! ¡Se lo llevó corriendo!", "witness": "¡Es rapidísimo, cortale el paso!", "thanks": "¡Mi paquete llegó sano y salvo! Gracias.", "surrender": "¡Me cansé! Ahí tenés el paquete." },
+      "durationSeconds": 180,
+      "rewardPoints": 65,
+      "reputation": 6,
+      "schedule": "any",
+      "districts": ["centro", "sol"]
+    },
+    {
+      "id": "dron",
+      "name": "Dron descontrolado",
+      "villain": "dron",
+      "victim": "comerciante",
+      "item": "cartel",
+      "stages": ["spawn", "attempt", "alert", "pursuit", "confront", "recover", "return", "complete"],
+      "lines": { "alert": "¡Un dron se volvió loco y me arrancó el cartel!", "witness": "¡Cuidado, tira descargas!", "thanks": "¡Mi cartel! Lo vuelvo a colgar. ¡Gracias!", "surrender": "*bip* ... *bip* (dron apagado)" },
+      "durationSeconds": 240,
+      "rewardPoints": 90,
+      "reputation": 12,
+      "schedule": "any",
+      "districts": ["centro"]
+    }
+  ]
+}

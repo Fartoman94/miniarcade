@@ -1,0 +1,42 @@
+{
+  "schema": "mateo-districts-v2",
+  "source": "Adaptado de docs/kit_v2/data/distritos.json a las coordenadas y colisiones reales (V2 P1).",
+  "districts": [
+    {
+      "id": "centro",
+      "display": "Centro de Altura",
+      "zone": "central",
+      "rect": [-232, 232, -232, 232],
+      "streamed": false,
+      "referenceZone": { "blocks": [2, 5, 2, 5], "areas": ["Plaza Mayor", "Avenida Prisma (comercial)", "Torre Altura (manzana alta)", "Barrio Las Glicinas (residencial)"] },
+      "landmarks": ["Torre Altura", "Plaza Mayor", "Banco Central", "Torre del Reloj"],
+      "incidents": ["bolso", "comercio", "fuga", "dron"],
+      "timeDensity": { "day": 1, "night": 0.7 }
+    },
+    {
+      "id": "sol",
+      "display": "Barrio del Sol",
+      "zone": "residential",
+      "rect": [-404, -232, -140, 140],
+      "streamed": true,
+      "seed": 4401,
+      "roadsX": [-256, -320, -384],
+      "roadsZ": [-128, -64, 0, 64, 128],
+      "park": [0, 1],
+      "landmarks": ["Parque de la Amistad", "Costanera del Sol"],
+      "incidents": ["bolso", "fuga"],
+      "timeDensity": { "day": 0.8, "night": 0.35 },
+      "streaming": { "preload": 150, "unload": 215 }
+    },
+    {
+      "id": "puerto",
+      "display": "Distrito Puerto",
+      "zone": "industrial",
+      "rect": [199, 300, -130, 130],
+      "streamed": false,
+      "landmarks": ["Muelle", "Grúas pórtico", "Carguero"],
+      "incidents": ["fuga", "dron"],
+      "timeDensity": { "day": 0.9, "night": 0.4 }
+    }
+  ]
+}

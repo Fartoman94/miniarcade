@@ -1,10 +1,20 @@
 # Punto de continuación
 
-- **Rama de trabajo:** `feat/miniarcade-3` (se mergea a `main` por PR con CI en verde; autorizado por el dueño).
-- **Último merge a main:** PR #7 → `971fd82` (2026-10-10). Producción: https://miniarcade-gold.vercel.app
-- **Released:** 15/20 (ver `docs/IMPLEMENTATION_PROGRESS.md`).
-- **En curso:** Carrera Vertical (18), Mareas Profundas (17), Corsarios del Abismo (11), Cocina del Caos (19).
-- **Pendiente:** Portales Imposibles (20); reino explorable en ¡SALVA AL REY! y EL VALLE ENCANTADO (`docs/specs/REINO_EXPLORABLE.md`).
-- **Comandos:** `npm run serve` · `npm test` · `npm run typecheck` · `ML_WORKERS=1 npx playwright test tests/e2e/<id>.spec.js` (validar también con `ML_WORKERS=4`) · `node tools/make-thumbs.mjs <id>`.
-- **Integrar un juego nuevo:** entrada en `games/registry.js` (con `added`), JSON-LD y enlace estático en `index.html`, miniatura, línea en `START` de `tests/e2e/lifecycle.spec.js`, fila en IMPLEMENTATION_PROGRESS.
-- **Trampas conocidas:** 2 joysticks físicos en la máquina de desarrollo (el SDK los ignora bajo webdriver); Chromium headless demora timers/entrada con carga → pruebas deterministas con `simulate()`; el CI de GitHub corre en 2 núcleos con WebGL por software.
+- **Estado:** **20/20 juegos publicados**, más el modo Reino del Alba. `main` = `e3c0952` (PR #10). Producción: https://miniarcade-gold.vercel.app
+- **Rama de trabajo:** `feat/miniarcade-3`. Se mergea a `main` por PR, solo con el CI en verde; el dueño lo autorizó.
+- **Siguiente trabajo sugerido** (ver `docs/PENDIENTES.md`):
+  1. estabilizar la prueba inestable de `granja_runas`;
+  2. migrar a Three.js 0.186 los 3 juegos 3D originales, con regresión visual;
+  3. probar en dispositivos reales y medir FPS;
+  4. agregar el logo oficial de MateLabs para los coleccionables, si el dueño lo provee.
+- **Comandos:**
+  - `npm run serve`
+  - `npm test`
+  - `npm run typecheck`
+  - `ML_WORKERS=1 npx playwright test tests/e2e/<id>.spec.js` (también con `ML_WORKERS=4`)
+  - `node tools/make-thumbs.mjs <id>`
+- **Integrar un juego:** entrada en `games/registry.js` (con `added`), JSON-LD y enlace en `index.html`, miniatura, línea en `START` de `tests/e2e/lifecycle.spec.js` y fila en IMPLEMENTATION_PROGRESS.
+- **Trampas conocidas:**
+  - la máquina de desarrollo tiene 2 joysticks físicos (el SDK los ignora bajo webdriver);
+  - Chromium headless demora timers y entrada cuando hay carga, así que las pruebas usan `simulate()` o tiempo manual;
+  - el CI corre en runners de 2 núcleos con WebGL por software.

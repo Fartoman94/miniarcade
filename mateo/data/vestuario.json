@@ -1,0 +1,38 @@
+{
+  "schema": "mateo-wardrobe-v2-juego",
+  "note": "Adaptado del kit (docs/kit_v2/data/vestuario.json). Prendas y trajes ORIGINALES: sin marcas ni diseños de terceros. El traje M es azul/rojo con la M propia del juego.",
+  "heroSuits": [
+    { "id": "heroe_m_azul", "name": "Traje M Original", "unlockReputation": 0, "suit": "#1f2c52", "panel": "#394150", "accent": "#d63031", "trim": "#f5f5f5", "glow": "#5ff2ff" },
+    { "id": "heroe_m_noche", "name": "M Nocturno", "unlockReputation": 90, "suit": "#1d2438", "panel": "#2a3350", "accent": "#66cfff", "trim": "#dfe8f0", "glow": "#9fe8ff" },
+    { "id": "heroe_m_aurora", "name": "M Aurora", "unlockReputation": 200, "suit": "#5b3f9e", "panel": "#47367a", "accent": "#efc948", "trim": "#fff6dc", "glow": "#ffe27a" }
+  ],
+  "civil": {
+    "top": [
+      { "id": "remera_blanca", "name": "Remera blanca", "color": "#f0efe9", "start": true },
+      { "id": "buzo_gris", "name": "Buzo gris", "color": "#8a9099", "start": true },
+      { "id": "remera_verde", "name": "Remera verde", "color": "#3f9a5a", "start": true },
+      { "id": "remera_azul", "name": "Remera azul", "color": "#2f6db0" },
+      { "id": "campera_naranja", "name": "Campera naranja", "color": "#e07a2a" }
+    ],
+    "pants": [
+      { "id": "pantalon_azul", "name": "Jean azul", "color": "#3a5683", "start": true },
+      { "id": "pantalon_negro", "name": "Pantalón negro", "color": "#2b2b30", "start": true },
+      { "id": "pantalon_gris", "name": "Pantalón gris", "color": "#7d8288" }
+    ],
+    "shoes": [
+      { "id": "zapatillas_blancas", "name": "Zapatillas blancas", "color": "#f2f2f2", "sole": "#b9b9b9", "start": true },
+      { "id": "zapatillas_urbanas", "name": "Zapatillas urbanas", "color": "#3a6fd0", "sole": "#f2f2f2" }
+    ],
+    "accessory": [
+      { "id": "ninguno", "name": "Sin accesorio", "start": true },
+      { "id": "gorra_azul", "name": "Gorra azul", "color": "#2f5fb0", "start": true },
+      { "id": "mochila_amarilla", "name": "Mochila amarilla", "color": "#e8b81a" }
+    ]
+  },
+  "start": { "top": "remera_blanca", "pants": "pantalon_azul", "shoes": "zapatillas_blancas", "accessory": "ninguno" },
+  "presets": [
+    { "id": "casual_blanco", "name": "Mateo Casual", "top": "remera_blanca", "pants": "pantalon_azul", "shoes": "zapatillas_blancas", "accessory": "ninguno" },
+    { "id": "casual_deporte", "name": "Día de Parque", "top": "buzo_gris", "pants": "pantalon_negro", "shoes": "zapatillas_blancas", "accessory": "gorra_azul" }
+  ],
+  "slots": ["top", "pants", "shoes", "accessory", "full_suit"]
+}

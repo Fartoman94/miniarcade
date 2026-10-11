@@ -1,0 +1,26 @@
+{
+  "schema": "mateo-jobs-v2-juego",
+  "note": "Adaptado del kit (docs/kit_v2/data/actividades.json). Actividades solidarias, opcionales y NO peligrosas para un protagonista niño; pagan sólo monedas M de ficción. Cada trabajo tiene enfriamiento en minutos de juego y paga UNA vez por vuelta (transacción con id único).",
+  "jobs": [
+    { "id": "cartas", "name": "Cartas de agradecimiento", "district": "centro", "reward": 45, "cooldownGameMinutes": 240, "difficulty": 1,
+      "steps": [ { "anchor": "tablero", "label": "Recibí las cartas en la cartelera del barrio", "prompt": "Recibir cartas ✉️" },
+                 { "anchor": "puerta_vecina_1", "label": "Repartí la carta 1 de 3 (Barrio Las Glicinas)", "prompt": "Dejar carta ✉️" },
+                 { "anchor": "puerta_vecina_2", "label": "Repartí la carta 2 de 3", "prompt": "Dejar carta ✉️" },
+                 { "anchor": "puerta_vecina_3", "label": "Repartí la carta 3 de 3", "prompt": "Dejar carta ✉️" },
+                 { "anchor": "tablero", "label": "Volvé a la cartelera del barrio", "prompt": "Avisar que terminaste ✔" } ] },
+    { "id": "jardin", "name": "Ayudar en el jardín de la plaza", "district": "centro", "reward": 50, "cooldownGameMinutes": 360, "difficulty": 1,
+      "steps": [ { "anchor": "plaza_regadera", "label": "Buscá la regadera junto a la fuente", "prompt": "Agarrar regadera 🚿" },
+                 { "anchor": "plaza_planta_1", "label": "Regá el cantero 1 de 3", "prompt": "Regar 💧" },
+                 { "anchor": "plaza_planta_2", "label": "Regá el cantero 2 de 3", "prompt": "Regar 💧" },
+                 { "anchor": "plaza_planta_3", "label": "Regá el cantero 3 de 3", "prompt": "Regar 💧" },
+                 { "anchor": "plaza_regadera", "label": "Devolvé la regadera", "prompt": "Devolver regadera ✔" } ] },
+    { "id": "fotos", "name": "Fotos para el diario escolar", "district": "centro", "reward": 65, "cooldownGameMinutes": 240, "difficulty": 1,
+      "steps": [ { "anchor": "foto_fuente", "label": "Sacá una foto de la fuente de la plaza", "prompt": "Sacar foto 📸" },
+                 { "anchor": "foto_avenida", "label": "Sacá una foto de la Avenida Prisma", "prompt": "Sacar foto 📸" },
+                 { "anchor": "foto_glicinas", "label": "Sacá una foto del Barrio Las Glicinas", "prompt": "Sacar foto 📸" },
+                 { "anchor": "tablero", "label": "Dejá el álbum en la cartelera del barrio", "prompt": "Entregar álbum 📒" } ] },
+    { "id": "paquetes", "name": "Llevar las compras a un vecino", "district": "centro", "reward": 80, "cooldownGameMinutes": 180, "difficulty": 1,
+      "steps": [ { "anchor": "mercado", "label": "Retirá las compras en el Mercado Prisma", "prompt": "Retirar bolsa 🛍" },
+                 { "anchor": "puerta_vecina_3", "label": "Llevá la bolsa a la casa de Doña Rosa (Las Glicinas)", "prompt": "Entregar bolsa 🛍" } ] }
+  ]
+}
