@@ -197,6 +197,14 @@
   footer .made img{width:28px;height:28px;border-radius:50%;box-shadow:0 0 12px rgba(46,230,230,.4)}
   footer .made b{color:var(--brand);font-weight:700}
 
+  @media (pointer:coarse){
+    .chip{min-height:44px;padding:10px 16px;font-size:13px}
+    .fav{width:44px;height:44px}
+    .info-btn{min-height:48px}
+    .tag{font-size:11px}
+    .me span,.d-stats span,.mini small,.brand small{font-size:11px}
+    .orbit a{min-width:44px;min-height:44px}
+  }
   @media (max-width:640px){
     .d-stats{grid-template-columns:repeat(2,1fr)}
     .grid{grid-template-columns:1fr;gap:16px}

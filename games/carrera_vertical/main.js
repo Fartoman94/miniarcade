@@ -43,7 +43,7 @@ function sanitize() {
   const o = s.opts, dO = D.opts;
   s.opts = {
     sens: typeof o.sens === 'number' && o.sens >= 0.3 && o.sens <= 2.5 ? o.sens : 1,
-    invert: !!o.invert, autocam: o.autocam !== false, music: o.music !== false,
+    invert: !!o.invert, autocam: o.autocam !== false, music: o.music !== false, haptics: o.haptics !== false,
     motion: ['auto', 'reduce', 'full'].includes(o.motion) ? o.motion : 'auto',
     ghost: ['best', 'last', 'off'].includes(o.ghost) ? o.ghost : 'best',
     binds: { ...dO.binds, ...(o.binds && typeof o.binds === 'object' ? o.binds : {}) },
@@ -113,6 +113,69 @@ let input = createInput(game.root, { joystick: 'left', look: true, buttons: [{ i
 if (input.isTouch) document.body.classList.add('cv-touch');
 input.showTouch(false);
 const actBtn = /** @type {HTMLElement|null} */ (document.querySelector('.k3-btn[aria-label="action"]'));
+
+/* ======================= táctil: joystick flotante, ↩ con pulsación larga, vibración ======================= */
+/** Vibración corta opcional (se apaga en opciones o con movimiento reducido). @param {number|number[]} ms */
+function buzz(ms) { try { if (input.isTouch && S().opts.haptics && !reduced() && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* sin vibración */ } }
+let respawnTouch = false;
+const touchUI = /** @type {HTMLElement|null} */ (document.querySelector('.k3-touch'));
+const joyEl = /** @type {HTMLElement|null} */ (document.querySelector('.k3-joy'));
+if (input.isTouch && touchUI && joyEl) {
+  // Zona del pulgar izquierdo: tocar en cualquier lugar de ella centra el joystick bajo el dedo, así un toque
+  // impreciso nunca gira la cámara por error; el resto de la pantalla (fuera de botones) sigue siendo para mirar.
+  const zone = document.createElement('div'); zone.className = 'cv-joyzone'; zone.setAttribute('aria-hidden', 'true');
+  touchUI.insertBefore(zone, touchUI.firstChild);
+  const home = () => { joyEl.style.left = joyEl.style.bottom = ''; joyEl.classList.remove('cv-float'); };
+  zone.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const r = joyEl.getBoundingClientRect(), half = r.width / 2;
+    const x = clamp(e.clientX, half + 4, innerWidth - half - 4), y = clamp(e.clientY, half + 4, innerHeight - half - 4);
+    joyEl.style.left = (x - half) + 'px'; joyEl.style.bottom = (innerHeight - y - half) + 'px'; joyEl.classList.add('cv-float');
+    joyEl.dispatchEvent(new PointerEvent('pointerdown', { pointerId: e.pointerId, pointerType: e.pointerType, isPrimary: e.isPrimary, clientX: e.clientX, clientY: e.clientY, bubbles: true, cancelable: true }));
+  });
+  joyEl.addEventListener('pointerup', home); joyEl.addEventListener('pointercancel', home);
+  // volver al punto de control: mantener 0,45 s (evita toques accidentales que te harían perder el avance)
+  const rb = document.createElement('div'); rb.className = 'cv-respawn'; rb.textContent = '↩'; rb.setAttribute('role', 'button'); rb.setAttribute('aria-label', 'respawn');
+  rb.title = 'Mantené para volver al punto de control';
+  touchUI.appendChild(rb);
+  let rid = -1, rt0 = 0, raf = 0;
+  const rStop = () => { rid = -1; cancelAnimationFrame(raf); rb.classList.remove('on'); rb.style.removeProperty('--p'); };
+  const rTick = () => {
+    if (rid === -1) return;
+    const k = (performance.now() - rt0) / 450;
+    rb.style.setProperty('--p', Math.min(100, k * 100).toFixed(0) + '%');
+    if (k >= 1) { respawnTouch = true; buzz(25); rStop(); return; }
+    raf = requestAnimationFrame(rTick);
+  };
+  rb.addEventListener('pointerdown', e => { e.preventDefault(); if (rid !== -1) return; rid = e.pointerId; try { rb.setPointerCapture(rid); } catch (er) { /* */ } rt0 = performance.now(); rb.classList.add('on'); raf = requestAnimationFrame(rTick); });
+  const rUp = e => { if (e.pointerId !== rid) return; if (performance.now() - rt0 < 450) toast('Mantené ↩ apretado para volver al punto de control', 1400); rStop(); };
+  rb.addEventListener('pointerup', rUp); rb.addEventListener('pointercancel', rStop);
+  for (const b of document.querySelectorAll('.k3-btn')) b.addEventListener('pointerdown', () => buzz(8));
+  // al irse a segundo plano no quedan dedos «pegados» (sin pointerup) ni el joystick fuera de lugar
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { input.clear(); home(); rStop(); } });
+}
+
+/* aviso suave (no bloquea) para girar el teléfono: el parkour se ve mejor apaisado */
+const rotHint = document.createElement('div'); rotHint.id = 'cv-rot'; rotHint.hidden = true; rotHint.setAttribute('role', 'status');
+rotHint.textContent = '📱↻ Girá el teléfono: en apaisado ves más';
+document.body.appendChild(rotHint);
+let rotShown = false, rotT = 0; // rotT: segundos de juego que le quedan al aviso
+rotHint.addEventListener('pointerdown', e => { e.stopPropagation(); rotHint.hidden = true; });
+function maybeRotHint() {
+  if (rotShown || !input.isTouch || innerWidth >= innerHeight) return;
+  rotShown = true; rotHint.hidden = false; rotT = 5;
+}
+addEventListener('resize', () => { if (innerWidth > innerHeight) rotHint.hidden = true; placeTip(); });
+/** En vertical táctil el tutorial va arriba, debajo del HUD y de las misiones, para no tapar a la corredora. */
+function placeTip() {
+  if (!input.isTouch) return;
+  const mh = /** @type {HTMLElement|null} */ (document.querySelector('.mlm-hud'));
+  const t = /** @type {HTMLElement|null} */ (document.querySelector('#cv-chips'));
+  let y = 120;
+  if (mh && !mh.hidden) y = Math.max(y, mh.getBoundingClientRect().bottom);
+  if (t) y = Math.max(y, t.getBoundingClientRect().bottom + 14);
+  document.body.style.setProperty('--cv-tip-top', Math.round(y + 8) + 'px');
+}
 
 /* ======================= carrera ======================= */
 const run = {
@@ -185,7 +248,7 @@ const ctx = {
 const P = createPlayer(ctx);
 
 /* ======================= tutorial contextual ======================= */
-const K = id => input.isTouch ? ({ jump: 'SALTO', slide: 'DESLIZ', action: 'ACCIÓN', respawn: '↩' })[id] : keyLabel(binds()[id]);
+const K = id => input.isTouch ? ({ jump: 'SALTO', slide: 'DESLIZ', action: 'ACCIÓN', respawn: 'mantener ↩' })[id] : keyLabel(binds()[id]);
 const TIPS = {
   move: () => input.isTouch ? 'Corré con el <b>joystick</b>: el sprint llega solo si no frenás. La cámara te sigue; arrastrá el dedo para mirar.' : 'Corré con <b>WASD</b>: el sprint llega solo si no frenás. La cámara te sigue; arrastrá el mouse o usá <b>Q/E</b> para mirar.',
   jump: () => `Saltá con <b>${K('jump')}</b>. Si llegás justo, te agarrás de la cornisa sola. Mantené apretado para saltar más alto.`,
@@ -209,7 +272,7 @@ function tip(id) {
   const t = S().tutorial;
   if (t.off || t.seen[id] || tipId === id || state !== 'play') return;
   t.seen[id] = true; persist();
-  tipId = id; tipT = 10;
+  tipId = id; tipT = 10; placeTip();
   ui.tip(/** @type {any} */ (TIPS)[id](), a => { if (a === 'skip') { S().tutorial.off = true; persist(); toast('Tutorial desactivado (lo reactivás desde «Cómo jugar»)', 2200); } closeTip(); });
   emit('tutorial');
 }
@@ -295,7 +358,7 @@ function startRun(id) {
   cam.tx = W.start.x; cam.ty = W.start.y + 1.4; cam.tz = W.start.z;
   closeTip(); fx.clear();
   menu.hide(); endScreen.hide(); helpScreen.hide(); optScreen.hide();
-  ui.show(true); input.showTouch(true); input.clear(); ui.fade(false);
+  ui.show(true); input.showTouch(true); input.clear(); respawnTouch = false; ui.fade(false);
   M.runStart();
   // progreso de campaña ya logrado (las metas acumulativas no se pierden entre sesiones)
   const doneN = COURSES.slice(0, 3).filter(c => s.done[c.id]).length; if (doneN) emit('circuit', doneN);
@@ -306,7 +369,7 @@ function startRun(id) {
   if (boss) { boss.start(); state = 'intro'; run.stateT = 0; A.refresh(); ui.title('VIGÍA MAYOR', 'CIRCUITO MAESTRO · EL GRAN EVENTO', 3800); sfx.roar(); }
   else beginCountdown();
 }
-function beginCountdown() { state = 'count'; run.stateT = 0; run.countN = 4; A.refresh(); ui.title(run.course.name, `${['I', 'II', 'III', 'FINAL'][courseIndex(run.course.id)]} · ${run.ghost ? 'FANTASMA ' + fmtTime(run.ghost.t) : 'SIN FANTASMA'}`, 1500); }
+function beginCountdown() { maybeRotHint(); state = 'count'; run.stateT = 0; run.countN = 4; A.refresh(); ui.title(run.course.name, `${['I', 'II', 'III', 'FINAL'][courseIndex(run.course.id)]} · ${run.ghost ? 'FANTASMA ' + fmtTime(run.ghost.t) : 'SIN FANTASMA'}`, 1500); }
 function endRun(won) {
   M.runEnd({ won });
   A.ended({ score: Math.max(0, Math.round(run.result ? run.result.score : run.score)) });
@@ -330,13 +393,13 @@ function startFall(fell = true) {
   if (fell) {
     const d = diff();
     run.pen += d.fallPen; run.falls++; run.fallsInSector++; showPen(`+${d.fallPen} s`);
-    sfx.fall(); emit('fall'); ctx.breakCombo();
+    sfx.fall(); emit('fall'); ctx.breakCombo(); buzz(30);
     toast(`¡Caíste! +${d.fallPen} s · volvés al punto de control`, 1500);
   }
 }
 function capture() {
   run.captures++;
-  sfx.capture(); fx.shake(0.5); if (!reduced()) ui.flash();
+  sfx.capture(); fx.shake(0.5); if (!reduced()) ui.flash(); buzz([30, 40, 30]);
   emit('captured');
   if (run.captures >= diff().captures) { defeat('captured'); return; }
   const d = diff();
@@ -458,6 +521,8 @@ function updateGhost(t) {
 
 /* ======================= actualización ======================= */
 const cam = { yaw: 0, pitch: 0.3, dist: 6, tx: 0, ty: 0, tz: 0, lookT: 9, roll: 0, menuA: 0, fov: 62 };
+/** FOV vertical base: en vertical (pantalla angosta) se abre para que el ancho visible no sea un túnel. */
+const fovBase = () => camera.aspect < 0.8 ? 72 : 62;
 let bot = /** @type {any} */ (null), dbgFreeze = false;
 /** piloto automático (sólo ?debug): sigue puntos de paso con acciones; la física y las reglas son las reales */
 function botInput() {
@@ -490,9 +555,10 @@ function readInput() {
     jumpHit: input.hit(bd.jump, 'F13', 'btn:jump'), jumpHeld: input.down(bd.jump) || input.down('F13') || input.button('jump'),
     slideHit: input.hit(bd.slide, 'KeyC', 'ControlLeft', 'F14', 'btn:slide'), slideHeld: input.down(bd.slide) || input.down('KeyC') || input.down('F14') || input.button('slide'),
     actionHit: input.hit(bd.action, 'F15', 'btn:action'),
-    respawnHit: input.hit(bd.respawn, 'F16'),
+    respawnHit: input.hit(bd.respawn, 'F16') || takeRespawnTouch(),
   };
 }
+function takeRespawnTouch() { const r = respawnTouch; respawnTouch = false; return r; }
 function update(dt) {
   W && W.update(dt, state === 'play' ? P : null);
   if (boss) {
@@ -558,6 +624,7 @@ function update(dt) {
   updateGhost(run.clock);
   run.comboT -= dt; if (run.comboT <= 0 && run.combo) { run.combo = 0; run.lastMove = ''; }
   if (tipId) { tipT -= dt; if (tipT <= 0) closeTip(); }
+  if (rotT > 0 && (rotT -= dt) <= 0) rotHint.hidden = true;
   hudTick(dt);
   input.endStep();
 }
@@ -669,11 +736,21 @@ function updateCamera(dt, inp) {
   const rollWant = !reduced() && P.mode === 'wall' ? -P.wall.side * 0.09 : 0;
   cam.roll += (rollWant - cam.roll) * Math.min(1, dt * 6);
   if (cam.roll) camera.rotateZ(cam.roll);
-  const fovWant = reduced() ? 62 : 62 + clamp((sp - 8) * 1.3, 0, 10);
+  framePortrait();
+  const fovWant = reduced() ? fovBase() : fovBase() + clamp((sp - 8) * 1.3, 0, 10);
   if (Math.abs(fovWant - cam.fov) > 0.05) { cam.fov += (fovWant - cam.fov) * Math.min(1, dt * 4); camera.fov = cam.fov; camera.updateProjectionMatrix(); }
   ui.speedFx(reduced() ? 0 : clamp((sp - 10.5) / 6, 0, 1));
   followLights();
   void inp;
+}
+/** En vertical se corre el encuadre hacia abajo: la corredora queda más baja (entre el joystick y los botones,
+ *  lejos del tutorial) y se ve más recorrido por delante. */
+let viewShift = 0;
+function framePortrait() {
+  const want = state !== 'menu' && camera.aspect < 0.8 ? 0.1 : 0;
+  if (want === viewShift) return;
+  viewShift = want;
+  if (want) camera.setViewOffset(1, 1, 0, -want, 1, 1); else camera.clearViewOffset();
 }
 function followLights() {
   const th = W.theme, sd = th.sunDir;
@@ -697,7 +774,8 @@ function menuCamera(dt) {
     cam.tx = p.x; cam.ty = p.y; cam.tz = p.z;
     poseRunner(RM, 0, 0, a * 20); placeRunner(); blob.visible = false;
   }
-  if (camera.fov !== 62) { camera.fov = 62; cam.fov = 62; camera.updateProjectionMatrix(); }
+  framePortrait();
+  if (camera.fov !== fovBase()) { camera.fov = cam.fov = fovBase(); camera.updateProjectionMatrix(); }
   ui.speedFx(0);
   followLights();
 }
@@ -732,6 +810,17 @@ const endScreen = screen('', { accent: ACCENT, id: 'cv-end' }); endScreen.hide()
 const helpScreen = screen('', { accent: ACCENT, id: 'cv-help' }); helpScreen.hide();
 const optScreen = screen('', { accent: ACCENT, id: 'cv-opts' }); optScreen.hide();
 let selected = S().last;
+/* aviso «deslizá para ver más» cuando una pantalla no entra (celulares bajos): nada queda cortado sin pista */
+const moreHint = document.createElement('div'); moreHint.className = 'cv-more'; moreHint.hidden = true; moreHint.setAttribute('aria-hidden', 'true');
+moreHint.textContent = '▾ Deslizá para ver más'; document.body.appendChild(moreHint);
+const SCREENS = [menu, endScreen, helpScreen, optScreen];
+function checkMore() {
+  const sc = SCREENS.map(x => x.el).find(e => !e.hidden);
+  moreHint.hidden = !sc || sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 8;
+}
+const moreMO = new MutationObserver(() => requestAnimationFrame(checkMore));
+for (const x of SCREENS) { x.el.addEventListener('scroll', checkMore, { passive: true }); moreMO.observe(x.el, { attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true }); x.el.addEventListener('toggle', checkMore, true); }
+addEventListener('resize', () => requestAnimationFrame(checkMore));
 function diffText() {
   const d = diff();
   return `Caída +${d.fallPen} s · Alarma +${d.alarmPen} s · Detección ${d.detect} s · Aviso de torreta ${d.turretWarn} s · Barreras ×${d.barrier} · Drones ×${d.drone} · Vigía ${d.bossChase} m/s, ${d.captures} captura${d.captures > 1 ? 's' : ''} · Límite ×${d.limitMul} · Oro ×${d.champMul} · Alcance de cornisa ${d.reach} m${d.marker ? ' · marca de aterrizaje' : ''}`;
@@ -752,14 +841,16 @@ function showMenu() {
   if (courseIndex(selected) + 1 > s.unlocked) selected = COURSES[s.unlocked - 1].id;
   const c = courseById(selected);
   const doneN = COURSES.filter(x => s.done[x.id]).length;
-  menu.show(`<span class="k3-kicker">PARKOUR URBANO 3D</span><h1>CARRERA VERTICAL</h1>
+  // dos columnas en apaisado bajo (CSS): título + botón principal | circuitos, dificultad y opciones; en vertical, una sola
+  const tall = innerHeight > 880;
+  menu.show(`<div class="cv-mcol cv-mcol-a"><span class="k3-kicker">PARKOUR URBANO 3D</span><h1>CARRERA VERTICAL</h1>
     <p>${s.champion ? '🏆 <b>Campeón Vertical</b> · ' : ''}Corré por las azoteas, por las paredes y por los cables. Batí tus fantasmas y escapá del dron jefe.</p>
-    <div class="k3-btnrow"><button class="k3-b" data-go>▶ Correr: ${c.short}</button></div>
-    <div class="cv-courses" role="group" aria-label="Circuitos">${courseCards()}</div>
+    <div class="k3-btnrow"><button class="k3-b cv-go" data-go>▶ Correr: ${c.short}</button></div>
+    <div class="cv-credit">CREADO POR <img src="matelabs/mascota-128.webp" alt="">MATELABS</div></div>
+    <div class="cv-mcol cv-mcol-b"><div class="cv-courses" role="group" aria-label="Circuitos">${courseCards()}</div>
     <div class="cv-menu-prog">Circuitos ${doneN}/${COURSES.length} · ${c.blurb}</div>
-    <div data-diff></div><div class="cv-dtab" data-dtab>${diffText()}</div>
-    <div class="k3-btnrow"><button class="k3-b alt" data-opts>⚙ Controles y opciones</button><button class="k3-b alt" data-help>📖 Cómo jugar</button></div>
-    <div class="cv-credit">CREADO POR <img src="matelabs/mascota-128.webp" alt="">MATELABS</div>`);
+    <div data-diff></div><details class="cv-dtab"${tall ? ' open' : ''}><summary>Qué cambia con la dificultad</summary><span data-dtab>${diffText()}</span></details>
+    <div class="k3-btnrow"><button class="k3-b alt" data-opts>⚙ Controles y opciones</button><button class="k3-b alt" data-help>📖 Cómo jugar</button></div></div>`);
   const holder = /** @type {HTMLElement} */ (menu.el.querySelector('[data-diff]'));
   M.difficultyPicker(holder, { onChange: () => { const t = menu.el.querySelector('[data-dtab]'); if (t) t.textContent = diffText(); } });
   loadCourse(selected);
@@ -814,13 +905,15 @@ function openOptions(pause) {
   const sel = (key, opts) => `<select data-${key}>${opts.map(([v, l]) => `<option value="${v}"${/** @type {any} */ (o)[key] === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
   optScreen.show(`<span class="k3-kicker">OPCIONES</span><h1 style="font-size:30px">CONTROLES</h1>
     <div class="cv-opts">
-      ${row('jump', 'Saltar')}${row('slide', 'Deslizar / rodar')}${row('action', 'Acción (tirolina)')}${row('respawn', 'Volver al punto de control')}
+      ${input.isTouch ? '' : row('jump', 'Saltar') + row('slide', 'Deslizar / rodar') + row('action', 'Acción (tirolina)') + row('respawn', 'Volver al punto de control')}
       <label>Sensibilidad de cámara <input type="range" min="0.4" max="2" step="0.1" value="${o.sens}" data-sens aria-label="Sensibilidad de cámara"></label>
       <label>Invertir cámara vertical <input type="checkbox" data-invert ${o.invert ? 'checked' : ''}></label>
       <label>Cámara automática detrás del corredor <input type="checkbox" data-autocam ${o.autocam ? 'checked' : ''}></label>
       <label>Fantasma ${sel('ghost', [['best', 'Mejor carrera'], ['last', 'Carrera anterior'], ['off', 'Apagado']])}</label>
       <label>Música (pulso) <input type="checkbox" data-music ${o.music ? 'checked' : ''}></label>
+      ${input.isTouch ? `<label>Vibración al tocar los botones <input type="checkbox" data-haptics ${o.haptics ? 'checked' : ''}></label>` : ''}
       <label>Movimiento (sacudidas, destellos, FOV) ${sel('motion', [['auto', 'Según el sistema'], ['reduce', 'Reducido'], ['full', 'Completo']])}</label>
+      ${input.isTouch ? '<div class="cv-small">Táctil: joystick donde apoyes el pulgar izquierdo (mitad inferior izquierda) · SALTO / DESLIZ / ACCIÓN a la derecha · mantené ↩ para volver al punto de control · arrastrá en el resto de la pantalla para mirar.</div>' : ''}
       <div class="cv-small">Mover: WASD/flechas · Cámara: Q/E o arrastrar · Gamepad: A saltar, B deslizar, X acción, Y punto de control, LB/RB cámara, Start pausa. Sonido y calidad gráfica: menú ⏸ de la barra.</div>
     </div>
     <div class="k3-btnrow"><button class="k3-b" data-back>Listo</button><button class="k3-b alt" data-defaults>Valores por defecto</button></div>`);
@@ -834,6 +927,7 @@ optScreen.el.addEventListener('input', e => {
   if (t.matches('[data-invert]')) o.invert = t.checked;
   if (t.matches('[data-autocam]')) o.autocam = t.checked;
   if (t.matches('[data-music]')) o.music = t.checked;
+  if (t.matches('[data-haptics]')) o.haptics = t.checked;
   if (t.matches('[data-ghost]')) o.ghost = t.value;
   if (t.matches('[data-motion]')) o.motion = t.value;
   persist();

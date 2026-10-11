@@ -432,26 +432,63 @@ test.describe('Cocina del Caos', () => {
     expectNoErrors(errors);
   });
 
-  for (const vp of [{ w: 412, h: 915 }, { w: 915, h: 412 }]) {
-    test(`celular ${vp.w}×${vp.h}: sin superposiciones ni scroll, controles táctiles funcionan`, async ({ page, isMobile }) => {
+  /* ===================== móvil (proyecto 'mobile', Pixel 7 con toque emulado) ===================== */
+  const VIEWPORTS = [{ w: 360, h: 640 }, { w: 390, h: 844 }, { w: 412, h: 915 }, { w: 915, h: 412 }, { w: 844, h: 390 }];
+  /** Cajas visibles de la UI propia + barra del SDK, superposiciones, desbordes y objetivos táctiles chicos. */
+  const layout = (page, sels) => page.evaluate(sels => {
+    const vis = e => { for (let p = e; p; p = p.parentElement) if (p.hidden) return false; const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden') return false; const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+    const box = s => { const e = document.querySelector(s); return e && vis(e) ? e.getBoundingClientRect() : null; };
+    const els = Object.fromEntries(Object.entries(sels).map(([k, s]) => [k, box(s)]));
+    const hit = (a, b) => a && b && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    const pairs = []; const k = Object.keys(els);
+    for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) if (hit(els[k[i]], els[k[j]])) pairs.push(k[i] + '/' + k[j]);
+    const out = Object.entries(els).filter(([, b]) => b && (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1)).map(([n]) => n);
+    const small = [];
+    for (const e of document.querySelectorAll('button,[role=button],a[href]')) {
+      if (!vis(e)) continue; const b = e.getBoundingClientRect();
+      if (b.width < 44 || b.height < 44) small.push(`${(e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 20)} ${Math.round(b.width)}×${Math.round(b.height)}`);
+    }
+    return { pairs, out, small, scrollW: document.documentElement.scrollWidth, scrollH: document.documentElement.scrollHeight, els };
+  }, sels);
+  const HUD = { top: '#hTop', tickets: '#tickets .tk:not([hidden])', joy: '.k3-joy', act: '.k3-btn[aria-label="act"]', dash: '.k3-btn[aria-label="dash"]', help: '.k3-btn[aria-label="help"]', bar: '.mla-bar', prompt: '#prompt', missions: '#missions', phase: '#phase' };
+
+  for (const vp of VIEWPORTS) {
+    test(`celular ${vp.w}×${vp.h}: menú entra (Jugar visible y tocable), HUD sin superposiciones, objetivos ≥ 44 px, partida sólo táctil`, async ({ page, isMobile }) => {
       test.skip(!isMobile, 'sólo en el proyecto mobile');
       await page.setViewportSize({ width: vp.w, height: vp.h });
-      const errors = await start(page, true);
+      const { errors } = await openGame(page, FILE);
+      await ready(page);
+      // menú: sin scroll horizontal, nada propio fuera de los costados, botón principal ≥ 56 px dentro de la pantalla y sin tapar la barra del SDK
+      const m = await layout(page, { play: '#ccMenu [data-play]', kicker: '#ccMenu .k3-kicker', title: '#ccMenu h1', bar: '.mla-bar' });
+      expect(m.scrollW).toBeLessThanOrEqual(vp.w);
+      expect(m.pairs).toEqual([]);
+      expect(m.small).toEqual([]);
+      expect(m.els.play.height).toBeGreaterThanOrEqual(56);
+      expect(m.els.play.bottom).toBeLessThanOrEqual(vp.h);
+      const cards = await page.evaluate(() => [...document.querySelectorAll('#ccMenu .cc-k')].map(e => e.getBoundingClientRect()).filter(b => b.left < 0 || b.right > innerWidth).length);
+      expect(cards).toBe(0);
+      await page.locator('#ccMenu [data-play]').tap();
+      await expect.poll(() => hk(page, 'state'), POLL).toBe('play');
+      // tutorial: el cuadro no pisa controles, HUD ni barra
+      await expect(page.locator('#coach')).toBeVisible();
+      const t = await layout(page, { ...HUD, coach: '#coach' });
+      expect(t.pairs.filter(p => p.includes('coach'))).toEqual([]);
+      expect(t.out).toEqual([]);
+      await page.locator('#coachSkip').tap();
+      await expect(page.locator('#coach')).toBeHidden();
       await expect.poll(() => hk(page, 'orders.length'), POLL).toBeGreaterThan(0);
       await page.evaluate(() => /** @type {any} */ (window).__cocina_caos.at('nevera_lechuga'));
       await wait(page, 400);
-      const r = await page.evaluate(() => {
-        const box = s => { const e = document.querySelector(s); if (!e || /** @type {HTMLElement} */ (e).hidden || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return b.width ? b : null; };
-        const els = { top: box('#hTop'), tickets: box('.tk:not([hidden])'), joy: box('.k3-joy'), act: box('.k3-btn[aria-label="act"]'), dash: box('.k3-btn[aria-label="dash"]'), help: box('.k3-btn[aria-label="help"]'), bar: box('.mla-bar'), prompt: box('#prompt') };
-        const hit = (a, b) => a && b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-        const pairs = []; const k = Object.keys(els);
-        for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) if (hit(els[k[i]], els[k[j]])) pairs.push(k[i] + '/' + k[j]);
-        const inside = Object.entries(els).filter(([, b]) => b && (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1)).map(([n]) => n);
-        return { pairs, inside, scrollW: document.documentElement.scrollWidth, scrollH: document.documentElement.scrollHeight, actSize: els.act ? els.act.width : 0 };
-      });
-      expect(r.pairs).toEqual([]); expect(r.inside).toEqual([]);
+      const r = await layout(page, HUD);
+      expect(r.pairs).toEqual([]); expect(r.out).toEqual([]); expect(r.small).toEqual([]);
       expect(r.scrollW).toBeLessThanOrEqual(vp.w); expect(r.scrollH).toBeLessThanOrEqual(vp.h);
-      expect(r.actSize).toBeGreaterThanOrEqual(90);
+      expect(r.els.act.width).toBeGreaterThanOrEqual(90);
+      // el botón de acción en la zona del pulgar (cuarto inferior derecho)
+      expect(r.els.act.left).toBeGreaterThan(vp.w / 2); expect(r.els.act.top).toBeGreaterThan(vp.h / 2);
+      // texto de juego legible: ≥ 12 px en HUD y aviso (los badges de los tickets ≥ 11)
+      const fs = await page.evaluate(() => ['#hTime', '#hScore', '#prompt', '.tk-p', '#pipoTag'].map(s => { const e = document.querySelector(s); return e ? parseFloat(getComputedStyle(e).fontSize) : 99; }));
+      for (const f of fs) expect(f).toBeGreaterThanOrEqual(12);
+      // acción central con toque real
       await expect(page.locator('.k3-btn[aria-label="act"]')).toHaveText('AGARRAR');
       await page.locator('.k3-btn[aria-label="act"]').tap();
       await expect.poll(() => hk(page, 'hold?.ing'), POLL).toBe('lechuga');
@@ -460,8 +497,72 @@ test.describe('Cocina del Caos', () => {
       const p0 = await hk(page, 'player');
       await page.locator('.k3-btn[aria-label="dash"]').tap();
       await expect.poll(async () => Math.hypot((await hk(page, 'player')).x - p0.x, (await hk(page, 'player')).z - p0.z), POLL).toBeGreaterThan(0.3);
+      // en vertical se ve la cocina entera hasta la cinta (sin cámara de seguimiento)
+      if (vp.h > vp.w) expect((await hk(page, 'camera')).follow).toBe(false);
       await page.screenshot({ path: `test-results/cocina_caos-${vp.w}x${vp.h}.png` });
       expectNoErrors(errors);
     });
   }
+
+  test('celular: multitáctil — caminar con el joystick y tocar ACCIÓN a la vez', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto mobile');
+    const errors = await start(page, true);
+    await quiet(page);
+    await page.evaluate(() => { const h = /** @type {any} */ (window).__cocina_caos; h.at('nevera_lechuga'); });
+    const j = /** @type {any} */ (await page.locator('.k3-joy').boundingBox()), a = /** @type {any} */ (await page.locator('.k3-btn[aria-label="act"]').boundingBox());
+    const jc = { x: j.x + j.width / 2, y: j.y + j.height / 2 }, ac = { x: a.x + a.width / 2, y: a.y + a.height / 2 };
+    const cdp = await page.context().newCDPSession(page);
+    const T = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
+    // dedo 1: joystick empujando hacia la nevera (sostenido) — dedo 2: toca ACCIÓN mientras el 1 sigue apoyado
+    await T('touchStart', [{ ...jc, id: 1 }]);
+    await T('touchMove', [{ x: jc.x, y: jc.y - 50, id: 1 }]);
+    await wait(page, 300);
+    await T('touchStart', [{ x: jc.x, y: jc.y - 50, id: 1 }, { ...ac, id: 2 }]);
+    await expect.poll(() => hk(page, 'hold?.ing'), POLL).toBe('lechuga');
+    expect(await page.locator('.k3-btn[aria-label="act"]').evaluate(e => e.classList.contains('on'))).toBe(true); // presión visible
+    await T('touchEnd', []);
+    await expect.poll(() => page.locator('.k3-btn[aria-label="act"]').evaluate(e => e.classList.contains('on')), POLL).toBe(false);
+    // el joystick sigue respondiendo después: abajo aleja al chef de la nevera
+    const z0 = (await hk(page, 'player')).z;
+    await T('touchStart', [{ ...jc, id: 3 }]);
+    await T('touchMove', [{ x: jc.x, y: jc.y + 50, id: 3 }]);
+    await expect.poll(async () => (await hk(page, 'player')).z - z0, POLL).toBeGreaterThan(0.5);
+    await T('touchEnd', []);
+    expectNoErrors(errors);
+  });
+
+  test('celular: rotar a mitad de partida reencuadra la cámara y reubica controles sin perder el estado', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto mobile');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const errors = await start(page, true);
+    await expect.poll(() => hk(page, 'orders.length'), POLL).toBeGreaterThan(0);
+    await page.evaluate(() => { const h = /** @type {any} */ (window).__cocina_caos; h.at('nevera_tomate'); h.act(); });
+    await expect.poll(() => hk(page, 'hold?.ing'), POLL).toBe('tomate');
+    const before = { cam: await hk(page, 'camera'), score: await hk(page, 'score'), orders: await hk(page, 'orders.length') };
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect.poll(async () => (await hk(page, 'camera')).dist, POLL).toBeLessThan(before.cam.dist - 5); // apaisado: cámara más cerca
+    await wait(page, 300);
+    const r = await layout(page, HUD);
+    expect(r.pairs).toEqual([]); expect(r.out).toEqual([]);
+    expect(await hk(page, 'state')).toBe('play');
+    expect(await hk(page, 'hold?.ing')).toBe('tomate');
+    expect(await hk(page, 'orders.length')).toBeGreaterThanOrEqual(before.orders);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(async () => Math.abs((await hk(page, 'camera')).dist - before.cam.dist), POLL).toBeLessThan(0.5);
+    expectNoErrors(errors);
+  });
+
+  test('celular: la app en segundo plano pausa la partida; volver y reanudar sigue jugando', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto mobile');
+    const errors = await start(page, true);
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect.poll(async () => (await sdk(page)).paused, POLL).toBe(true);
+    const t0 = await hk(page, 'simTime'); await wait(page, 800);
+    expect(await hk(page, 'simTime')).toBe(t0);
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+    await page.locator('.mla-pause [data-a="resume"]').tap();
+    await expect.poll(async () => (await sdk(page)).paused, POLL).toBe(false);
+    await expect.poll(() => hk(page, 'simTime'), POLL).toBeGreaterThan(t0);
+    expectNoErrors(errors);
+  });
 });

@@ -67,6 +67,9 @@ const input = createInput(g.root, { joystick: 'left', buttons: [{ id: 'act', lab
 input.showTouch(false);
 const actBtn = /** @type {HTMLElement} */ (document.querySelector('.k3-btn[aria-label="act"]'));
 const helpBtn = /** @type {HTMLElement} */ (document.querySelector('.k3-btn[aria-label="help"]'));
+// vibración breve al tocar los botones táctiles (si el equipo la soporta; se omite con «reducir movimiento»)
+const buzz = ms => { if (!REDUCED && input.isTouch && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) { /* sin vibración */ } };
+for (const b of document.querySelectorAll('.k3-btn')) b.addEventListener('pointerdown', () => buzz(8));
 
 /* ---------- luces ---------- */
 const hemi = new THREE.HemisphereLight(0xffe2b8, 0x4a3322, 1.25); scene.add(hemi);
@@ -110,7 +113,8 @@ function applyQuality(q) {
   applyFog();
   for (const k of Object.keys(G.kitchens)) { const st = G.kitchens[k].group.children.find(o => o.isPoints); if (st) st.geometry.setDrawRange(0, G.Q.stars); }
 }
-function applyFog() { scene.fog.near = G.Q.fog[0]; scene.fog.far = G.Q.fog[1]; camera.far = G.Q.fog[1] + 60; camera.updateProjectionMatrix(); }
+// la niebla se corre con la distancia de cámara: en celulares verticales la cámara se aleja más y, con valores fijos, la cocina quedaba velada
+function applyFog() { const ex = Math.max(0, (G.cam && G.cam.dist || 0) - 18); scene.fog.near = G.Q.fog[0] + ex; scene.fog.far = G.Q.fog[1] + ex; camera.far = scene.fog.far + 60; camera.updateProjectionMatrix(); }
 
 /* ======================= cocinas ======================= */
 function getKitchen(id) {
@@ -346,7 +350,7 @@ function cardHTML(id, i) {
 }
 function menuHTML() {
   const bq = SV.unlocked >= 4, bb = SV.best.banquete;
-  return `<span class="k3-kicker">MATELABS PRESENTA</span><h1>Cocina<br>del Caos</h1>
+  return `<span class="k3-kicker">MATELABS PRESENTA</span><h1>Cocina<br> del Caos</h1>
     <p>Picá, horneá, emplatá y serví pedidos contra reloj mientras todo se prende fuego. Tres cocinas, un ayudante a tus órdenes y el Gran Banquete del Rey.</p>
     <div class="cc-kgrid">${KITCHEN_ORDER.map(cardHTML).join('')}
       <button type="button" class="cc-k royal ${bq ? '' : 'locked'} ${G.selKitchen === 'banquete' ? 'sel' : ''}" data-k="banquete" ${bq ? '' : 'aria-disabled="true"'}><span class="cc-ki">${bq ? '👑' : '🔒'}</span><span class="cc-kt"><b>Gran Banquete</b><small>${bq ? (SV.banquetWon ? `🏆 superado · ${bb.stars}/9 ★` : 'Evento final en 3 fases') : 'Conseguí ★ en las 3 cocinas'}</small></span></button>
@@ -520,8 +524,11 @@ const _v = new THREE.Vector3(), _corner = new THREE.Vector3();
 function fitCamera(snap) {
   const K = G.K; if (!K) return;
   const portrait = innerWidth < innerHeight;
+  // al rotar, este 'resize' puede llegar antes que el ResizeObserver del motor: sin esto se encuadraba con el aspecto viejo
+  camera.aspect = innerWidth / Math.max(1, innerHeight); camera.updateProjectionMatrix();
   const pitch = portrait ? 1.22 : 0.98; G.cam.pitch = pitch;
-  const minX = -K.halfW - 0.4, maxX = K.halfW + 3.6, minZ = -K.halfH - 0.4, maxZ = K.halfH + 0.4;
+  // en vertical se encuadra sólo la cocina (hasta la cinta): el comedor queda fuera pero los pedidos se leen en los tickets
+  const minX = -K.halfW - 0.4, maxX = K.halfW + (portrait ? 0.5 : 3.6), minZ = -K.halfH - 0.4, maxZ = K.halfH + 0.4;
   const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2 + (portrait ? 0.4 : 0.6);
   const top = 0.66, bot = -0.82;
   let lo = 6, hi = 60;
@@ -537,10 +544,10 @@ function fitCamera(snap) {
   }
   // en vertical el plano completo queda chico: se acerca y sigue al chef
   const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
-  const maxD = (portrait ? 13 : 99) / 2 / Math.tan(hfov / 2) + 2;
+  const maxD = (portrait ? 16.4 : 99) / 2 / Math.tan(hfov / 2) + 2;
   G.cam.follow = hi > maxD; G.cam.dist = Math.min(hi, maxD); G.cam.cx = cx; G.cam.cz = cz;
   if (snap) { G.cam.tx = G.cam.follow ? G.player.x : cx; G.cam.tz = G.cam.follow ? G.player.z : cz; }
-  applyCam();
+  applyFog(); applyCam();
 }
 function applyCam() {
   const c = G.cam, d = c.dist;

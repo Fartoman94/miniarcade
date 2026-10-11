@@ -139,7 +139,8 @@ export function createInput(root, opts = {}) {
       justify-content:flex-end;max-width:220px;pointer-events:none}
     .k3-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.35);
       background:rgba(10,14,22,.55);color:#fff;font:800 13px system-ui,sans-serif;display:grid;place-items:center;user-select:none;-webkit-user-select:none}
-    .k3-btn.on{background:rgba(46,230,230,.4)}
+    .k3-btn.on{background:rgba(46,230,230,.4);transform:scale(.92)}
+    .k3-btn{transition:transform .06s}
     .k3-touch[hidden]{display:none}
   </style>`;
   /** @type {HTMLElement|null} */ let joyEl = null;

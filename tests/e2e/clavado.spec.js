@@ -463,3 +463,137 @@ test.describe('¡Clavado! 3.0', () => {
     expectNoErrors(errors);
   });
 });
+
+/* ---------------- Móvil (proyecto 'mobile', Pixel 7) ---------------- */
+const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+/** @param {number[]} a @param {number[]} b */
+const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+/** Rectángulos [x0,y0,x1,y1] de elementos visibles. */
+const rects = (page, sel) => page.evaluate(s => [...document.querySelectorAll(s)].filter(e => {
+  const cs = getComputedStyle(e); const r = e.getBoundingClientRect();
+  return cs.visibility !== 'hidden' && cs.display !== 'none' && r.width > 0 && r.height > 0 && !e.closest('[hidden]');
+}).map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }), sel);
+
+test.describe('¡Clavado! móvil', () => {
+  test.beforeEach(({ hasTouch }) => { test.skip(!hasTouch, 'sólo en el proyecto móvil'); });
+
+  test('matriz de pantallas: menú, HUD, misiones y cuchillo sin superposiciones; partida sólo con toques', async ({ page }) => {
+    test.setTimeout(150_000);
+    const { errors } = await openGame(page, DBG);
+    for (const [w, h] of SIZES) {
+      const tag = `${w}×${h}`;
+      await page.setViewportSize({ width: w, height: h });
+      await page.reload();
+      await page.waitForFunction(() => !!(/** @type {any} */ (window).__clavado));
+      await expect.poll(async () => (await S(page)).layout.W, { timeout: T }).toBe(w);
+      // menú: sin scroll, todo dentro de la pantalla y nada pisando la barra del arcade ni el selector
+      const sc = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight, innerWidth, innerHeight]);
+      expect(sc[0], tag + ' scroll horizontal').toBeLessThanOrEqual(sc[2]);
+      expect(sc[1], tag + ' scroll vertical').toBeLessThanOrEqual(sc[3]);
+      const bar = (await rects(page, '.mla-bar'))[0];
+      const diff = (await rects(page, '#diffBox .mlm-diff'))[0];
+      const menuEls = await rects(page, '#menu > :not(#diffBox):not(.foot)');
+      for (const r of [...menuEls, diff]) {
+        expect(r[0] >= 0 && r[1] >= 0 && r[2] <= w + 0.5 && r[3] <= h + 0.5, tag + ' fuera de pantalla ' + r).toBe(true);
+        expect(hit(r, bar), tag + ' tapado por la barra ' + r).toBe(false);
+      }
+      for (const r of menuEls) expect(hit(r, diff), tag + ' pisa el selector ' + r).toBe(false);
+      // objetivos táctiles
+      for (const r of await rects(page, '#diffBox button, .mla-bar .mla-btn')) expect(Math.min(r[2] - r[0], r[3] - r[1]), tag + ' objetivo chico').toBeGreaterThanOrEqual(44);
+      const play = page.locator('#playBtn');
+      await expect(play).toBeVisible();
+      const pb = /** @type {any} */ (await play.boundingBox());
+      expect(pb.height, tag + ' botón principal').toBeGreaterThanOrEqual(56);
+      // texto de juego legible
+      const fs = await page.evaluate(() => ['#goal', '#stage', '#playBtn'].map(s => parseFloat(getComputedStyle(/** @type {Element} */ (document.querySelector(s))).fontSize)));
+      for (const f of fs) expect(f, tag + ' texto chico').toBeGreaterThanOrEqual(12);
+
+      // arranque y lanzamiento con toques reales
+      await page.touchscreen.tap(pb.x + pb.width / 2, pb.y + pb.height / 2);
+      await expect.poll(async () => (await S(page)).state, { timeout: T }).toBe('playing');
+      await ready(page);
+      await dbg(page, 'setSpin', 0);
+      await dbg(page, 'aimFree');
+      const before = (await S(page)).stuck;
+      await page.touchscreen.tap(w / 2, h * 0.5);
+      await expect.poll(async () => (await S(page)).stuck, { timeout: T }).toBe(before + 1);
+
+      // nivel jefe: barra del jefe + 3 chips de misiones, contra cuchillo, HUD y barra del arcade
+      await dbg(page, 'setLevel', 5);
+      await expect(page.locator('.mlm-hud')).toBeVisible();
+      const L = (await S(page)).layout;
+      expect(L.KY + 96, tag + ' el soporte del cuchillo se sale').toBeLessThanOrEqual(h);
+      const lane = [L.CX - 9, L.CY + L.R - 13, L.CX + 9, L.KY + 96]; // recorrido del cuchillo
+      const boss = [L.CX - L.bossBarW / 2 - 2, L.bossBarY - 18, L.CX + L.bossBarW / 2 + 2, L.bossBarY + 10];
+      const chips = await rects(page, '.mlm-hud .mlm-m');
+      expect(chips.length).toBeGreaterThan(0);
+      const hudEls = await rects(page, '#hud .lvl > *, #score, #hud .label');
+      const bar2 = (await rects(page, '.mla-bar'))[0];
+      for (const c of chips) {
+        expect(c[0] >= 0 && c[2] <= w + 0.5 && c[3] <= h + 0.5, tag + ' chip fuera de pantalla').toBe(true);
+        expect(hit(c, lane), tag + ' chip tapa el cuchillo').toBe(false);
+        expect(hit(c, boss), tag + ' chip tapa la barra del jefe').toBe(false);
+        expect(hit(c, bar2), tag + ' chip bajo la barra del arcade').toBe(false);
+        for (const e of hudEls) expect(hit(c, e), tag + ' chip sobre el HUD').toBe(false);
+      }
+      for (const e of hudEls) expect(hit(e, bar2), tag + ' HUD bajo la barra del arcade').toBe(false);
+      expect(hit(boss, bar2), tag + ' barra del jefe bajo la barra del arcade').toBe(false);
+      for (const e of hudEls) expect(hit(e, boss), tag + ' barra del jefe sobre el HUD').toBe(false);
+      const chipFont = await page.evaluate(() => parseFloat(getComputedStyle(/** @type {Element} */ (document.querySelector('.mlm-m'))).fontSize));
+      expect(chipFont, tag).toBeGreaterThanOrEqual(12);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('girar el teléfono a mitad de partida conserva el estado y reubica el encuadre', async ({ page }) => {
+    const { errors } = await startDbg(page, true);
+    await throwFree(page, true);
+    const a = await S(page);
+    await page.setViewportSize({ width: 839, height: 412 });
+    await expect.poll(async () => (await S(page)).layout.W, { timeout: T }).toBe(839);
+    const b = await S(page);
+    expect(b).toMatchObject({ state: 'playing', score: a.score, stuck: a.stuck, level: a.level, throwsLeft: a.throwsLeft });
+    expect(b.layout.KY + 96).toBeLessThanOrEqual(412);
+    await throwFree(page, true);
+    await page.setViewportSize({ width: 412, height: 839 });
+    await expect.poll(async () => (await S(page)).layout.W, { timeout: T }).toBe(412);
+    expect((await S(page)).state).toBe('playing');
+    expect((await S(page)).canvasW).toBe(Math.round(412 * (await S(page)).dpr));
+    expectNoErrors(errors);
+  });
+
+  test('menú táctil: elegir dificultad (o errarle por poco) no arranca; el botón principal sí', async ({ page }) => {
+    const { errors } = await openGame(page, FILE);
+    await page.waitForFunction(() => !!(/** @type {any} */ (window).__clavado));
+    const btn = page.locator('#diffBox button', { hasText: 'Difícil' });
+    const bb = /** @type {any} */ (await btn.boundingBox());
+    await page.touchscreen.tap(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    await expect(btn).toHaveAttribute('aria-checked', 'true');
+    // toque en la franja del selector, al lado de los botones
+    const box = /** @type {any} */ (await page.locator('#diffBox').boundingBox());
+    await page.touchscreen.tap(box.x + 4, box.y + box.height / 2);
+    await wait(page, 300);
+    expect((await S(page)).state).toBe('menu');
+    const pb = /** @type {any} */ (await page.locator('#playBtn').boundingBox());
+    await page.touchscreen.tap(pb.x + pb.width / 2, pb.y + pb.height / 2);
+    await expect.poll(async () => (await S(page)).state, { timeout: T }).toBe('playing');
+    expect((await S(page)).difficulty).toBe('dificil');
+    await page.evaluate(() => /** @type {any} */ (window).MLMissions.setDifficulty('normal'));
+    expectNoErrors(errors);
+  });
+
+  test('gestos: sin bloqueo de zoom en el viewport, el lienzo no hace pan/zoom y la calidad automática es media', async ({ page }) => {
+    const { errors } = await openGame(page, FILE);
+    await page.waitForFunction(() => !!(/** @type {any} */ (window).__clavado));
+    const r = await page.evaluate(() => ({
+      meta: document.querySelector('meta[name=viewport]')?.getAttribute('content'),
+      ta: getComputedStyle(/** @type {Element} */ (document.getElementById('c'))).touchAction,
+    }));
+    expect(r.meta).not.toMatch(/user-scalable=no|maximum-scale/);
+    expect(r.ta).toBe('none');
+    const s = await S(page);
+    expect(s.quality).toBe('medium');
+    expect(s.dpr).toBeLessThanOrEqual(1.5);
+    expectNoErrors(errors);
+  });
+});

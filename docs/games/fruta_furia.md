@@ -208,3 +208,67 @@ Se agregó `__fruta.debug.cut(x1,y1,x2,y2)` (sólo con `?debug`). Arma un tajo s
 - La helada ahora espera el puntaje (que no se vence) en vez de la ventana de cámara lenta.
 
 Resultado: `ML_WORKERS=1` → **23 passed, 1 skipped (7,9 min)**; `ML_WORKERS=4` → **23 passed, 1 skipped (3,9 min)**. Load average de la máquina entre 15 y 37. No se corrió en GitHub Actions.
+
+## Móvil
+
+Pasada mobile-first (11/10). Emulación de Chromium headless con toque y DPR 2,625 en 360×640, 390×844, 412×915, 915×412 y 844×390. **No se probó en teléfonos reales.**
+
+Capturas en `.perf/mobile/fruta_furia/`:
+- antes: `antes-<ancho>x<alto>-{menu,play,boss}.png`
+- después: `despues-<ancho>x<alto>-{menu,play,boss}.png` y `despues-{360x640,844x390}-over.png`
+
+El script está en el scratchpad de la sesión (no en el repo).
+
+### Problemas encontrados → arreglo
+
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| **El aviso de bomba/petardo (⚠ abajo) quedaba debajo de la barra del arcade** cuando la bomba salía por la izquierda, y debajo de los chips de misiones cuando salía por la derecha. Se vio en todas las medidas (`antes-360x640-play.png`). Era la única advertencia de una bomba y no se veía. | `warnY(x)` lee cada 0,5 s los rectángulos de `.mla-bar` y `.mlm-hud` y dibuja el aviso (con su aro) por encima de lo que tape esa columna. También respeta el safe-area de abajo. |
+| **Girar el teléfono en plena partida** dejaba la fruta en coordenadas viejas. Al pasar de vertical a apaisado, la fruta baja quedaba debajo de `H+80` y contaba como escapada: se perdía una vida. | `rescaleWorld()` en el `resize` escala posición y velocidad de fruta, mitades, avisos, partículas, manchas, textos y jefe. La velocidad vertical se ajusta para conservar la altura relativa del vuelo; el radio del jefe se recalcula. Sirve también cuando aparecen o desaparecen las barras del navegador. |
+| Menú sin botón: sólo «▶ TOCA PARA JUGAR» parpadeando y pegado a la barra del arcade (360×640). | Botón real `#playBtn` «▶ JUGAR» de ≥56 px en la zona del pulgar. En apaisado va en la columna derecha (grilla: título y dificultad a la izquierda; créditos, leyenda y JUGAR a la derecha). Tocar en cualquier parte sigue arrancando. |
+| Menú en 360×640 justo y con el chip «ARRASTRÁ EL MOUSE» en táctil. | Con `pointer:coarse` se ocultan los chips de control: el de arriba ya dice «DESLIZÁ PARA CORTAR». Las pantallas de 561–760 px de alto ocultan la fila de frutas y achican el título. Si miden ≤700 px, dejan además un margen inferior para la barra. Con ≤430 px de alto (apaisado) se oculta el chip «HTML5 · PC + ANDROID». |
+| Selector de dificultad con 53×33 px en el informe de auditoría. | Mínimo de 44×44 px en táctil o pantallas chicas, con CSS del juego sobre `#diffBox`. «OTRA VEZ» llega a 56 px y «MENÚ · DIFICULTAD» a 44 px. |
+| La marca de agua «CREADO POR MATELABS» (9 px) se encimaba con los chips de misiones en vertical. | Pasa a 11 px y respeta el safe-area. En vertical ≤640 px de ancho se oculta durante la partida (`body.playing`); sigue en menú y overlays. |
+| Texto chico: leyenda y «CREADO POR» a 10 px; texto de la barra del jefe a 11 px. | 11 px y 12 px. La barra del jefe tiene un ancho mínimo de 200 px, así el texto entra en 360 px. |
+| «TAJEALA ANTES DE QUE SE VAYA» se dibujaba encima de la Sandía Gigante en vertical. | El subtítulo va debajo de la sandía y el título escala con el ancho. |
+| Meta `maximum-scale=1, user-scalable=no`. | Se quitó. La partida no hace zoom porque `body` tiene `touch-action:none` y por `preventDefault` en `pointerdown`/`contextmenu`/`gesturestart` (iOS). |
+| HUD sin safe-area: en apaisado con notch, puntos y vidas quedaban bajo el recorte. | Padding del HUD y de los overlays con `env(safe-area-inset-*)`. |
+| En apaisado bajo, el punto más alto del vuelo podía quedar debajo del marcador. | Con H<500 el pico queda a ≥64 px del borde superior; la prueba de altura sigue en 0,1–0,55. |
+
+### Asistencias táctiles
+- Un tajo con el dedo (`pointerType` touch o pen) corta fruta y jefe con **12 px de margen** sobre el radio; el mouse mantiene 4 px.
+- **Bombas y petardos siempre usan 4 px**: la ayuda nunca facilita tocar una bomba.
+- Escritorio sin cambios.
+
+### Rendimiento, pausa y audio (revisado, sin cambios)
+- En táctil, la calidad automática del SDK elige `medium`: DPR tope 1,5 y 260 partículas.
+- La pausa al pasar a segundo plano la hace el SDK (`visibilitychange`).
+- El audio arranca o se reanuda sólo dentro de un `pointerdown`, `keydown` o el clic de reanudar.
+- Las barras del navegador al aparecer o desaparecer disparan `resize`, que ahora reubica el mundo sin romper el estado.
+- El juego se juega bien en las dos orientaciones, por eso no hay aviso de «girá el teléfono».
+
+### Pruebas nuevas (proyecto `mobile`, Pixel 7)
+- Matriz de 5 pantallas:
+  - sin scroll; menú dentro de la pantalla y fuera de la barra; objetivos ≥44 px; JUGAR ≥56 px; textos ≥11 px;
+  - arranque con un toque real en JUGAR;
+  - HUD sin pisar la barra ni las misiones; marca de agua sin pisar las misiones;
+  - barra del jefe dentro de la pantalla y sin pisar puntos ni vidas;
+  - avisos de bomba y petardo en los bordes por encima de la barra y de las misiones;
+  - un tajo táctil real corta una fruta, sin scroll ni zoom.
+- Gestos: el meta no bloquea el zoom, `touch-action:none`, y deslizar en todas direcciones (incluido «tirar para recargar») no hace scroll ni zoom.
+- Rotación 412×915 → 915×412 → 412×915 en plena partida: la fruta sigue en pantalla y no se pierden vidas.
+- Asistencia táctil: una pasada a r+8 px corta con el dedo y no con el mouse; con bomba o petardo no pasa nada.
+
+### Resultados
+`tests/e2e/fruta_furia.spec.js` tiene 32 pruebas: 16 por proyecto. Las 4 de «Fruta Furia móvil» y la de multitáctil se saltean en desktop.
+
+| Workers | Resultado | Desktop | Mobile | Tiempo |
+|---|---|---|---|---|
+| `ML_WORKERS=1` | **27 passed, 5 skipped** | 11 ✓ | 16 ✓ | 9,2 min |
+| `ML_WORKERS=4` | **27 passed, 5 skipped** | 11 ✓ | 16 ✓ | 5,4 min |
+
+La máquina estaba cargada por otros agentes en paralelo.
+
+### Pendiente
+- Probar en teléfonos reales: iOS Safari (`gesturestart`, safe-area con notch) y Android Chrome (barras dinámicas).
+- La pantalla de fin no tiene aserciones propias de la matriz; se verificó con capturas en 360×640 y 844×390.

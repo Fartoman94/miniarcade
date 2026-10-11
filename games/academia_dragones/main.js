@@ -319,7 +319,15 @@ function startRun(kind, restart = false) {
   else banner(REGION_NAME[kind].toUpperCase(), regionSubtitle(kind));
   if (kind === 'picos' && !SV().tutorial) startTutorial(); else { tut.step = -1; H.tip.hidden = true; }
   if (restart) toast('Partida reiniciada', 1200);
+  else maybeRotateHint();
   H.fade.style.opacity = '0';
+}
+/** Sugerencia suave (no bloquea): en vertical se ve menos cielo; se muestra una vez por sesión. */
+let rotateHinted = false;
+function maybeRotateHint() {
+  if (rotateHinted || !input.isTouch || innerWidth >= innerHeight) return;
+  rotateHinted = true;
+  setTimeout(() => { if (state === 'play' && innerWidth < innerHeight) toast('📱↻ Consejo: en horizontal ves más cielo', 2600); }, 2200);
 }
 function regionSubtitle(kind) {
   return kind === 'picos' ? 'ENTRENAMIENTO Y CIRCUITO DE AROS' : kind === 'lago' ? 'CARRERA DE LOS ESPEJOS' : kind === 'volcan' ? 'RESCATE EN EL VOLCÁN' : '';
@@ -368,7 +376,7 @@ function hurtPlayer(amount, src) {
   if (!P.alive || P.invuln > 0 || state !== 'play') return;
   const dmg = amount * diff.damage / P.def.resist;
   P.energy -= dmg; P.invuln = 0.9; P.hurtT = 0.4;
-  sfx.hit(); if (SV().settings.shake && !reducedMQ.matches) camShake = Math.min(1, camShake + 0.5);
+  sfx.hit(); buzz(35); if (SV().settings.shake && !reducedMQ.matches) camShake = Math.min(1, camShake + 0.5);
   fx.burst(P.pos.x, P.pos.y, P.pos.z, 10, 0xff6a5a, 10, 0.5);
   run.streak = 0;
   if (P.energy <= 0) { P.energy = 0; fall(`Sin energía (${src})`); }
@@ -396,10 +404,23 @@ function respawn() {
 }
 
 /* ======================= vuelo ======================= */
+/** Táctil: zona muerta y curva suave en el joystick (el pulgar tiembla; los toques chicos no deben desviar). Teclado intacto. */
+function touchCurve(ax) {
+  if (!input.isTouch) return ax;
+  const l = Math.hypot(ax.x, ax.y);
+  if (l < 0.12) return { x: 0, y: 0 };
+  const k = Math.pow((l - 0.12) / 0.88, 1.35) / l;
+  return { x: ax.x * k, y: ax.y * k };
+}
+/** Vibración corta opcional (sólo táctil; se apaga con «sacudidas» o movimiento reducido). @param {number|number[]} ms */
+function buzz(ms) {
+  if (!input.isTouch || !SV().settings.shake || reducedMQ.matches || !navigator.vibrate) return;
+  try { navigator.vibrate(ms); } catch (e) { /* sin vibración */ }
+}
 function assistOn() { const a = SV().settings.assist; return a === 'on' || (a === 'auto' && input.isTouch); }
 
 function updatePlayer(dt) {
-  const st = SV().settings, ax = input.axis();
+  const st = SV().settings, ax = touchCurve(input.axis());
   const sens = st.sens;
   let turn = ax.x * sens;
   let vert = -ax.y * (st.invert ? -1 : 1) * sens;
@@ -712,7 +733,7 @@ function updateEggs() {
   }
 }
 function collectEgg(e) {
-  e.group.visible = false; sfx.egg();
+  e.group.visible = false; sfx.egg(); buzz(15);
   fx.burst(e.pos.x, e.pos.y + 2, e.pos.z, 36, e.shiny ? 0xff9fe0 : 0xffd34d, 16, 1.1);
   if (e.shiny) { run.shiny = true; addScore(SCORE.shiny); MLM.emit('shinyEgg'); banner('¡HUEVO BRILLANTE!', 'UN TESORO DEL LAGO DE ESPEJOS', 2.2); return; }
   const d = SV(); if (!d.eggs.includes(e.id)) d.eggs.push(e.id);
@@ -1028,19 +1049,20 @@ function menuHTML() {
       <span class="st"><span>Vel.</span>${bar(x.speed)}<span>Resist.</span>${bar(x.resist)}<span>Poder</span>${bar(x.power)}</span>
       <small>${locked ? `Juntá los 3 huevos dorados (${d.eggs.length}/3)` : `${x.element} · ${x.desc}`}</small></button>`;
   }).join('');
-  return `<span class="k3-kicker">MATELABS · AVENTURA AÉREA</span>
+  // dos columnas: en vertical se apilan (display:contents); en horizontal bajo, quedan lado a lado
+  return `<div class="ad-mcol ad-mcol-a"><span class="k3-kicker">MATELABS · AVENTURA AÉREA</span>
     <h1>ACADEMIA DE<br>DRAGONES</h1>
     <p class="ad-hide-short">Volá entre picos, lagos y volcanes: superá las pruebas de la academia, rescatá crías y defendela de la Serpiente de Tormenta.</p>
-    <div class="ad-dragons" role="group" aria-label="Elegí tu dragón">${cards}</div>
-    <div id="adDiff"></div><div class="ad-diffinfo" id="adDiffInfo">${diffInfo(MLM.difficulty())}</div>
-    <div class="k3-btnrow">
-      <button type="button" class="k3-b" id="adStart" data-go>▶ ${trialsDone() || c.markers.length ? 'Continuar' : 'Volar'}${next !== 'picos' ? ` · ${REGION_NAME[next]}` : ''}</button>
+    <div class="ad-dragons" role="group" aria-label="Elegí tu dragón">${cards}</div></div>
+    <div class="ad-mcol ad-mcol-b"><div id="adDiff"></div><div class="ad-diffinfo" id="adDiffInfo">${diffInfo(MLM.difficulty())}</div>
+    <div class="k3-btnrow ad-menubtns">
+      <button type="button" class="k3-b ad-go" id="adStart" data-go>▶ ${trialsDone() || c.markers.length ? 'Continuar' : 'Volar'}${next !== 'picos' ? ` · ${REGION_NAME[next]}` : ''}</button>
       <button type="button" class="k3-b alt" data-regions>🗺 Regiones</button>
       <button type="button" class="k3-b alt" data-settings>⚙ Ajustes</button>
       <button type="button" class="k3-b alt" data-help>? Cómo jugar</button>
     </div>
     <div class="ad-prog">Pruebas ${trialsDone()}/3 · Huevos ${d.eggs.length}/3 · ${d.bossDefeated ? '🏆 Academia salvada' : 'Serpiente: invicta'} · Récord ${Math.max(d.best, MLA.scores.best(ID) || 0)}</div>
-    <div class="ad-credit"><span>CREADO POR</span><img src="matelabs/mascota-128.webp" alt="">MATELABS</div>`;
+    <div class="ad-credit"><span>CREADO POR</span><img src="matelabs/mascota-128.webp" alt="">MATELABS</div></div>`;
 }
 function showMenu() {
   menu.show(menuHTML());
@@ -1137,6 +1159,21 @@ endScreen.el.addEventListener('click', e => {
   else if (t.closest('[data-menu]')) toMenu();
 });
 
+// iOS: el audio sólo se reanuda dentro de un gesto; cada toque durante el juego lo despierta si quedó suspendido
+addEventListener('pointerdown', () => { if (!game.paused && game.audio.ctx && game.audio.ctx.state === 'suspended') game.audio.resume(); }, { capture: true, passive: true });
+
+// en vertical angosto el panel de puntos puede crecer (récords largos, 5 vidas): el objetivo/jefe se corre debajo
+{
+  const stats = /** @type {HTMLElement} */ (document.querySelector('.ad-stats'));
+  const place = () => {
+    const narrow = innerWidth <= 640;
+    const top = narrow && !H.hud.hidden ? Math.round(stats.getBoundingClientRect().bottom + 8) : 0;
+    for (const el of [H.obj, H.boss]) if (el) el.style.top = top ? `max(calc(var(--ad-top) + 84px), ${top}px)` : '';
+  };
+  new ResizeObserver(place).observe(stats);
+  addEventListener('resize', place);
+}
+
 /* ======================= arranque ======================= */
 setDragon(SV().dragon);
 loadRegion('picos');
@@ -1149,7 +1186,7 @@ const hook = {
   get state() { return state; },
   get scene() { return sceneName; },
   get missions() { return MLM.state(); },
-  get player() { return { pos: { x: P.pos.x, y: P.pos.y, z: P.pos.z }, yaw: P.yaw, pitch: P.pitch, speed: P.speed, energy: P.energy, maxEnergy: P.maxEnergy, alive: P.alive, boosting: P.boosting, dragon: P.def.id, carrying: run.carrying.length, invuln: P.invuln }; },
+  get player() { return { pos: { x: P.pos.x, y: P.pos.y, z: P.pos.z }, yaw: P.yaw, pitch: P.pitch, speed: P.speed, energy: P.energy, maxEnergy: P.maxEnergy, alive: P.alive, boosting: P.boosting, dragon: P.def.id, carrying: run.carrying.length, invuln: P.invuln, turn: P.turn, vert: P.vert }; },
   get hp() { return P.energy; },
   get lives() { return lives; },
   get score() { return score; },

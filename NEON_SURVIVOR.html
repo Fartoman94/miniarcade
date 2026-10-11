@@ -24,7 +24,9 @@
   #playBtn:hover, #playBtn:focus-visible { background:#0ff; color:#000; box-shadow:0 0 30px #0ff; outline:none; }
   .only-touch { display:none; }
   @media (pointer:coarse) { .only-touch { display:block; } .only-keys { display:none; } }
-  #levelUp { position:fixed; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:#000c; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); z-index:20; padding:20px; overflow-y:auto; }
+  #levelUp { position:fixed; inset:0; display:none; align-items:center; justify-content:safe center; flex-direction:column; gap:14px; background:#000c; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    /* por encima de las misiones del SDK (z 2147481000) y por debajo de su barra (2147482000) y su pausa */
+    z-index:2147481100; padding:20px; overflow-y:auto; }
   #levelUp h2 { text-align:center; font-size:clamp(24px,7vw,32px); color:#0ff; text-shadow:0 0 20px #0ff; }
   #levelUp .sub { font-size:13px; opacity:.75; text-align:center; }
   #cards { display:flex; flex-wrap:wrap; justify-content:center; gap:20px; }
@@ -68,6 +70,59 @@
     .ml-credit { margin-top:8px !important; }
   }
   .ml-credit { margin-top:26px; font-size:11px; letter-spacing:.3em; font-weight:700; color:#8ff; opacity:.75; text-shadow:0 0 10px #0ff8; }
+  /* ---------- móvil ---------- */
+  .card:active { transform:scale(.97); }
+  #playBtn:active { background:#0ff3; }
+  @media (pointer:coarse) {
+    #playBtn { min-height:56px; min-width:200px; }
+    #levelUp { padding-bottom:calc(60px + env(safe-area-inset-bottom)); } /* tarjetas nunca bajo la barra del SDK */
+    .card .k { display:none; }                       /* el número es un atajo de teclado */
+    #levelUp .sub { font-size:14px; }
+    /* selectores compartidos (personaje / dificultad): objetivos táctiles de 44 px y textos legibles en esta página */
+    #diffPick .mlm-diff button { min-height:44px; min-width:48px; }
+    #charPick .mlc-anim { min-height:44px; font-size:12px; padding:0 4px; }
+    #charPick .mlc-title, #diffPick .mlm-diff-t { font-size:11px; }
+    #charPick .mlc-card small { font-size:11px; }
+    /* misiones: siempre por encima de la barra del SDK (44 px + márgenes + zona segura del iPhone) */
+    .mlm-hud.bl { bottom:calc(62px + env(safe-area-inset-bottom)); }
+    /* menú: el contenido no baja hasta la barra del SDK (abajo a la derecha) */
+    #overlay { padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+    .mlm-hud { transition:opacity .2s; }
+    .mlm-hud.ns-dim { opacity:.25; }                   /* el dedo del joystick está encima de las misiones */
+  }
+  /* columnas del menú: en vertical no existen (display:contents); en celular apaisado, dos columnas */
+  .ov-col { display:contents; }
+  @media (max-height:500px) and (orientation:landscape) {
+    #overlay { flex-direction:row; flex-wrap:wrap; align-content:safe center; column-gap:28px;
+      padding:max(8px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }
+    @media (pointer:coarse) { #overlay { padding-bottom:calc(60px + env(safe-area-inset-bottom)); } }
+    .ov-col { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1 1 0; min-width:0; max-width:460px; }
+    #overlay .ml-credit { flex:0 0 100%; margin-top:4px !important; }
+    #overlay h1 { font-size:clamp(26px,9vh,40px); }
+    #charPick { margin-top:0; }
+    #playBtn { margin-top:8px; min-height:56px; }
+  }
+  @media (pointer:coarse) and (max-height:480px) { .mlm-hud .mlm-m, .mlm-hud .mlm-m .ic { font-size:11px; } }
+  /* celular vertical con poca altura (360×640 y similares): menú compacto, sin desplazar */
+  @media (orientation:portrait) and (max-height:760px) {
+    #overlay { padding-top:max(12px,env(safe-area-inset-top)); }
+    #overlay h1 { font-size:clamp(30px,min(11vw,6.6vh),64px); margin-bottom:4px; }
+    #overlay p { margin:3px 0; font-size:14px; }
+    #charPick { margin-top:8px; } #diffPick { margin-top:6px; }
+    #playBtn { margin-top:10px; }
+    .ml-credit { margin-top:10px; }
+  }
+  /* subir de nivel en pantallas bajas: tarjetas compactas en fila */
+  @media (max-height:500px) {
+    #levelUp { gap:8px; padding:8px max(16px,env(safe-area-inset-right)) 8px max(16px,env(safe-area-inset-left)); }
+    #levelUp h2 { font-size:clamp(20px,6vh,26px); }
+    #cards { flex-direction:row; flex-wrap:nowrap; width:auto; gap:12px; }
+    .card { width:min(220px,30vw); padding:14px 12px; display:block; text-align:center; }
+    .card .icon { font-size:30px; margin-bottom:4px; }
+    .card h3 { font-size:17px; margin-bottom:4px; }
+    .card .tag { left:50%; right:auto; transform:translateX(-50%); }
+    .card:hover, .card.sel { transform:scale(1.03); }
+  }
   .ns-tree ul { margin:0; padding:0; } .ns-tree li { list-style:none; margin:3px 0; }
   .ns-tree .pips { letter-spacing:2px; color:#ffd23f; }
 </style>
@@ -88,15 +143,19 @@
 <div id="wave" aria-hidden="true">OLEADA 1</div>
 
 <div id="overlay" role="dialog" aria-labelledby="ovTitle">
+  <div class="ov-col ov-l">
   <h1 id="ovTitle">NEON SURVIVOR</h1>
   <p id="ovMsg">Sobreviví a las hordas. Subí de nivel. Elegí mejoras.</p>
   <p class="only-keys"><b>WASD / Flechas</b> para moverte · Disparo automático</p>
   <p class="only-touch"><b>Arrastrá el dedo</b> en cualquier lado para moverte · Disparo automático</p>
   <p id="bestScore">Mejor puntaje: 0</p>
+  </div>
+  <div class="ov-col ov-r">
   <div id="charPick"></div>
   <div id="diffPick"></div>
   <div id="diffInfo"></div>
   <button id="playBtn" type="button">JUGAR</button>
+  </div>
   <div class="ml-credit"><img class="ml-ava" src="matelabs/mascota-128.webp" alt="">CREADO POR MATELABS</div>
 </div>
 
@@ -162,20 +221,35 @@ const $ = id => document.getElementById(id);
 const overlay = $('overlay'), levelUpEl = $('levelUp'), cardsEl = $('cards');
 
 /* ---------- tamaño y DPR (tope según calidad) ---------- */
-let W = 0, H = 0, DPR = 1, vignette = null, bannerFont = '', bossFont = '';
+/* Cámara: el mundo es la pantalla, pero en celulares (lado corto < MIN_VIEW px) se aleja la vista para que el
+   lado corto del mundo mida MIN_VIEW unidades: en vertical los enemigos de los costados y los carriles de
+   embestida (230-300 u) ya no ocupan toda la pantalla. W/H = tamaño del MUNDO; SW/SH = pantalla en px CSS.
+   En PC (ventanas de 440 px o más) VS = 1 y todo queda exactamente igual. */
+const MIN_VIEW = 440;
+let W = 0, H = 0, SW = 0, SH = 0, VS = 1, PX = 1, DPR = 1, vignette = null, bannerFont = '', bossFont = '', bossBox = null;
 function resize() {
   const d = Math.min(Q.dpr, window.devicePixelRatio || 1);
   if (d !== DPR) { spriteCache.clear(); mati.gfx = null; }
-  DPR = d; W = innerWidth; H = innerHeight;
-  cvs.width = Math.round(W * DPR); cvs.height = Math.round(H * DPR);
-  cvs.style.width = W + 'px'; cvs.style.height = H + 'px';
+  const oW = W, oH = H, wasPortrait = SH > SW;
+  DPR = d; SW = innerWidth; SH = innerHeight;
+  VS = Math.min(1, Math.min(SW, SH) / MIN_VIEW); PX = DPR * VS;
+  W = SW / VS; H = SH / VS;
+  cvs.width = Math.round(SW * DPR); cvs.height = Math.round(SH * DPR);
+  cvs.style.width = SW + 'px'; cvs.style.height = SH + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   vignette = null;
-  bannerFont = `700 ${Math.round(Math.min(38, W / 17))}px 'Segoe UI',system-ui,sans-serif`;
-  bossFont = `700 ${W < 520 ? 11 : 13}px 'Segoe UI',system-ui,sans-serif`;
-  if (player) {
+  bannerFont = `700 ${Math.round(Math.max(18, Math.min(38, SW / 17)))}px 'Segoe UI',system-ui,sans-serif`;
+  bossFont = `700 ${SW < 520 ? 12 : 13}px 'Segoe UI',system-ui,sans-serif`;
+  bossBox = null; // se recalcula con el HUD en su nueva posición
+  if (player && oW > 0 && oH > 0 && (oW !== W || oH !== H)) {
+    // girar el teléfono o que aparezca/desaparezca la barra del navegador: todo conserva su posición relativa
+    const kx = W / oW, ky = H / oH;
+    const move = a => { for (const o of a) { o.x *= kx; o.y *= ky; } };
+    move(enemies); move(orbs); move(bullets); move(shots); move(pickups); move(warns); move(particles); move(player.trail);
+    player.x *= kx; player.y *= ky;
     player.x = Math.max(player.r, Math.min(W - player.r, player.x));
     player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+    if (wasPortrait !== (SH > SW)) joy.id = null; // giró: el joystick viejo ya no tiene sentido
   }
   if (state !== 'play') draw();
 }
@@ -485,7 +559,7 @@ const held = { up: false, down: false, left: false, right: false };
 const JOY_R = 55;
 const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 function dirOf(e) { return KEYMAP[e.code] || KEYFALLBACK[(e.key || '').toLowerCase()] || null; }
-function clearInput() { held.up = held.down = held.left = held.right = false; joy.id = null; }
+function clearInput() { held.up = held.down = held.left = held.right = false; joy.id = null; dimMissions(false); }
 
 addEventListener('keydown', e => {
   sfx.unlock();
@@ -499,10 +573,53 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { const d = dirOf(e); if (d) held[d] = false; });
 addEventListener('blur', clearInput); // antes una tecla quedaba "pegada" al cambiar de ventana
 
+/* ---------- táctil: pista de joystick fantasma, misiones que se apartan del dedo y vibración ---------- */
+const coarse = matchMedia('(pointer: coarse)');
+// pista al empezar: un joystick fantasma animado en la zona del pulgar hasta el primer toque (o 7 s de juego)
+const hint = { t: 0 };
+const HINT_MS = 7000;
+function hintPos() {
+  // vertical: abajo al centro, por encima de misiones y barra; apaisado: tercio izquierdo (pulgar izquierdo)
+  return SH > SW ? { x: SW / 2, y: Math.max(SH * .58, SH - 210) } : { x: SW * .3, y: SH * .48 };
+}
+function drawHint() {
+  const { x, y } = hintPos(), k = Math.min(1, hint.t / 600); // se desvanece al final
+  const a = reduceMotion ? 0 : performance.now() / 650;
+  ctx.globalAlpha = .5 * k; ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2;
+  ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.arc(x, y, JOY_R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  ctx.globalAlpha = .45 * k; ctx.fillStyle = '#0ff';
+  const kx = x + Math.cos(a) * JOY_R * .55, ky = y + Math.sin(a) * JOY_R * .55;
+  ctx.beginPath(); ctx.arc(kx, ky, 22, 0, TAU); ctx.fill();
+  ctx.globalAlpha = .9 * k; ctx.font = "700 15px 'Segoe UI',system-ui,sans-serif"; ctx.textAlign = 'center';
+  ctx.fillStyle = '#dff'; ctx.shadowBlur = 8; ctx.shadowColor = '#0ff';
+  ctx.fillText('Arrastrá en cualquier lado para moverte', x < SW / 2 && SW > SH ? Math.max(x, 160) : x, y - JOY_R - 16);
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+}
+// misiones del SDK (abajo a la izquierda): si el dedo del joystick está encima, se atenúan para no tapar
+var hudEl = null, hudRect = null; // var: clearInput() puede llamarla antes de esta línea
+function dimMissions(on, x, y) {
+  if (!hudEl) hudEl = document.querySelector('.mlm-hud');
+  if (!hudEl) return;
+  if (on && !hudRect) hudRect = hudEl.getBoundingClientRect();
+  const over = on && hudRect && hudRect.width > 0 && x > hudRect.left - 50 && x < hudRect.right + 50 && y > hudRect.top - 70 && y < hudRect.bottom + 50;
+  hudEl.classList.toggle('ns-dim', !!over);
+}
+// vibración corta (sólo táctil, nunca con «reducir movimiento»)
+let buzzAt = 0;
+function buzz(ms) {
+  if (!coarse.matches || reduceMotion || !navigator.vibrate) return;
+  const n = performance.now(); if (n - buzzAt < 450) return; buzzAt = n;
+  try { navigator.vibrate(ms); } catch (_) {}
+}
+// iOS sólo habilita el audio en touchend/click: se reintenta también ahí
+addEventListener('touchend', () => sfx.unlock(), { passive: true });
+
 cvs.addEventListener('pointerdown', e => {
   sfx.unlock();
   if (state !== 'play' || joy.id !== null) return;
   joy.id = e.pointerId; joy.ox = joy.x = e.clientX; joy.oy = joy.y = e.clientY;
+  hint.t = Math.min(hint.t, 300); // el jugador ya encontró el control
+  hudRect = null; dimMissions(true, joy.x, joy.y);
   try { cvs.setPointerCapture(e.pointerId); } catch (_) {}
   e.preventDefault();
 });
@@ -512,8 +629,9 @@ cvs.addEventListener('pointermove', e => {
   // si el dedo se aleja más que el radio, la base lo sigue (cambiar de dirección es inmediato)
   const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy);
   if (l > JOY_R) { joy.ox = joy.x - dx / l * JOY_R; joy.oy = joy.y - dy / l * JOY_R; }
+  dimMissions(true, joy.x, joy.y);
 });
-const joyEnd = e => { if (e.pointerId === joy.id) joy.id = null; };
+const joyEnd = e => { if (e.pointerId === joy.id) { joy.id = null; dimMissions(false); } };
 cvs.addEventListener('pointerup', joyEnd);
 cvs.addEventListener('pointercancel', joyEnd);
 cvs.addEventListener('contextmenu', e => e.preventDefault());
@@ -628,6 +746,7 @@ function startGame() {
   wave = 1; nextElite = DF.elite; kills = eliteKills = bossKills = summonerKills = pickupsTaken = hurtCount = 0; lastSec = 0; cleanMinuteSent = false;
   stepKills = 0; bossRef = null; bossCount = 0; dodges = 0;
   clearInput();
+  hint.t = coarse.matches ? HINT_MS : 0;
   for (const k in hudCache) hudCache[k] = null;
   state = 'play';
   if (MM) { if (MM.state().running) MM.runEnd({ won: false }); MM.runStart(); MM.emit('wave', 1); }
@@ -818,6 +937,7 @@ function hurtPlayer(dmg) {
   shake = 15;
   addParticles(player.x, player.y, '#f33', 20, 6);
   sfx.hurt();
+  buzz(30);
   hurtCount++;
   if (MM) MM.emit('hurt');
   if (player.hp <= 0) { player.hp = 0; gameOver(); return true; }
@@ -1055,6 +1175,7 @@ function step() {
     if (wave % 3 === 0) swarmRing(); else if (bannerT <= 0) banner(`OLEADA ${wave}`, '#9ff', 1.4);
   }
   if (bannerT > 0) bannerT -= STEP / 1000;
+  if (hint.t > 0) hint.t -= STEP;
 
   // Movimiento: joystick analógico o teclado normalizado
   let dx = 0, dy = 0;
@@ -1224,7 +1345,7 @@ function step() {
   }
 
   if (shake > 0) shake *= .85;
-  if (pendingLevels > 0) { state = 'levelup'; sfx.level(); if (ML) ML.refresh(); }
+  if (pendingLevels > 0) { state = 'levelup'; sfx.level(); buzz(20); if (ML) ML.refresh(); }
 }
 
 function killReward(e) {
@@ -1478,10 +1599,10 @@ function draw() {
   drawn = 0;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#05060f';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, SW, SH);
   const sh = reduceMotion ? shake * .25 : shake;
   const shx = (Math.random() - .5) * sh, shy = (Math.random() - .5) * sh;
-  ctx.setTransform(DPR, 0, 0, DPR, shx * DPR, shy * DPR);
+  ctx.setTransform(PX, 0, 0, PX, shx * PX, shy * PX);
 
   const px = player ? player.x : W / 2, py = player ? player.y : H / 2;
   drawBackground(px, py);
@@ -1548,7 +1669,7 @@ function draw() {
   for (const e of enemies) drawList.push(e);
   for (let i = 1; i < drawList.length; i++) { const e = drawList[i]; let k = i - 1; while (k >= 0 && drawList[k].y > e.y) { drawList[k + 1] = drawList[k]; k--; } drawList[k + 1] = e; }
   for (const e of drawList) drawEnemy(e, shx, shy);
-  ctx.setTransform(DPR, 0, 0, DPR, shx * DPR, shy * DPR);
+  ctx.setTransform(PX, 0, 0, PX, shx * PX, shy * PX);
 
   // Disparos enemigos: borde rojo, núcleo blanco
   if (shots.length) {
@@ -1586,7 +1707,10 @@ function draw() {
 
   const flicker = player.invul > 0 && Math.floor(gameMs / 60) % 2;
   if (!flicker) drawPlayer();
+  // desde acá, capa de interfaz en px CSS de pantalla (no se aleja con la cámara)
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  if (hint.t > 0 && state === 'play') drawHint();
 
   // Joystick táctil
   if (joy.id !== null && state === 'play') {
@@ -1605,7 +1729,7 @@ function draw() {
     ctx.globalAlpha = Math.min(1, bannerT) * (reduceMotion ? 1 : .75 + .25 * Math.sin(gameMs / 140));
     ctx.font = bannerFont;
     ctx.textAlign = 'center'; ctx.fillStyle = bannerColor; ctx.shadowBlur = 20 * Q.glow; ctx.shadowColor = bannerColor;
-    ctx.fillText(bannerText, W / 2, H * .3);
+    ctx.fillText(bannerText, SW / 2, SH * .3);
     ctx.shadowBlur = 0; ctx.globalAlpha = 1;
   }
 }
@@ -1623,13 +1747,13 @@ function drawEnemy(e, shx, shy) {
   } else if (e.kind === 'ghost') alpha = e.dodgeT > 0 ? .55 : .9;
   else if (e.kind === 'boss' && e.st === 'stagger') rot += Math.sin(gameMs / 40) * .05;
   const x = e.x + shx, y = e.y + shy - bob, c = Math.cos(rot), sn = Math.sin(rot);
-  ctx.setTransform(DPR * c * sx, DPR * sn * sx, -DPR * sn * sy, DPR * c * sy, x * DPR, y * DPR);
+  ctx.setTransform(PX * c * sx, PX * sn * sx, -PX * sn * sy, PX * c * sy, x * PX, y * PX);
   ctx.globalAlpha = alpha;
   ctx.drawImage(s.c, -s.half, -s.half, s.size, s.size); drawn++;
   if (e.flash > 0) { const wsp = shapeSprite(shape, e.r, e.color, true); ctx.globalAlpha = Math.min(.7, e.flash / 90 * .7); ctx.drawImage(wsp.c, -wsp.half, -wsp.half, wsp.size, wsp.size); }
   ctx.globalAlpha = 1;
   // detalles animados en espacio de pantalla
-  ctx.setTransform(DPR, 0, 0, DPR, x * DPR, y * DPR);
+  ctx.setTransform(PX, 0, 0, PX, x * PX, y * PX);
   if (e.kind === 'ghost' && e.ch > 0) { // carga del disparo
     const k = 1 - e.ch / tele(600); blit(glow(2 + 5 * k, DANGER, 10), 0, 0);
   } else if (e.kind === 'summoner') {
@@ -1643,9 +1767,9 @@ function drawEnemy(e, shx, shy) {
   }
   if (e.elite) {
     const es = eliteSprite(e.r), a = gameMs / 1500;
-    ctx.setTransform(DPR * Math.cos(a), DPR * Math.sin(a), -DPR * Math.sin(a), DPR * Math.cos(a), x * DPR, y * DPR);
+    ctx.setTransform(PX * Math.cos(a), PX * Math.sin(a), -PX * Math.sin(a), PX * Math.cos(a), x * PX, y * PX);
     ctx.drawImage(es.c, -es.half, -es.half, es.size, es.size); drawn++;
-    ctx.setTransform(DPR, 0, 0, DPR, x * DPR, y * DPR);
+    ctx.setTransform(PX, 0, 0, PX, x * PX, y * PX);
   }
   if (e.hp < e.maxHp && e.kind !== 'boss') {
     const w = e.r * 2;
@@ -1656,14 +1780,22 @@ function drawEnemy(e, shx, shy) {
 
 /* Barra del Coloso: arriba al centro (en pantallas angostas, debajo del HUD), con marcas de fase. */
 let bossLabel = '', bossLabelKey = '';
+/* Se ubica midiendo el HUD real (zona segura incluida): arriba al centro si entra entre la vida y el reloj,
+   si no, debajo de todo el HUD. Siempre en px de pantalla (la cámara alejada no achica el texto). */
+function bossLayout() {
+  const ui = $('ui').getBoundingClientRect(), tm = timerEl.getBoundingClientRect(), wv = waveEl.getBoundingClientRect();
+  const left = ui.right + 16, right = SW - Math.max(120, SW - tm.left) - 16;
+  let bw = Math.min(460, 2 * Math.min(SW / 2 - left, right - SW / 2)), y = tm.top + 6;
+  if (bw < 240) { bw = Math.min(460, SW - 32); y = Math.max(ui.bottom, wv.bottom) + 10; }
+  return { bw, y, x: (SW - bw) / 2 };
+}
 function drawBossBar(b) {
-  let bw = Math.min(460, W - 520), y = 16;
-  if (bw < 240) { bw = Math.min(460, W - 40); y = 92; }
-  const x = (W - bw) / 2, f = Math.max(0, b.hp / b.maxHp);
+  if (!bossBox) bossBox = bossLayout();
+  const { bw, y, x } = bossBox, f = Math.max(0, b.hp / b.maxHp);
   const key = bossCount + '|' + b.phase;
   if (key !== bossLabelKey) { bossLabelKey = key; bossLabel = `COLOSO${bossCount > 1 ? ' ' + bossCount : ''} · FASE ${b.phase}/3`; }
-  ctx.fillStyle = '#05060fcc'; ctx.fillRect(x - 4, y - 3, bw + 8, 26);
-  ctx.strokeStyle = '#a6f'; ctx.lineWidth = 1; ctx.strokeRect(x - 4, y - 3, bw + 8, 26);
+  ctx.fillStyle = '#05060fcc'; ctx.fillRect(x - 4, y - 4, bw + 8, 28);
+  ctx.strokeStyle = '#a6f'; ctx.lineWidth = 1; ctx.strokeRect(x - 4, y - 4, bw + 8, 28);
   ctx.fillStyle = '#1a0f2a'; ctx.fillRect(x, y + 12, bw, 8);
   ctx.fillStyle = b.phase === 3 ? '#ff6bd6' : b.phase === 2 ? '#c27bff' : '#a6f'; ctx.fillRect(x, y + 12, bw * f, 8);
   ctx.fillStyle = '#fff'; ctx.fillRect(x + bw * .6 - 1, y + 10, 2, 12); ctx.fillRect(x + bw * .3 - 1, y + 10, 2, 12);
@@ -1756,6 +1888,10 @@ window.__neon = {
   get weapons() { return player ? Object.assign({}, player.w) : null; },
   get boss() { return bossAlive() ? { hp: bossRef.hp, maxHp: bossRef.maxHp, phase: bossRef.phase, st: bossRef.st, x: bossRef.x, y: bossRef.y } : null; },
   get nextBoss() { return nextBoss; },
+  // móvil: cámara (escala de vista y tamaño del mundo), pista del joystick, barra del Coloso en pantalla
+  get view() { return { vs: VS, W, H, SW, SH }; }, get hint() { return hint.t > 0 ? hintPos() : null; },
+  get bossBar() { return bossAlive() ? Object.assign({ h: 28 }, bossBox || bossLayout()) : null; },
+  get joy() { return joy.id !== null; },
   get perf() { return { frameMs: +perf.frame.toFixed(2), stepMs: +perf.step.toFixed(3), drawMs: +perf.draw.toFixed(3), frames: perf.frames, sprites: perf.drawn }; },
   get enemyList() { return enemies.map(e => ({ id: e.id, kind: e.kind, elite: !!e.elite, hp: e.hp, maxHp: e.maxHp, x: e.x, y: e.y, st: e.st, r: e.r, dmg: e.dmg, speed: e.speed, phase: e.phase })); },
 };

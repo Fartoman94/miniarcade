@@ -273,6 +273,7 @@ test.describe('Academia de Dragones', () => {
   });
 
   test('regiones: las cuatro escenas cargan y el portal lleva a la siguiente', async ({ page }) => {
+    test.slow(); // carga las 4 regiones: bajo carga alta de la máquina supera los 60 s
     const { errors } = await openGame(page, DBG);
     await ready(page);
     for (const k of ['picos', 'lago', 'volcan', 'tormenta']) {
@@ -472,28 +473,119 @@ test.describe('Academia de Dragones', () => {
     expectNoErrors(errors);
   });
 
-  for (const [w, h] of [[412, 915], [915, 412]]) {
-    test(`celular ${w}×${h}: sin scroll ni superposición del HUD con controles y barra`, async ({ page, isMobile }) => {
+  /* ======================= móvil ======================= */
+  // matriz de tamaños de celular (vertical y horizontal): menú entero visible, objetivos táctiles, sin superposiciones
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+  const overlap = (a, b) => a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1;
+  const boxesOf = (page, sels) => page.evaluate(ss => ss.flatMap(s => [...document.querySelectorAll(s)].filter(e => {
+    if (e.closest('[hidden]')) return false; const cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden';
+  }).map(e => { const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, s: s + ':' + (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 16) }; }).filter(b => b.w > 0)), sels);
+  for (const [w, h] of SIZES) {
+    test(`celular ${w}×${h}: menú completo, objetivos ≥44 px, toque arranca y el HUD no se pisa`, async ({ page, isMobile }) => {
       test.skip(!isMobile, 'diseño celular: proyecto mobile');
       await page.setViewportSize({ width: w, height: h });
       const { errors } = await openGame(page, DBG);
       await ready(page);
-      // menú sin desbordar horizontalmente
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.body.scrollHeight <= innerHeight + 1)).toBe(true);
-      await startReal(page, true);
-      await sim(page, 0.3); await wait(page, 400);
-      const boxes = await page.evaluate(() => {
-        const r = s => { const e = document.querySelector(s); if (!e || e.offsetParent === null && getComputedStyle(e).position !== 'fixed') return null; const b = e.getBoundingClientRect(); return b.width ? { x: b.x, y: b.y, w: b.width, h: b.height, s } : null; };
-        return ['.ad-stats', '#adObj', '#adTip', '.mla-bar', '.k3-joy', '.k3-btns'].map(r).filter(Boolean);
-      });
-      const over = (a, b) => a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1;
-      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-        expect(over(boxes[i], boxes[j]), `${boxes[i].s} se superpone con ${boxes[j].s}`).toBe(false);
+      const noScroll = () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight + 1);
+      expect(await noScroll()).toBe(true);
+      // menú: todo dentro de la pantalla sin scroll interno, nada debajo de la barra del SDK
+      expect(await page.evaluate(() => { const m = document.querySelector('#adMenu'); return m.scrollHeight <= m.clientHeight + 1; })).toBe(true);
+      const bar = (await boxesOf(page, ['.mla-bar']))[0];
+      const ui = await boxesOf(page, ['#adMenu button', '#adMenu h1', '#adMenu .ad-prog', '#adMenu .ad-credit', '#adMenu .ad-diffinfo']);
+      expect(ui.length).toBeGreaterThan(10);
+      for (const b of ui) {
+        expect(b.x, b.s).toBeGreaterThanOrEqual(0); expect(b.y, b.s).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.w, b.s).toBeLessThanOrEqual(w + 1); expect(b.y + b.h, b.s).toBeLessThanOrEqual(h + 1);
+        expect(overlap(b, bar), `${b.s} bajo la barra del SDK`).toBe(false);
       }
-      for (const b of boxes) { expect(b.x).toBeGreaterThanOrEqual(0); expect(b.x + b.w).toBeLessThanOrEqual(w + 1); expect(b.y + b.h).toBeLessThanOrEqual(h + 1); }
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight + 1)).toBe(true);
+      for (const b of await boxesOf(page, ['#adMenu button'])) { expect(b.h, b.s).toBeGreaterThanOrEqual(44); expect(b.w, b.s).toBeGreaterThanOrEqual(44); }
+      const go = (await boxesOf(page, ['#adStart']))[0];
+      expect(go.h).toBeGreaterThanOrEqual(56);
+      // arranque sólo con toque y acción principal (aliento) con el botón táctil
+      await page.locator('#adStart').tap();
+      await expect.poll(() => page.evaluate(() => window.__academia_dragones.state), { timeout: 30_000 }).toBe('play');
+      await call(page, 'setInvuln', 999);
+      await sim(page, 0.3); await wait(page, 300);
+      const hud = await boxesOf(page, ['.ad-stats', '#adObj', '#adTip', '.mla-bar', '.k3-joy', '.k3-btn']);
+      expect(hud.filter(b => b.s.startsWith('.k3-btn'))).toHaveLength(4);
+      for (let i = 0; i < hud.length; i++) for (let j = i + 1; j < hud.length; j++) {
+        if (hud[i].s.startsWith('.mla-bar') && hud[j].s.startsWith('.mla-bar')) continue;
+        expect(overlap(hud[i], hud[j]), `${hud[i].s} se superpone con ${hud[j].s}`).toBe(false);
+      }
+      for (const b of hud) { expect(b.x, b.s).toBeGreaterThanOrEqual(0); expect(b.x + b.w, b.s).toBeLessThanOrEqual(w + 1); expect(b.y + b.h, b.s).toBeLessThanOrEqual(h + 1); }
+      for (const b of hud.filter(b => b.s.startsWith('.k3-btn'))) expect(b.h, b.s).toBeGreaterThanOrEqual(56);
+      expect((await boxesOf(page, ['#adTipSkip']))[0].h).toBeGreaterThanOrEqual(44);
+      // texto del HUD legible (≥ 11 px rótulos, ≥ 12 px información)
+      const fonts = await page.evaluate(() => [...document.querySelectorAll('#adHud *, #adTip *')].filter(e => e.childNodes.length && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && e.getClientRects().length).map(e => [e.id || e.className || e.tagName, parseFloat(getComputedStyle(e).fontSize)]));
+      for (const [n, f] of fonts) expect(f, String(n)).toBeGreaterThanOrEqual(11);
+      const before = (await H(page)).counts.bolts;
+      await page.locator('.k3-btn[data-btn="fire"]').tap();
+      await expect.poll(async () => (await H(page)).counts.bolts, { timeout: 30_000 }).toBeGreaterThan(before);
+      expect(await noScroll()).toBe(true);
       await page.screenshot({ path: test.info().outputPath(`celular-${w}x${h}.png`) });
       expectNoErrors(errors);
     });
   }
+
+  test('celular: multitáctil (joystick + aliento a la vez), zona muerta y botón con respuesta visual', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'táctil: sólo celular');
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await startReal(page, true);
+    await call(page, 'setInvuln', 999);
+    const joy = await page.locator('.k3-joy').boundingBox();
+    const fire = await page.locator('.k3-btn[data-btn="fire"]').boundingBox();
+    const cx = joy.x + joy.width / 2, cy = joy.y + joy.height / 2;
+    const fx = fire.x + fire.width / 2, fy = fire.y + fire.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    // temblor del pulgar (5 px) dentro de la zona muerta: no gira
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx, y: cy, id: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx + 5, y: cy, id: 1 }] });
+    await sim(page, 0.1);
+    expect((await H(page)).player.turn).toBe(0);
+    // joystick a fondo + segundo dedo en 🔥, simultáneos
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx + 60, y: cy, id: 1 }] });
+    const b0 = (await H(page)).counts.bolts;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx + 60, y: cy, id: 1 }, { x: fx, y: fy, id: 2 }] });
+    expect(await page.locator('.k3-btn[data-btn="fire"]').evaluate(e => e.classList.contains('on'))).toBe(true);
+    await sim(page, 0.1);
+    const s = await H(page);
+    expect(s.player.turn).toBeGreaterThan(0.5);
+    expect(s.counts.bolts).toBeGreaterThan(b0);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    await sim(page, 0.1);
+    expect((await H(page)).player.turn).toBe(0);
+    expectNoErrors(errors);
+  });
+
+  test('celular: girar el teléfono en pleno vuelo reacomoda cámara y controles sin perder la partida', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'táctil: sólo celular');
+    await page.setViewportSize({ width: 412, height: 915 });
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await startReal(page, true);
+    await call(page, 'setInvuln', 999);
+    await call(page, 'addScore', 777);
+    await sim(page, 0.5);
+    const a = await H(page);
+    expect(await page.evaluate(() => window.__academia_dragones.state)).toBe('play');
+    await page.setViewportSize({ width: 915, height: 412 });
+    await wait(page, 500);
+    await sim(page, 0.5);
+    const b = await H(page);
+    expect(b.state).toBe('play'); expect(b.score).toBe(a.score); expect(b.lives).toBe(a.lives);
+    expect(Math.hypot(b.player.pos.x - a.player.pos.x, b.player.pos.z - a.player.pos.z)).toBeGreaterThan(3);
+    const btns = await boxesOf(page, ['.k3-joy', '.k3-btn', '.ad-stats', '#adObj']);
+    for (const x of btns) { expect(x.x + x.w, x.s).toBeLessThanOrEqual(916); expect(x.y + x.h, x.s).toBeLessThanOrEqual(413); }
+    expect(await page.evaluate(() => { const c = document.querySelector('canvas'); return Math.abs(c.clientWidth / c.clientHeight - 915 / 412) < 0.02; })).toBe(true);
+    // y de vuelta a vertical
+    await page.setViewportSize({ width: 412, height: 915 });
+    await wait(page, 400); await sim(page, 0.2);
+    expect((await H(page)).state).toBe('play');
+    // la app pasa a segundo plano: se pausa sola
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect.poll(() => page.evaluate(() => window.__academia_dragones.paused)).toBe(true);
+    expectNoErrors(errors);
+  });
 });
