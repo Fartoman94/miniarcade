@@ -185,3 +185,46 @@ Lectura honesta: el costo propio del juego por cuadro queda por debajo de 1 ms e
 - `prefers-reduced-motion`: implementado (sin vibración del cuchillo, temblor al 25 %, aviso de compuerta fijo), no cubierto por un test.
 - Récord por dificultad: no (un solo récord, como antes).
 - Rendimiento en un teléfono real: no medido.
+
+## Móvil
+
+Pasada mobile-first (2026-10-11). Capturas con Chromium headless emulando táctil (`hasTouch`, `isMobile`, DPR 2) en 360×640, 390×844, 412×915, 915×412 y 844×390 — menú, nivel 5 (jefe + 3 chips de misiones) y fin de partida:
+
+- Antes: `.perf/mobile-clavado/antes-<ancho>x<alto>-{menu,play,over}.png` (y la auditoría central `.perf/mobile-audit/clavado-*.png`).
+- Después: `.perf/mobile-clavado/despues-<ancho>x<alto>-{menu,play,over}.png`.
+
+El recuadro de fps de las capturas es el overlay de `?debug` del SDK, no aparece en juego normal.
+
+### Problemas encontrados → arreglos
+
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| En vertical (360×640, 390×844, 412×915) los chips de misiones (abajo a la derecha) se desbordaban hacia la izquierda y tapaban el cuchillo listo y su recorrido; con el jefe, además pisaban la barra del jefe (que bajaba a H·0,78−30). | En vertical el HUD de misiones se limita a `50vw − 30px` (nunca cruza el carril del cuchillo) y los títulos hacen salto de línea en vez de cortarse. La barra del jefe en vertical va justo debajo del tronco. |
+| Texto chico: etapa (BOSQUE) 10 px, reto del nivel 11 px, chips de misiones 10–11 px (10 px en horizontal por la regla compartida `max-height:480px`), crédito y pie 10 px, marca de agua 9 px. | Etapa y reto 12 px, chips 12 px en todas las orientaciones (y títulos hasta 240 px en horizontal, antes se cortaban con «…»), crédito/pie/marca 11 px. |
+| En horizontal (844×390, 915×412) el soporte del cuchillo quedaba fuera de pantalla y la marca «MATELABS» se dibujaba encima del mango. | Punta del cuchillo listo en `KY = min(H·0,78, H − 112 − safe-bottom)`; la marca de agua pasa abajo a la derecha. Tronco un poco más grande en horizontal (`H·0,19`). |
+| En vertical el reto del nivel (2 líneas bajo NIVEL) quedaba encima del borde superior del tronco (360×640). | En vertical el tronco baja lo justo (`CY ≥ 150 + R + safe-top`, acotado para dejar sitio a la barra del jefe). |
+| El menú no tenía un botón: sólo un texto parpadeante (opacidad 0,12). En 360×640, con récord guardado, el chip «TU RÉCORD» se superponía al selector de dificultad (506–540 contra 517–582). | «▶ TOCÁ PARA JUGAR» es un `<button id="playBtn">` de 56 px de alto con pulso suave (sin animación con `prefers-reduced-motion`); tocar en cualquier parte sigue arrancando. El menú reserva arriba el lugar de la barra del arcade y abajo el del selector (padding), así nada se pisa; en ≤480 px de ancho se oculta el chip «HTML5 · PC + ANDROID» y en táctil sólo se muestra el chip de control táctil. |
+| Tocar justo al lado de un botón de dificultad arrancaba la partida. | Franja muerta: `#diffBox` (con 6 px de margen) frena `pointerdown/mousedown/touchstart`. |
+| Viewport con `maximum-scale=1, user-scalable=no`. | Quitado; el lienzo tiene `touch-action:none` (el `body` ya lo tenía), así que el juego no hace zoom ni pan. |
+| HUD, combo, cuchillos restantes, selector y pie sin zonas seguras (notch / barra de inicio). | `env(safe-area-inset-*)` en CSS y una sonda `#safe` que el canvas lee para el cuchillo y los cuchillos restantes. |
+
+Sin cambios (ya estaban bien): toques sobre la barra del arcade y el selector no lanzan cuchillos (frenan la propagación), pausa al ir a segundo plano (SDK), audio reanudado sólo tras un gesto, vibración corta en clavada/rotura/rebote, calidad automática «media» en táctil (DPR ≤ 1,5), el juego es de un solo toque (no hay controles que se superpongan). Ambas orientaciones son jugables, así que no se muestra aviso de girar.
+
+### Pruebas (`tests/e2e/clavado.spec.js`, describe «¡Clavado! móvil», sólo proyecto mobile)
+
+- **Matriz de pantallas** (5 tamaños): sin scroll; menú dentro de pantalla y sin pisar la barra del arcade ni el selector; botones de dificultad y de la barra ≥ 44 px; botón principal ≥ 56 px; texto ≥ 12 px; arranque tocando el botón y lanzamiento con toque real que se clava; en el nivel 5, chips de misiones sin tapar el carril del cuchillo, la barra del jefe, el HUD ni la barra del arcade; soporte del cuchillo dentro de la pantalla.
+- **Girar a mitad de partida**: vertical → horizontal → vertical conserva estado, puntaje y cuchillos, reubica el encuadre y sigue lanzando.
+- **Menú táctil**: tocar «Difícil» la elige sin arrancar; tocar al lado del selector no arranca; el botón principal arranca con la dificultad elegida.
+- **Gestos/calidad**: viewport sin bloqueo de zoom, `touch-action:none` en el lienzo, calidad automática media y DPR ≤ 1,5.
+
+Resultados (spec completo, 2026-10-11):
+
+| Corrida | desktop | mobile | Total |
+|---|---|---|---|
+| `ML_WORKERS=1` | 16 passed, 5 skipped (tests táctiles) | 21 passed | 37 passed, 5 skipped (12,7 min) |
+| `ML_WORKERS=4` | 16 passed, 5 skipped | 21 passed | 37 passed, 5 skipped (8,8 min) |
+
+### NO PROBADO (móvil)
+
+- Teléfonos reales: no había; todo es emulación de Chromium (Pixel 7 + tamaños forzados). No se probaron Safari/iOS (notch real, barras dinámicas, desbloqueo de audio) ni el rendimiento en un teléfono.
+- Las zonas seguras se probaron sólo con insets = 0 (Chromium headless no los emula).

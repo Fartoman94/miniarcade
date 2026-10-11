@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b1d17">
 <title>¡CLAVADO! — un juego de MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AA%3C/text%3E%3C/svg%3E">
@@ -17,12 +17,15 @@
   body{background:#0b1d17;font-family:'Space Grotesk',system-ui,sans-serif;color:#fff;
        touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none;
        -webkit-tap-highlight-color:transparent}
-  #c{position:fixed;inset:0;display:block}
+  #c{position:fixed;inset:0;display:block;touch-action:none}
+  /* sonda de zonas seguras (notch / barra de inicio): el JS lee su padding */
+  #safe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;
+       padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
   .vignette{position:fixed;inset:0;pointer-events:none;z-index:1;
        background:radial-gradient(130% 100% at 50% 36%,transparent 52%,rgba(2,8,5,.62))}
 
   .hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;
-       padding:16px 20px;pointer-events:none;opacity:0;transition:opacity .4s;z-index:5}
+       padding:max(16px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) 16px max(20px,env(safe-area-inset-left));pointer-events:none;opacity:0;transition:opacity .4s;z-index:5}
   .hud.show{opacity:1}
   /* la barra del arcade va arriba a la derecha: el bloque NIVEL baja para no quedar tapado */
   .hud .lvl{text-align:right;margin-top:40px}
@@ -33,13 +36,13 @@
   .num.small{font-size:26px;color:#ffd93d}
   .num.pop{animation:pop .3s}
   @keyframes pop{35%{transform:scale(1.3) rotate(-2deg)}}
-  #combo{position:fixed;top:102px;left:22px;font-family:'Bungee';font-size:22px;color:#ffd93d;
+  #combo{position:fixed;top:calc(102px + env(safe-area-inset-top,0px));left:max(22px,env(safe-area-inset-left));font-family:'Bungee';font-size:22px;color:#ffd93d;
          text-shadow:0 3px 0 rgba(6,14,9,.55);opacity:0;transform:translateY(-6px) scale(.7);
          transition:opacity .25s,transform .25s;z-index:5;pointer-events:none}
   #combo.show{opacity:1;transform:none}
   #combo.pop{animation:cpop .3s}
   @keyframes cpop{40%{transform:scale(1.35)}}
-  .watermark{position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;
+  .watermark{position:fixed;bottom:max(8px,env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right));text-align:right;font-size:11px;font-weight:700;
        letter-spacing:.42em;color:rgba(255,255,255,.38);text-shadow:0 1px 4px rgba(0,0,0,.5);
        pointer-events:none;z-index:4}
 
@@ -55,16 +58,20 @@
        text-shadow:0 6px 0 #8C2F1B,0 14px 30px rgba(0,0,0,.45)}
   .tag{font-size:clamp(14px,2.6vw,17px);line-height:1.55;color:rgba(255,255,255,.92);max-width:36ch;font-weight:500}
   .controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-  .blink{font-family:'Bungee';font-size:clamp(15px,3.2vw,21px);letter-spacing:.06em;
-         animation:blink 1.15s steps(2) infinite;margin-top:6px}
-  @keyframes blink{50%{opacity:.12}}
+  /* acción principal del menú: tocar en cualquier parte arranca, pero también hay un botón real (≥56 px) */
+  .blink{font-family:'Bungee';font-size:clamp(15px,3.2vw,21px);letter-spacing:.06em;color:#fff;cursor:pointer;
+         min-height:56px;padding:12px 26px;border-radius:999px;border:2px solid rgba(255,217,61,.6);background:rgba(6,20,13,.55);
+         animation:blink 1.15s ease-in-out infinite alternate;margin-top:6px;touch-action:manipulation}
+  .blink:active{transform:scale(.96);background:rgba(255,217,61,.18)}
+  @keyframes blink{to{opacity:.55}}
+  @media (prefers-reduced-motion:reduce){.blink{animation:none}}
 
   .credit{display:flex;flex-direction:column;gap:3px;padding:10px 24px;transform:rotate(-1.2deg);
        border:2px solid rgba(255,217,61,.55);border-radius:10px;background:rgba(6,20,13,.65);
        box-shadow:0 5px 0 rgba(4,10,6,.5)}
-  .credit-k{font-size:10px;letter-spacing:.34em;font-weight:700;color:rgba(255,255,255,.7)}
+  .credit-k{font-size:11px;letter-spacing:.34em;font-weight:700;color:rgba(255,255,255,.7)}
   .credit-n{font-family:'Bungee';font-size:clamp(17px,4vw,23px);color:#ffd93d;letter-spacing:.04em}
-  .foot{position:absolute;bottom:30px;left:0;right:0;font-size:10px;letter-spacing:.22em;
+  .foot{position:absolute;bottom:calc(30px + env(safe-area-inset-bottom,0px));left:0;right:0;font-size:11px;letter-spacing:.22em;
        color:rgba(255,255,255,.55);font-weight:700}
 
   .kicker{font-size:12px;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.75)}
@@ -80,14 +87,27 @@
   .btn:hover{transform:translateY(-2px);box-shadow:0 9px 0 #7e1f16,0 18px 32px rgba(0,0,0,.4)}
   .btn:active{transform:translateY(5px);box-shadow:0 2px 0 #7e1f16}
   .hint{font-size:12px;color:rgba(255,255,255,.6);letter-spacing:.08em}
-  .goal{margin-top:6px;font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.88);
+  .goal{margin-top:6px;font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.88);
        text-shadow:0 1px 5px rgba(0,0,0,.6);max-width:44vw;margin-left:auto;line-height:1.3}
   .goal.done{color:#8be07a}
   .goal.fail{color:rgba(255,255,255,.45);text-decoration:line-through}
-  .stage{font-size:10px;font-weight:700;letter-spacing:.26em;color:rgba(255,255,255,.7);margin-top:2px}
+  .stage{font-size:12px;font-weight:700;letter-spacing:.26em;color:rgba(255,255,255,.7);margin-top:2px}
   /* el selector va abajo, fuera de la zona central donde se toca para jugar */
-  #diffBox{position:absolute;left:0;right:0;bottom:58px;display:flex;justify-content:center;padding:0 12px}
-  @media (max-height:560px){.overlay{gap:9px;padding:14px}.tag,.credit{display:none}.title{font-size:clamp(40px,10vh,70px)}
+  #diffBox{position:absolute;left:0;right:0;bottom:calc(52px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;padding:6px 12px}
+  /* el menú centra su contenido en el espacio libre entre la barra del arcade (arriba) y el selector (abajo) */
+  #menu{padding-top:60px;padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+  /* en táctil sólo se muestra el control que aplica */
+  @media (pointer:coarse){.ctl-mouse{display:none}}
+  @media (pointer:fine){.ctl-touch{display:none}}
+  @media (max-width:480px){#menu>.chip:first-child{display:none}}
+  /* misiones (MLMissions, HUD abajo a la derecha): legibles (12 px) y, en vertical, sin cruzar el carril del cuchillo */
+  body .mlm-m,body .mlm-m .ic{font-size:12px}
+  body .mlm-hud.br .mlm-m .t{max-width:240px}
+  @media (orientation:portrait){
+    body .mlm-hud.br{max-width:calc(50vw - 30px)}
+    body .mlm-hud.br .mlm-m{align-items:flex-start}
+    body .mlm-hud.br .mlm-m .t{white-space:normal;max-width:none;overflow:visible}}
+  @media (max-height:560px){.overlay{gap:9px;padding:14px}#menu{padding-top:52px;padding-bottom:calc(132px + env(safe-area-inset-bottom,0px))}.tag,.credit{display:none}.title{font-size:clamp(40px,10vh,70px)}
     .controls .chip{padding:5px 11px}.foot{bottom:24px}.finalScore{font-size:clamp(48px,14vh,90px)}.btn{padding:11px 30px}}
   @media (max-height:420px){.controls{display:none}.overlay>.chip:first-child{display:none}}
 </style>
@@ -95,6 +115,7 @@
 <body>
 <script src="matelabs/intro.js" data-game="¡CLAVADO!" data-accent="#ff6b5d"></script>
 <canvas id="c"></canvas>
+<div id="safe"></div>
 <div class="vignette"></div>
 
 <div class="hud" id="hud">
@@ -114,11 +135,11 @@
     <span class="credit-n"><img class="ml-ava" src="matelabs/mascota-128.webp" alt="">MATELABS</span>
   </div>
   <div class="controls">
-    <span class="chip">🖱️ CLIC / ESPACIO</span>
-    <span class="chip">👆 TOQUE</span>
+    <span class="chip ctl-mouse">🖱️ CLIC / ESPACIO</span>
+    <span class="chip ctl-touch">👆 TOCÁ EN CUALQUIER PARTE</span>
   </div>
   <div id="diffBox"></div>
-  <div class="blink">▶ TOCÁ PARA JUGAR</div>
+  <button class="blink" type="button" id="playBtn">▶ TOCÁ PARA JUGAR</button>
   <div class="chip" id="menuBest" style="display:none"></div>
   <div class="foot">© 2026 MATELABS · HECHO CON HTML5</div>
 </div>
@@ -217,14 +238,26 @@ const PLATE_HALF={steel:.32,ice:.30,shutter:.38};
 const GRAZE=0.2; // roce: clavar a menos de esto de otro cuchillo (sin llegar al choque de 0,105)
 
 /* ---- lienzo y cachés ---- */
-let W=0,H=0,DPR=1,CX=0,CY=0,R=100;
+let W=0,H=0,DPR=1,CX=0,CY=0,R=100,KY=0,SAFE={t:0,r:0,b:0,l:0};
 let gBg=null,gSpot=null;
 let faceCv=null,sideCv=null,lightCv=null,layers=[],cacheKey='';
 let biomeIdx=0,BIOME=BIOMES[0];
 function mk(w,h,scale){const c=document.createElement('canvas');const s=scale||DPR;
   c.width=Math.max(1,Math.ceil(w*s));c.height=Math.max(1,Math.ceil(h*s));
   const x=c.getContext('2d');x.setTransform(s,0,0,s,0,0);return [c,x];}
-function layout(){CX=W/2;CY=H*0.335;R=Math.max(68,Math.min(W*0.27,H*0.17,132));buildBg();buildLog();}
+function readSafe(){try{const cs=getComputedStyle(document.getElementById('safe'));
+  SAFE={t:parseFloat(cs.paddingTop)||0,r:parseFloat(cs.paddingRight)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0};}catch(e){}}
+/* encuadre: el cuchillo listo (KY = punta) nunca se sale por abajo ni queda bajo la barra de inicio;
+   en vertical el tronco baja lo justo para no quedar debajo del bloque NIVEL/reto, dejando lugar a la barra del jefe */
+function layout(){readSafe();CX=W/2;
+  const portrait=H>W;
+  R=Math.max(68,Math.min(W*0.27,H*(portrait?0.17:0.19),132));
+  KY=Math.min(H*0.78,H-112-SAFE.b);
+  CY=H*0.335;
+  if(portrait)CY=Math.max(CY,Math.min(150+SAFE.t+R+4,KY-R*1.1-96));
+  buildBg();buildLog();}
+/* posición de la barra del tronco jefe: arriba del tronco si entra entre PUNTOS y NIVEL; si no, justo debajo del tronco */
+function bossBarY(w){const x=CX-w/2;return x>190?Math.max(CY-R-44,22+SAFE.t):CY+R*1.1+42;}
 function buildBg(){
   const B=BIOME;
   gBg=ctx.createLinearGradient(0,0,0,H);
@@ -823,7 +856,7 @@ function drawBossBar(){
   if(!boss||state==='menu')return;
   const w=Math.min(240,W*.6),x=CX-w/2,total=bossTotal(),left=bossLeft();
   // arriba del tronco si entra entre PUNTOS y NIVEL; si no (vertical angosto), sobre el cuchillo listo
-  const y=x>190?Math.max(CY-R-44,22):H*0.78-30;
+  const y=bossBarY(w);
   ctx.font='12px Bungee,"Arial Black",sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
   ctx.lineWidth=4;ctx.strokeStyle='rgba(6,14,9,.7)';
   const label=boss.name+' · FASE '+(boss.phase+1)+'/'+boss.phases;
@@ -867,7 +900,7 @@ function render(){
     ctx.beginPath();ctx.ellipse(r.x,r.y,6+k*34,3+k*12,0,0,TAU);ctx.stroke();}
   ctx.globalAlpha=1;
 
-  const restTipY=H*0.78;
+  const restTipY=KY;
   if(knifeState==='fly'){
     const p=flyT*flyT*(3-2*flyT);
     const tipY=restTipY+(CY+R-13-restTipY)*p;
@@ -878,7 +911,7 @@ function render(){
     ctx.fillStyle='#3a2717';rr(CX-34,restTipY+78,68,18,4);ctx.fill();
     ctx.fillStyle='#54391f';ctx.fillRect(CX-34,restTipY+78,68,4);
     drawKnife(CX,restTipY+bob);
-    for(let i=0;i<throwsLeft-1;i++)drawKnife(28+i*15,H-84,.42,.85);
+    for(let i=0;i<throwsLeft-1;i++)drawKnife(28+SAFE.l+i*15,H-84-SAFE.b,.42,.85);
   }
 
   for(const s of shards){
@@ -962,6 +995,8 @@ MLArcade.init({
 addEventListener('pageshow',e=>{if(e.persisted&&!MLArcade.isPaused()){paused=false;startLoop();}});
 // selector de dificultad en el menú de inicio (no durante la partida)
 if(M)M.difficultyPicker($('diffBox'),{onChange:()=>{readDiff();if(state==='menu')setupLevel(1);}});
+// franja muerta alrededor del selector: un toque que erra por poco a «Fácil»/«Extremo» no arranca la partida
+for(const t of['pointerdown','mousedown','touchstart'])$('diffBox').addEventListener(t,e=>e.stopPropagation());
 readDiff();
 // gancho para las pruebas automáticas: leer el estado y forzar un choque sin depender del azar
 window.__clavado={snap:()=>({state,score,level,theta,throwsLeft,knifeState,stuck:stuck.length,apples:applesArr.length,time,best,paused,
@@ -969,6 +1004,7 @@ window.__clavado={snap:()=>({state,score,level,theta,throwsLeft,knifeState,stuck
     omega:omega(),mode:levelCfg.mode,base:levelCfg.base,biome:BIOME.id,difficulty:diffKey,comboWindow:D.combo,
     quality,dprCap:Q.dpr,dpr:DPR,partCap:Q.partCap,ambient:amb.length,layers:Math.min(Q.layers,layers.length),shadows:Q.shadows,
     canvasW:canvas.width,reduced,
+    layout:{W,H,CX,CY,R,KY,bossBarY:bossBarY(Math.min(240,W*.6)),bossBarW:Math.min(240,W*.6),safe:SAFE},
     plates:plates.map(p=>({type:p.type,c:p.c,half:p.half,hp:p.hp,solid:plateSolid(p),jammed:p.jammed})),
     stuckAngles:stuck.map(s=>s.local),appleAngles:applesArr.map(a=>a.local),
     boss:boss?{name:boss.name,tier:boss.tier,phase:boss.phase,phases:boss.phases,left:bossLeft(),total:bossTotal(),breaking:!!boss.breaking}:null,
