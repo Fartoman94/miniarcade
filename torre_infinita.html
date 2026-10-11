@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1233">
 <title>TORRE INFINITA — un juego de MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%B1%3C/text%3E%3C/svg%3E">
@@ -17,12 +17,12 @@
   body{background:#0a1233;font-family:'Space Grotesk',system-ui,sans-serif;color:#fff;
        touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none;
        -webkit-tap-highlight-color:transparent}
-  #c{position:fixed;inset:0;display:block}
+  #c{position:fixed;inset:0;display:block;touch-action:none}
   .vignette{position:fixed;inset:0;pointer-events:none;z-index:1;
        background:radial-gradient(130% 100% at 50% 38%,transparent 55%,rgba(3,6,20,.5))}
 
   .hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;
-       padding:16px 20px;pointer-events:none;opacity:0;transition:opacity .4s;z-index:5}
+       padding:calc(16px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 16px calc(20px + env(safe-area-inset-left));pointer-events:none;opacity:0;transition:opacity .4s;z-index:5}
   .hud.show{opacity:1}
   .label{font-size:11px;font-weight:700;letter-spacing:.24em;color:rgba(255,255,255,.8);
          text-shadow:0 1px 6px rgba(0,0,0,.5)}
@@ -31,18 +31,19 @@
   .num.small{font-size:26px;color:#FFD93D}
   .num.pop{animation:pop .3s}
   @keyframes pop{35%{transform:scale(1.3) rotate(-2deg)}}
-  #combo{position:fixed;top:102px;left:22px;font-family:'Bungee';font-size:22px;color:#FFD93D;
+  #combo{position:fixed;top:calc(102px + env(safe-area-inset-top));left:calc(22px + env(safe-area-inset-left));font-family:'Bungee';font-size:22px;color:#FFD93D;
          text-shadow:0 3px 0 rgba(8,12,34,.45);opacity:0;transform:translateY(-6px) scale(.7);
          transition:opacity .25s,transform .25s;z-index:5;pointer-events:none}
   #combo.show{opacity:1;transform:none}
   #combo.pop{animation:cpop .3s}
   @keyframes cpop{40%{transform:scale(1.35)}}
-  .watermark{position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;
+  .watermark{position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:11px;font-weight:700;
        letter-spacing:.42em;color:rgba(255,255,255,.4);text-shadow:0 1px 4px rgba(0,0,0,.5);
        pointer-events:none;z-index:4}
 
   .overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;
-       justify-content:center;gap:18px;text-align:center;padding:28px;
+       justify-content:center;gap:18px;text-align:center;
+       padding:max(28px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(28px,env(safe-area-inset-left));
        background:linear-gradient(180deg,rgba(6,10,30,.28),rgba(6,10,30,.68));
        transition:opacity .45s,visibility .45s}
   .overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
@@ -61,9 +62,9 @@
   .credit{display:flex;flex-direction:column;gap:3px;padding:10px 24px;transform:rotate(-1.2deg);
        border:2px solid rgba(255,217,61,.55);border-radius:10px;background:rgba(8,14,38,.6);
        box-shadow:0 5px 0 rgba(8,12,34,.4)}
-  .credit-k{font-size:10px;letter-spacing:.34em;font-weight:700;color:rgba(255,255,255,.7)}
+  .credit-k{font-size:11px;letter-spacing:.34em;font-weight:700;color:rgba(255,255,255,.7)}
   .credit-n{font-family:'Bungee';font-size:clamp(17px,4vw,23px);color:#FFD93D;letter-spacing:.04em}
-  .foot{position:absolute;bottom:16px;left:0;right:0;font-size:10px;letter-spacing:.22em;
+  .foot{position:absolute;bottom:16px;left:0;right:0;font-size:11px;letter-spacing:.22em;
        color:rgba(255,255,255,.55);font-weight:700}
 
   .kicker{font-size:12px;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.75)}
@@ -81,7 +82,7 @@
   .hint{font-size:12px;color:rgba(255,255,255,.6);letter-spacing:.08em}
 
   /* aviso de eventos (tormenta, bloque gigante, desafío de estabilidad, piezas especiales) */
-  #event{position:fixed;top:18px;left:50%;transform:translate(-50%,-6px);z-index:5;pointer-events:none;
+  #event{position:fixed;top:calc(18px + env(safe-area-inset-top));left:50%;transform:translate(-50%,-6px);z-index:5;pointer-events:none;
          font-family:'Bungee',"Arial Black",sans-serif;font-size:14px;letter-spacing:.04em;white-space:nowrap;
          padding:7px 14px;border-radius:999px;background:rgba(8,14,38,.62);border:2px solid rgba(255,255,255,.3);
          color:#fff;text-shadow:0 2px 0 rgba(8,12,34,.45);opacity:0;transition:opacity .25s,transform .25s;max-width:calc(100vw - 24px);
@@ -94,7 +95,7 @@
   #event.bad{border-color:#FF5D5D;color:#ffb3b3}
   .diffWrap{display:flex;flex-direction:column;align-items:center;gap:6px}
   .diffWrap .mlm-diff{align-items:center}
-  .diffInfo{font-size:11px;letter-spacing:.06em;color:rgba(255,255,255,.75);font-weight:700;min-height:14px}
+  .diffInfo{font-size:12px;letter-spacing:.06em;color:rgba(255,255,255,.75);font-weight:700;min-height:14px}
   .btn2{font-family:'Bungee';font-size:13px;color:#fff;background:rgba(8,14,38,.6);border:2px solid rgba(255,255,255,.4);
         border-radius:10px;padding:9px 18px;cursor:pointer;letter-spacing:.04em}
   .btn2:hover,.btn2:focus-visible{border-color:#FFD93D;color:#FFD93D;outline:none}
@@ -103,16 +104,33 @@
   .overMissions:empty{display:none}
   .overMissions .ok{color:#6be38a}.overMissions .ko{color:rgba(255,255,255,.5)}
   /* en celular las misiones (abajo a la derecha) quedan por encima de la marca de agua */
-  @media (max-width:760px){.mlm-hud.br{bottom:78px}#event{top:138px;font-size:12px}}
+  @media (max-width:760px){.mlm-hud.br{bottom:calc(78px + env(safe-area-inset-bottom))}#event{top:calc(138px + env(safe-area-inset-top));font-size:12px}}
+  /* chips de misiones: texto de juego legible también en apaisado (el SDK los baja a 11 px) */
+  body .mlm-hud .mlm-m{font-size:12px}
+  /* botón principal del menú: objetivo grande en la zona del pulgar */
+  .btn.play{min-height:56px;min-width:200px;padding:14px 38px;margin-top:2px}
+  .blink2{animation:blink 1.6s steps(2) infinite}
+  @media (pointer:coarse){.btn2{min-height:44px;padding:11px 18px}.btn{min-height:56px}}
 
   /* el pie de las pantallas ya dice MATELABS: la marca de agua se oculta para no encimarse */
   body:has(.overlay:not(.hidden)) .watermark{opacity:0}
   /* la barra del arcade va abajo a la izquierda: en pantallas angostas subimos los textos del pie */
-  @media (max-width:760px){.watermark{bottom:52px}.foot{bottom:54px}}
-  @media (max-height:520px){.overlay{gap:8px;padding:12px}.foot{display:none}
-    #menu>.chip:first-child,#menu .controls,#menu .tag{display:none}
-    .title{font-size:clamp(40px,11vh,64px)}.credit{padding:6px 16px}.finalScore{font-size:64px}
-    #event{top:14px;font-size:12px}}
+  @media (max-width:760px){.watermark{bottom:calc(64px + env(safe-area-inset-bottom))}.foot{bottom:calc(64px + env(safe-area-inset-bottom))}}
+  /* celulares comunes (alto ≤ 760): menú compacto para que nada se corte */
+  @media (max-height:760px){#menu{gap:12px}#menu .controls,#menu .foot{display:none}#menu .title{font-size:clamp(48px,13vw,96px)}
+    #menu .tag{font-size:14px}}
+  @media (max-height:700px){#menu>.chip:first-child{display:none}}
+  /* pantallas angostas: los 4 botones de dificultad entran en una sola fila */
+  @media (max-width:400px){#menu{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+    #diffBox .mlm-diff-row{gap:5px;justify-content:center;flex-wrap:nowrap}#diffBox .mlm-diff button{padding-left:10px;padding-right:10px}}
+  @media (max-height:520px){.overlay{gap:8px;padding-top:max(10px,env(safe-area-inset-top));padding-bottom:max(10px,env(safe-area-inset-bottom))}.foot{display:none}
+    #menu>.chip:first-child,#menu .controls,#menu .tag,#menu .credit,#playHint{display:none}
+    #menu .title{font-size:clamp(36px,10vh,56px)}.credit{padding:6px 16px}.finalScore{font-size:52px}
+    #over .label,#over .hint{display:none}.btn{padding:10px 30px;margin-top:0}.btn.play{min-height:56px}
+    .num{font-size:40px}.num.small{font-size:22px}#combo{top:calc(70px + env(safe-area-inset-top));font-size:16px}
+    #event{top:calc(14px + env(safe-area-inset-top));font-size:12px}}
+  /* overlays: si algo no entra, se desplaza dentro (sin cortar arriba) */
+  .overlay{justify-content:safe center}.overlay:not(.hidden){overflow-y:auto}
 </style>
 </head>
 <body>
@@ -142,7 +160,8 @@
     <span class="chip">👆 TOQUE</span>
   </div>
   <div class="diffWrap" id="diffBox"><div class="diffInfo" id="diffInfo"></div></div>
-  <div class="blink">▶ TOCÁ PARA EMPEZAR</div>
+  <button class="btn play" type="button" id="playBtn">▶ JUGAR</button>
+  <div class="hint blink2" id="playHint">o tocá en cualquier parte</div>
   <div class="chip" id="menuBest" style="display:none"></div>
   <div class="foot">© 2026 MATELABS · HECHO CON HTML5</div>
 </div>
@@ -198,10 +217,19 @@ function readDifficulty(){DK=MLM?MLM.difficulty('torre_infinita'):'normal';if(!D
   if(diffInfo)diffInfo.textContent=DIFF_INFO[DK];}
 readDifficulty();
 
-let W=0,H=0,DPR=1;
-function resize(){DPR=Math.min(devicePixelRatio||1,Q.dpr);W=innerWidth;H=innerHeight;
-  canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+'px';canvas.style.height=H+'px';
-  ctx.setTransform(DPR,0,0,DPR,0,0);buildLayers();}
+/* W/H = tamaño del mundo en px lógicos. VS (escala de vista) sólo baja de 1 si se gira el teléfono a mitad de
+   partida y la torre ya no entra (p. ej. base de 400 px armada en apaisado y ahora 360 px de ancho):
+   el mundo se dibuja un poco más chico en vez de quedar cortado. Toda partida nueva arranca con VS = 1. */
+let W=0,H=0,DPR=1,VS=1;
+function computeView(){const iw=innerWidth,ih=innerHeight,bhT=ih<620?28:34;
+  VS=Math.min(1,iw*.62/BASE_W,bhT/BH);if(!(VS>0))VS=1;W=iw/VS;H=ih/VS;}
+function applyCanvas(){const iw=innerWidth,ih=innerHeight;
+  canvas.width=Math.round(iw*DPR);canvas.height=Math.round(ih*DPR);canvas.style.width=iw+'px';canvas.style.height=ih+'px';
+  ctx.setTransform(DPR*VS,0,0,DPR*VS,0,0);buildLayers();}
+function resize(){DPR=Math.min(devicePixelRatio||1,Q.dpr);computeView();applyCanvas();
+  /* el piso se acomoda a los chips de misiones del nuevo tamaño (sin saltos: en partida se mide de nuevo) */
+  GPt=groundTarget();if(state!=='playing')GP=GPt;
+  if(state==='menu'&&tower.length)newGame();}
 addEventListener('contextmenu',e=>e.preventDefault());
 
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -210,7 +238,8 @@ const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const hex2rgb=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
 const mix=(a,b,t)=>{const A=hex2rgb(a),B=hex2rgb(b);
   return `rgb(${(A[0]+(B[0]-A[0])*t)|0},${(A[1]+(B[1]-A[1])*t)|0},${(A[2]+(B[2]-A[2])*t)|0})`;};
-const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
+/* vibración corta opcional (no con «reducir movimiento») */
+const buzz=p=>{if(reduceMotion)return;try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
 
 /* ---- audio sintetizado (sin archivos) ---- */
 let AC=null,master=null,muted=false,paused=false;
@@ -237,6 +266,14 @@ const sThunder=()=>{tone(70,1.1,'sawtooth',.07,0,32);};
 let state='menu',tower=[],cur=null,pieces=[],parts=[],texts=[];
 let camY=0,score=0,combo=0,maxCombo=0,shakeT=0,shakeMag=0,overAt=0,time=0,botErr=0;
 let BASE_W=300,BH=34;const GROUND_PAD=90;
+/* GP = alto del piso (px de mundo). Mínimo GROUND_PAD; en partida sube lo necesario para que la torre y el bloque
+   en movimiento queden siempre por encima de los chips de misiones (abajo a la derecha). */
+let GP=GROUND_PAD,GPt=GROUND_PAD,gpCheck=0;
+function groundTarget(){
+  if(state!=='playing')return GROUND_PAD;
+  const el=document.querySelector('.mlm-hud');if(!el||el.hidden)return GROUND_PAD;
+  const r=el.getBoundingClientRect();if(!r.height)return GROUND_PAD;
+  return Math.max(GROUND_PAD,(innerHeight-r.top+6)/VS);}
 /* récord: se guarda en MLArcade.scores y también en la clave vieja 'torre_best' (compatibilidad).
    Un único récord para todas las dificultades. */
 let best=0;try{best=+localStorage.getItem('torre_best')||0;}catch(e){}
@@ -244,7 +281,7 @@ if(ML){try{best=Math.max(best,+ML.scores.best()||0);}catch(e){}}
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const hueFor=r=>(r*16+8)%360;
-const blockTopY=row=>H-GROUND_PAD-(row+1)*BH+camY;
+const blockTopY=row=>H-GP-(row+1)*BH+camY;
 
 /* ================= ALGORITMO DE CORTE (idéntico al original) =================
    Función pura: no toca el estado. perfK escala la ventana de caída perfecta según la dificultad
@@ -374,7 +411,9 @@ const SPAL={
 };
 
 function newGame(){
+  const vs0=VS,w0=W,h0=H;VS=1;W=innerWidth;H=innerHeight;
   BASE_W=clamp(W*.55,180,400);BH=H<620?28:34;
+  computeView();if(VS!==vs0||W!==w0||H!==h0)applyCanvas();
   tower=[{cx:0,w:BASE_W,row:0,hue:hueFor(0),sp:null}];
   pieces=[];parts=[];texts=[];score=0;combo=0;maxCombo=0;camY=0;
   stabFail=false;zone=0;bannerT=0;events={storms:0,giants:0,stab:0,stabFail:0,specials:0};
@@ -526,7 +565,7 @@ function showOver(){
   overMissions.textContent='';
   if(sum)for(const m of sum){const d=document.createElement('div');const ok=m.status==='done';
     d.className=ok?'ok':'ko';d.textContent=(ok?'✔ ':'✖ ')+(m.kind==='primary'?'★ ':'')+m.title;overMissions.appendChild(d);}
-  hud.classList.remove('show');
+  hud.classList.remove('show');comboEl.classList.remove('show');
   setTimeout(()=>{if(state==='over')over.classList.remove('hidden');},550);
 }
 function startGame(){
@@ -537,12 +576,13 @@ function startGame(){
   menu.classList.add('hidden');over.classList.add('hidden');
   hud.classList.add('show');bestEl.textContent=best;
   runStart();
+  GPt=groundTarget();GP=GPt;gpCheck=.4;camY=0;
   if(ML){try{ML.started();}catch(e){}}
 }
 function goMenu(){
   runEnd();
   state='menu';over.classList.add('hidden');menu.classList.remove('hidden');hud.classList.remove('show');
-  setBanner('','');readDifficulty();
+  setBanner('','');readDifficulty();GP=GPt=GROUND_PAD;
   if(best>0){menuBest.style.display='inline-flex';menuBest.textContent='TU RÉCORD · '+best;}
   newGame();
 }
@@ -562,8 +602,11 @@ function addText(txt,x,y,c,size){texts.push({txt,x,y,c,size,life:1});}
 /* ---- update ---- */
 function update(dt){
   time+=dt;
-  const vis=H-GROUND_PAD;
-  const camTarget=Math.max(0,tower.length*BH-vis*.55);
+  if(state==='playing'&&(gpCheck-=dt)<=0){gpCheck=.4;GPt=groundTarget();}
+  GP+=(GPt-GP)*Math.min(1,dt*6);if(Math.abs(GPt-GP)<.25)GP=GPt;
+  const vis=H-GP;
+  /* en pantallas bajas (celular chico, apaisado) la punta de la torre queda un poco más abajo: el carril no pasa bajo el HUD ni los avisos */
+  const camTarget=Math.max(0,tower.length*BH-vis*(innerHeight<520?.45:innerHeight<700?.5:.55));
   camY+=(camTarget-camY)*Math.min(1,dt*5);
 
   if(state!=='over'&&cur){
@@ -580,7 +623,7 @@ function update(dt){
   if(shakeT>0)shakeT-=dt*2.6;
   for(let i=pieces.length-1;i>=0;i--){const p=pieces[i];
     p.vy+=1400*dt;p.alt-=p.vy*dt;p.x+=p.vx*dt;p.rot+=p.vr*dt;
-    if(H-GROUND_PAD-p.alt+camY>H+260)pieces.splice(i,1);}
+    if(H-GP-p.alt+camY>H+260)pieces.splice(i,1);}
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];
     p.vy+=900*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt*1.6;if(p.life<=0)parts.splice(i,1);}
   for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.y-=46*dt;t.life-=dt*1.1;if(t.life<=0)texts.splice(i,1);}
@@ -673,7 +716,7 @@ function render(){
   if(ma>0){ctx.globalAlpha=ma;ctx.drawImage(moonSpr,W*.22-100,H*.24-100);ctx.globalAlpha=1;}
 
   /* paralaje: horizonte lejano y ciudad (cada capa se extiende hacia abajo como terreno) */
-  const base=H-GROUND_PAD;
+  const base=H-GP;
   const first=Q.layers>=3?0:Q.layers===2?0:1,lastL=Q.layers>=3?2:1;
   for(let i=first;i<=lastL;i++){const L=layers[i];if(!L)continue;const yb=base+camY*L.f;if(yb-L.h>H)continue;
     ctx.globalAlpha=L.a;ctx.drawImage(L.c,0,yb-L.h,W,L.h);
@@ -705,16 +748,16 @@ function render(){
   if(zoom!==1){const ay=blockTopY(tower.length-1);ctx.translate(W/2,ay);ctx.scale(zoom,zoom);ctx.translate(-W/2,-ay);}
   ctx.translate(sx,sy);
 
-  const gy=H-GROUND_PAD+camY;
+  const gy=H-GP+camY;
   if(gy<H+80){ctx.fillStyle='#232a4d';ctx.fillRect(0,gy,W,H-gy+80);
     ctx.fillStyle='#39437a';ctx.fillRect(0,gy,W,7);
     if(Q.fx>0){ctx.fillStyle='rgba(0,0,0,.22)';const b=tower[0],bx=W/2+b.cx+b.w/2;  /* sombra de la torre en el piso */
       quad(W/2+b.cx-b.w/2,gy,bx,gy,bx+70,gy+16,W/2+b.cx-b.w/2+40,gy+16);}}
 
   /* sólo las filas visibles (tower[i].row===i): la torre crece sin límite */
-  const r0=Math.max(0,Math.floor((camY-80-GROUND_PAD)/BH)-1),r1=Math.min(tower.length-1,Math.ceil((camY+H+80)/BH)+1);
+  const r0=Math.max(0,Math.floor((camY-80-GP)/BH)-1),r1=Math.min(tower.length-1,Math.ceil((camY+H+80)/BH)+1);
   for(let i=r0;i<=r1;i++){const b=tower[i];drawBlock(b.cx,b.w,b.row,b.hue,b.sp,nl,i>0?tower[i-1]:null);}
-  for(const p of pieces){const y=H-GROUND_PAD-p.alt+camY,pp=palFor(p.hue,p.sp,nl);
+  for(const p of pieces){const y=H-GP-p.alt+camY,pp=palFor(p.hue,p.sp,nl);
     ctx.save();ctx.translate(W/2+p.x,y+BH/2);ctx.rotate(p.rot);
     ctx.fillStyle=pp.front;ctx.fillRect(-p.w/2,-BH/2,p.w,BH);
     ctx.fillStyle=pp.top;ctx.fillRect(-p.w/2,-BH/2,p.w,5);
@@ -771,8 +814,18 @@ function action(){
   else if(state==='over'&&performance.now()-overAt>600)startGame();   /* recién cuando ya se ve el resultado */
 }
 const onUI=t=>t instanceof Element&&!!t.closest('.mla-bar,.mla-pause,.mla-toast,.ui,.mlm-diff');
+/* zona muerta alrededor de los controles: un toque que erra por poco un botón de la barra, el selector de
+   dificultad o «Menú y dificultad» no arranca la partida ni suelta un bloque */
+const DEAD_PAD=14,DEAD_SEL='.mla-bar .mla-btn,#diffBox,#menuBtn';
+function nearUI(x,y){
+  for(const el of document.querySelectorAll(DEAD_SEL)){
+    if(el.closest('.overlay.hidden,[hidden]'))continue;
+    const r=el.getBoundingClientRect();if(!r.width||!r.height)continue;
+    if(x>=r.left-DEAD_PAD&&x<=r.right+DEAD_PAD&&y>=r.top-DEAD_PAD&&y<=r.bottom+DEAD_PAD)return true;}
+  return false;}
 addEventListener('pointerdown',e=>{
   if(onUI(e.target))return;
+  if(nearUI(e.clientX,e.clientY))return;
   if(e.pointerType==='mouse'&&e.button!==0)return;        /* clic derecho/medio no suelta bloques */
   e.preventDefault();action();},{passive:false});
 addEventListener('keydown',e=>{
@@ -782,6 +835,9 @@ addEventListener('keydown',e=>{
   if(e.repeat)return;                                      /* mantener apretado no suelta varios bloques */
   action();});
 menuBtn.addEventListener('click',()=>{if(state==='over')goMenu();});
+/* iOS: el audio se habilita recién con un gesto completo (touchend/click) */
+const unlockAudio=()=>{if(AC&&!paused&&AC.state==='suspended')AC.resume().catch(()=>{});};
+addEventListener('touchend',unlockAudio,{passive:true});addEventListener('click',unlockAudio);
 
 function setQuality(q){QN=QUAL[q]?q:'medium';Q=QUAL[QN];resize();
   if(parts.length>Q.parts)parts.length=Q.parts;}
@@ -841,6 +897,12 @@ Object.defineProperty(window,'__torre',{value:Object.freeze({
   get stabPhase(){return cur&&state==='playing'?stabPhase(cur.row):0;},get stabFail(){return stabFail;},
   get events(){return Object.assign({},events);},get banner(){return bannerTxt;},get zone(){return zone;},
   get drops(){return dropLog.slice();},
+  /* encuadre en px de pantalla (CSS): piso, carril del bloque en movimiento y tapa de la torre */
+  get layout(){const k=VS,top=tower.length?blockTopY(tower.length-1):0,lane=cur?blockTopY(cur.row):0;
+    return{W:Math.round(W*k),H:Math.round(H*k),VS:+VS.toFixed(4),GP:+GP.toFixed(2),GPt:+GPt.toFixed(2),BH,groundY:+((H-GP+camY)*k).toFixed(1),floorY:+((H-GP)*k).toFixed(1),
+      laneTop:+((lane-10)*k).toFixed(1),laneBottom:+((lane+BH)*k).toFixed(1),topY:+(top*k).toFixed(1),
+      laneL:+((W/2-(W/2+(cur?cur.w:0)/2+40))*k).toFixed(1),towerL:+((W/2+(tower.length?tower[tower.length-1].cx-tower[tower.length-1].w/2:0))*k).toFixed(1),
+      towerR:+((W/2+(tower.length?tower[tower.length-1].cx+tower[tower.length-1].w/2:0))*k).toFixed(1),baseW:BASE_W,canvasW:canvas.width,canvasH:canvas.height};},
   get stats(){return{parts:parts.length,pieces:pieces.length,texts:texts.length,rain:stormA>.01?Math.round(Q.rain*stormA):0,
     entities:parts.length+pieces.length+texts.length+(stormA>.01?Math.round(Q.rain*stormA):0),drawnBlocks:drawn,frameMs:+frameMs.toFixed(3),zoom:+zoom.toFixed(3)};},
   /* funciones puras del juego (no cambian el estado) */

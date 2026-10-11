@@ -190,3 +190,44 @@ Conclusión honesta: con esta carga no hay diferencia medible entre versiones; e
 - Récord único para todas las dificultades.
 - `registry.js` sigue diciendo `scoreLabel: 'pisos'` (ver informe anterior).
 - No se agregó audio de lluvia continuo (sólo truenos sintetizados y sonidos de bono/aviso).
+
+## Móvil
+
+Pasada mobile-first (emulación táctil Chromium/Playwright, Pixel 7 y matriz 360×640, 390×844, 412×915, 915×412, 844×390, DPR 2–3). **No se probó en un teléfono físico.**
+
+Capturas antes: `.perf/mobile-audit/torre_infinita-{chico,vertical,apaisado}-{menu,play}.png`.
+Capturas después: `.perf/mobile-audit/torre_infinita-movil/<ancho>x<alto>-{menu,play-tormenta,fin}.png` y `412x915-girado-a-915x412.png` (rotación a mitad de partida).
+
+### Problemas encontrados → arreglados
+
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| Los chips de misiones (abajo a la derecha) tapaban el carril del bloque en movimiento y la punta de la torre al arrancar (360×640, 915×412) | El piso (`GP`) sube en partida lo necesario para que la torre y el carril queden siempre por encima de los chips (se mide el `.mlm-hud` cada 0,4 s, con transición suave). En apaisado/pantallas bajas la cámara deja la punta un poco más abajo para que el carril no pase bajo el HUD/combo/avisos |
+| Botones de dificultad de 33 px y barra del arcade de 34 px (todas) | Dificultad ≥ 44 px (CSS táctil del SDK + fila de 4 botones sin cortes a 360 px); barra a 44 px (central); «Menú y dificultad» ≥ 44 px |
+| No había botón principal: sólo «▶ TOCÁ PARA EMPEZAR» parpadeando | Botón real **▶ JUGAR** de 56 px en la zona del pulgar; se mantiene «o tocá en cualquier parte» |
+| Tocar cerca (sin acertar) de un control arrancaba la partida o soltaba un bloque: hueco entre botones de la barra, al lado de la pausa, el texto de la dificultad, al lado de «Menú y dificultad» (todas; también PC con el mouse) | Zona muerta de 14 px alrededor de la barra, el selector de dificultad y «Menú y dificultad» |
+| «TU RÉCORD» encimado con el pie «© 2026…» y el pie/marca de agua debajo de la barra de 56 px (360×640, 412×839) | Menú compacto en alturas ≤ 760 (sin chips de controles ni pie) y ≤ 700 (sin el chip superior); pie y marca de agua suben sobre la barra |
+| Pantalla final: el «COMBO ×N» quedaba visible encima de «LA TORRE HA CAÍDO» (bug también en PC) | Se oculta al terminar la partida |
+| Rotar a mitad de partida: una base de 400 px armada en apaisado quedaba cortada en vertical; bloques de 34 px en una pantalla de 412 de alto | Escala de vista `VS` (sólo al rotar a mitad de partida): el mundo se dibuja más chico para que la torre entre y los bloques se vean a 28 px; cada partida nueva vuelve a escala 1 |
+| Viewport con `maximum-scale=1, user-scalable=no` | Quitado; el lienzo tiene `touch-action:none` (y el body ya lo tenía) |
+| Textos de 9–11 px (marca de agua, «CREADO POR», pie, chips de misiones en apaisado, texto de dificultad) | Marca/pie/«CREADO POR» 11 px (etiquetas), chips de misiones y texto de dificultad 12 px; HUD más compacto en alturas ≤ 520 |
+| Zonas seguras (notch/barra de inicio) | HUD, combo, avisos y overlays usan `env(safe-area-inset-*)` |
+| Audio en iOS | Además de crearse en el primer toque, se reanuda en `touchend`/`click` |
+| Vibración | Se omite con «reducir movimiento» |
+
+Ya estaba bien (verificado): calidad automática en táctil = media (DPR tope 2), pausa al ir a segundo plano (SDK), redimensionado sin romper el estado.
+
+### Pruebas nuevas (proyecto `mobile`)
+
+- Matriz de 5 tamaños (contexto nuevo por tamaño): menú sin scroll ni cortes ni encimados ni bajo la barra; objetivos ≥ 44 px; JUGAR ≥ 56 px; textos ≥ 12 px; arranque y suelta sólo con toques; con chips visibles el piso queda por encima de los chips, carril debajo de HUD/combo/aviso de tormenta, torre dentro de la pantalla; pantalla final entra y sin combo encima.
+- Rotación 412×839 → 839×412 → 412×839 a mitad de partida (estado, escala, canvas, chips, un toque más).
+- Base de apaisado girada a 360×640 (torre entra; partida nueva vuelve a escala 1).
+- Toques que erran por poco controles (menú, partida, pantalla final) no arrancan/sueltan/reinician.
+- Gestos/calidad/segundo plano: viewport sin bloqueo de zoom, `touch-action:none`, calidad media, pausa con `visibilitychange`.
+
+Nota: en esta máquina (carga 25–45 con otros navegadores headless) el renderizador a veces congela timers y cuadros varios segundos; por eso las esperas de las pruebas móviles tienen 20 s de margen y el toque real verifica que *se suelta* el bloque (apoye o no) en lugar de depender del momento exacto.
+
+### Pendiente
+
+- El aviso «NUEVO LOGRO» del SDK de misiones (`matelabs/missions.js`, compartido) aparece unos segundos en el centro y puede tapar el aviso de evento o la punta de la torre; no se tocó por ser archivo compartido.
+- Sin prueba en teléfono físico (iOS/Android reales, vibración y audio reales).

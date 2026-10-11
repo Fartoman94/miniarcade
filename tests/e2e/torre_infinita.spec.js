@@ -1,5 +1,5 @@
 // @ts-check
-import { test, expect } from '@playwright/test';
+import { test, expect, devices } from '@playwright/test';
 import { openGame, expectNoErrors, wait, sdk } from './helpers.js';
 
 const FILE = 'torre_infinita.html';
@@ -39,7 +39,8 @@ test.describe('Torre Infinita', () => {
   test('carga sin errores y la demo del menú corre', async ({ page }) => {
     const { errors } = await openGame(page, FILE);
     await expect(page.locator('#menu')).toBeVisible();
-    await expect(page.locator('#menu .blink')).toHaveText(/TOCÁ PARA EMPEZAR/);
+    await expect(page.locator('#playBtn')).toHaveText(/JUGAR/);
+    await expect(page.locator('#playHint')).toHaveText(/tocá en cualquier parte/);
     const a = await T(page);
     expect(a.state).toBe('menu');
     await wait(page, 600);
@@ -188,7 +189,7 @@ test.describe('Torre Infinita', () => {
     test.skip(!hasTouch, 'solo en el proyecto móvil');
     const { errors } = await openGame(page, FILE);
     await page.waitForFunction(() => !!(/** @type {any} */ (window).__torre));
-    await page.touchscreen.tap(150, 500);
+    await page.touchscreen.tap(200, 250);   // lejos de los controles (cerca de ellos hay zona muerta)
     await expect.poll(async () => (await T(page)).state).toBe('playing');
     await dropNearCenter(page, true);
     await expect.poll(async () => (await T(page)).rows).toBe(2);
@@ -597,6 +598,268 @@ test.describe('Torre Infinita 3.0', () => {
     await expect.poll(async () => (await X(page)).state, { timeout: 20_000 }).toBe('menu');
     await expect(page.locator('#menu')).toBeVisible({ timeout: 20_000 });
     expect((await missions(page)).running).toBe(false);
+    expectNoErrors(errors);
+  });
+});
+
+/* ---------------- Móvil (proyecto 'mobile', Pixel 7) ---------------- */
+/* en esta máquina (carga alta, varios navegadores headless) el renderizador a veces congela timers y cuadros
+   unos segundos: las esperas que dependen del reloj de la página usan un margen amplio */
+const TM = 20_000;
+const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+/** @param {number[]} a @param {number[]} b */
+const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+/** Rectángulos [x0,y0,x1,y1] de elementos visibles. */
+const rects = (page, sel) => page.evaluate(s => [...document.querySelectorAll(s)].filter(e => {
+  const cs = getComputedStyle(e); const r = e.getBoundingClientRect();
+  return cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0 && r.width > 0 && r.height > 0 && !e.closest('[hidden],.overlay.hidden');
+}).map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }), sel);
+const LAY = page => page.evaluate(() => /** @type {any} */ (window).__torre.layout);
+/** Toque real cuando el bloque pasa cerca del centro (siempre apoya). */
+/** Arranca con un toque real en el botón JUGAR. */
+async function tapPlay(page) {
+  await page.waitForFunction(() => !!(/** @type {any} */ (window).__torre) && !!(/** @type {any} */ (window).MLArcade));
+  const pb = /** @type {any} */ (await page.locator('#playBtn').boundingBox());
+  await page.touchscreen.tap(pb.x + pb.width / 2, pb.y + pb.height / 2);
+  await expect.poll(async () => (await T(page)).state, { timeout: TM }).toBe('playing');
+}
+/** Toque real en (x, y): tiene que soltar el bloque actual (apoye o no; con la máquina cargada el momento exacto no
+ *  es determinista). Si el bloque se cayó, se vuelve a jugar con un toque en «OTRA VEZ». */
+async function tapAct(page, x, y) {
+  const n = await page.evaluate(() => /** @type {any} */ (window).__torre.drops.length);
+  await page.touchscreen.tap(x, y);
+  await expect.poll(() => page.evaluate(() => /** @type {any} */ (window).__torre.drops.length), { timeout: TM }).toBe(n + 1);
+  if ((await T(page)).state === 'over') {
+    await expect(page.locator('#over')).not.toHaveClass(/hidden/, { timeout: TM });
+    await wait(page, 700);
+    const ob = /** @type {any} */ (await page.locator('#over .btn').boundingBox());
+    await page.touchscreen.tap(ob.x + ob.width / 2, ob.y + ob.height / 2);
+    await expect.poll(async () => (await T(page)).state, { timeout: TM }).toBe('playing');
+    return false;
+  }
+  return true;
+}
+
+test.describe('Torre Infinita móvil', () => {
+  test.beforeEach(({ hasTouch }) => { test.skip(!hasTouch, 'sólo en el proyecto móvil'); });
+
+  test('matriz de pantallas: menú entra, objetivos ≥ 44 px, chips de misiones y HUD sin pisar la torre ni el carril', async ({ browser }) => {
+    test.setTimeout(300_000);
+    for (const [w, h] of SIZES) {
+      const tag = `${w}×${h}`;
+      // un contexto nuevo por tamaño (pantalla táctil, DPR 2,625): recargar tras cambiar el viewport dejaba a veces
+      // el renderizador sin cuadros en headless con la máquina cargada
+      const ctx = await browser.newContext({ ...devices['Pixel 7'], viewport: { width: w, height: h } });
+      const page = await ctx.newPage();
+      await page.addInitScript(() => { try { localStorage.setItem('torre_best', '37'); Object.defineProperty(navigator, 'getGamepads', { value: () => [] }); } catch (e) {} });
+      const { errors } = await openGame(page, DBG);
+      await page.waitForFunction(() => !!(/** @type {any} */ (window).__torre) && !!(/** @type {any} */ (window).MLArcade));
+      await expect.poll(async () => (await LAY(page)).W).toBe(w);
+      // menú: sin scroll, dentro de la pantalla, sin pisar la barra del arcade ni el selector
+      const sc = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight,
+        innerWidth, innerHeight, /** @type {Element} */ (document.getElementById('menu')).scrollHeight]);
+      expect(sc[0], tag + ' scroll horizontal').toBeLessThanOrEqual(sc[2]);
+      expect(sc[1], tag + ' scroll vertical').toBeLessThanOrEqual(sc[3]);
+      expect(sc[4], tag + ' el menú no entra').toBeLessThanOrEqual(sc[3]);
+      const bar = (await rects(page, '.mla-bar'))[0];
+      const diff = (await rects(page, '#diffBox .mlm-diff'))[0];
+      const menuEls = await rects(page, '#menu > :not(#diffBox)');
+      expect(menuEls.length).toBeGreaterThan(2);
+      for (const r of [...menuEls, diff]) {
+        expect(r[0] >= 0 && r[1] >= 0 && r[2] <= w + 0.5 && r[3] <= h + 0.5, tag + ' fuera de pantalla ' + r).toBe(true);
+        expect(hit(r, bar), tag + ' tapado por la barra ' + r).toBe(false);
+      }
+      for (let i = 0; i < menuEls.length; i++) {
+        expect(hit(menuEls[i], diff), tag + ' pisa el selector ' + menuEls[i]).toBe(false);
+        for (let j = i + 1; j < menuEls.length; j++) expect(hit(menuEls[i], menuEls[j]), tag + ' elementos del menú encimados').toBe(false);
+      }
+      for (const r of await rects(page, '#diffBox button, .mla-bar .mla-btn')) expect(Math.min(r[2] - r[0], r[3] - r[1]), tag + ' objetivo chico').toBeGreaterThanOrEqual(44);
+      const play = page.locator('#playBtn');
+      await expect(play).toBeVisible();
+      const pb = /** @type {any} */ (await play.boundingBox());
+      expect(pb.height, tag + ' botón principal').toBeGreaterThanOrEqual(56);
+      expect(pb.y + pb.height, tag + ' botón principal fuera de pantalla').toBeLessThanOrEqual(h);
+      const fs = await page.evaluate(() => ['#diffInfo', '#playBtn'].map(s => parseFloat(getComputedStyle(/** @type {Element} */ (document.querySelector(s))).fontSize)));
+      for (const f of fs) expect(f, tag + ' texto chico').toBeGreaterThanOrEqual(12);
+
+      // partida sólo con toques: el botón arranca, un toque en el cielo suelta un bloque
+      await page.touchscreen.tap(pb.x + pb.width / 2, pb.y + pb.height / 2);
+      await expect.poll(async () => (await T(page)).state, { timeout: TM }).toBe('playing');
+      await tapAct(page, w / 2, h * 0.35);
+      // al arrancar (cámara en 0) el piso entero queda por encima de los chips de misiones
+      await expect(page.locator('.mlm-hud')).toBeVisible();
+      const L0 = await LAY(page);
+      for (const c of await rects(page, '.mlm-hud .mlm-m')) expect(c[1], tag + ' chip tapa el piso').toBeGreaterThanOrEqual(L0.groundY - 0.5);
+
+      // con chips de misiones a la vista: el piso (y todo lo jugable) queda por encima de los chips
+      await expect(page.locator('.mlm-hud')).toBeVisible();
+      await stackTo(page, 15);           // piso 15: aviso «se viene una tormenta» + combo largo + cámara en marcha
+      await wait(page, 1200);
+      const L = await LAY(page);
+      const chips = await rects(page, '.mlm-hud .mlm-m');
+      expect(chips.length).toBeGreaterThan(0);
+      const bar2 = (await rects(page, '.mla-bar'))[0];
+      const hudEls = await rects(page, '#hud .label, #score, #best');
+      const combo = await rects(page, '#combo.show');
+      const ev = await rects(page, '#event.show');
+      expect(ev.length, tag + ' aviso de evento').toBe(1);
+      expect(L.towerL, tag + ' torre fuera de pantalla').toBeGreaterThanOrEqual(0);
+      expect(L.towerR, tag + ' torre fuera de pantalla').toBeLessThanOrEqual(w);
+      for (const c of chips) {
+        expect(c[0] >= 0 && c[2] <= w + 0.5 && c[3] <= h + 0.5, tag + ' chip fuera de pantalla').toBe(true);
+        expect(c[1], tag + ' chip tapa la punta de la torre/carril').toBeGreaterThanOrEqual(Math.max(L.floorY, L.topY + L.BH * L.VS) - 0.5);
+        expect(hit(c, bar2), tag + ' chip bajo la barra del arcade').toBe(false);
+        for (const e of hudEls) expect(hit(c, e), tag + ' chip sobre el HUD').toBe(false);
+      }
+      // carril del bloque en movimiento: debajo del HUD, del combo y del aviso de eventos
+      for (const e of [...hudEls, ...combo, ...ev]) expect(e[3], tag + ' HUD/aviso sobre el carril').toBeLessThanOrEqual(L.laneTop + 0.5);
+      expect(L.laneBottom, tag + ' carril bajo el piso').toBeLessThanOrEqual(L.floorY);
+      for (const e of hudEls) expect(hit(e, bar2), tag + ' HUD bajo la barra del arcade').toBe(false);
+      const chipFont = await page.evaluate(() => parseFloat(getComputedStyle(/** @type {Element} */ (document.querySelector('.mlm-m'))).fontSize));
+      expect(chipFont, tag).toBeGreaterThanOrEqual(12);
+
+      // fin de partida: todo entra y los botones se pueden tocar
+      await page.evaluate(() => /** @type {any} */ (window).__torreDebug.dropAt(9999));
+      await expect(page.locator('#over')).not.toHaveClass(/hidden/, { timeout: TM });
+      await wait(page, 600);
+      const overH = await page.evaluate(() => /** @type {Element} */ (document.getElementById('over')).scrollHeight);
+      expect(overH, tag + ' fin de partida no entra').toBeLessThanOrEqual(h);
+      const overEls = await rects(page, '#over > *');
+      for (const r of overEls) {
+        expect(r[0] >= 0 && r[1] >= 0 && r[2] <= w + 0.5 && r[3] <= h + 0.5, tag + ' fin fuera de pantalla ' + r).toBe(true);
+        expect(hit(r, bar2), tag + ' fin tapado por la barra ' + r).toBe(false);
+      }
+      expect((await rects(page, '#combo.show')).length, tag + ' el combo queda sobre la pantalla final').toBe(0);
+      for (const r of await rects(page, '#over button')) expect(r[3] - r[1], tag + ' botón final chico').toBeGreaterThanOrEqual(44);
+      expectNoErrors(errors);
+      await ctx.close();
+    }
+  });
+
+  test('girar el teléfono a mitad de partida conserva el estado y la torre sigue entrando', async ({ page }) => {
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 412, height: 839 });
+    await tapPlay(page);
+    await stackTo(page, 8);
+    const a = await T(page);
+    await page.setViewportSize({ width: 839, height: 412 });
+    await expect.poll(async () => (await LAY(page)).W).toBe(839);
+    await wait(page, 700);
+    let L = await LAY(page);
+    expect(await T(page)).toMatchObject({ state: 'playing', score: a.score, rows: a.rows });
+    expect(L.VS).toBeLessThan(1);                      // bloques de 34 px armados en vertical: se ven a 28 px
+    expect(L.BH * L.VS).toBeCloseTo(28, 0);
+    expect(L.canvasW).toBe(Math.round(839 * Math.min(2, await page.evaluate(() => devicePixelRatio))));
+    expect(L.towerL).toBeGreaterThanOrEqual(0);
+    expect(L.towerR).toBeLessThanOrEqual(839);
+    const chips = await rects(page, '.mlm-hud .mlm-m');
+    expect(chips.length).toBeGreaterThan(0);
+    for (const c of chips) expect(c[1]).toBeGreaterThanOrEqual(Math.max(L.floorY, L.topY + L.BH * L.VS) - 0.5);
+    const before = (await T(page)).score;
+    if (await tapAct(page, 420, 60)) expect((await T(page)).rows).toBe(a.rows + 1);
+    else expect(before).toBe(a.score);
+    await page.setViewportSize({ width: 412, height: 839 });
+    await expect.poll(async () => (await LAY(page)).VS).toBe(1);
+    expect((await T(page)).state).toBe('playing');
+    expectNoErrors(errors);
+  });
+
+  test('base armada en apaisado y girada a vertical angosto: la torre entra entera', async ({ page }) => {
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 915, height: 412 });
+    await tapPlay(page);
+    expect((await LAY(page)).baseW).toBe(400);
+    await stackTo(page, 4);
+    await page.setViewportSize({ width: 360, height: 640 });
+    await expect.poll(async () => (await LAY(page)).W).toBe(360);
+    const L = await LAY(page);
+    expect(L.VS).toBeLessThan(1);
+    expect(L.towerL).toBeGreaterThanOrEqual(0);
+    expect(L.towerR).toBeLessThanOrEqual(360);
+    expect((await T(page)).state).toBe('playing');
+    // una partida nueva vuelve a escala 1 con una base acorde a la pantalla
+    await page.evaluate(() => /** @type {any} */ (window).__torreDebug.dropAt(9999));
+    await expect(page.locator('#over')).not.toHaveClass(/hidden/, { timeout: TM });
+    await wait(page, 700);
+    const ob = /** @type {any} */ (await page.locator('#over .btn').boundingBox());
+    await page.touchscreen.tap(ob.x + ob.width / 2, ob.y + ob.height / 2);
+    await expect.poll(async () => (await T(page)).state, { timeout: TM }).toBe('playing');
+    expect((await LAY(page)).VS).toBe(1);
+    expect((await LAY(page)).baseW).toBeLessThan(360 * 0.62);
+    expectNoErrors(errors);
+  });
+
+  test('toques que erran por poco un control no arrancan ni sueltan bloques', async ({ page }) => {
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() => !!(/** @type {any} */ (window).__torre) && !!(/** @type {any} */ (window).MLArcade));
+    // menú: tocar justo al lado de «Difícil», en el texto de la dificultad y entre botones de la barra
+    const btn = page.locator('#diffBox button', { hasText: 'Difícil' });
+    const bb = /** @type {any} */ (await btn.boundingBox());
+    await page.touchscreen.tap(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    await expect(btn).toHaveAttribute('aria-checked', 'true');
+    await page.touchscreen.tap(bb.x + bb.width / 2, bb.y - 8);
+    const di = /** @type {any} */ (await page.locator('#diffInfo').boundingBox());
+    await page.touchscreen.tap(di.x + di.width / 2, di.y + di.height / 2);
+    const btns = await rects(page, '.mla-bar .mla-btn');
+    await page.touchscreen.tap((btns[0][2] + btns[1][0]) / 2, (btns[0][1] + btns[0][3]) / 2);
+    await page.touchscreen.tap(btns[1][0] + 10, btns[1][1] - 8);
+    await wait(page, 300);
+    expect((await T(page)).state).toBe('menu');
+    expect(await page.evaluate(() => /** @type {any} */ (window).MLArcade.isPaused())).toBe(false);
+    // el botón principal sí arranca, con la dificultad elegida
+    const pb = /** @type {any} */ (await page.locator('#playBtn').boundingBox());
+    await page.touchscreen.tap(pb.x + pb.width / 2, pb.y + pb.height / 2);
+    await expect.poll(async () => (await T(page)).state, { timeout: TM }).toBe('playing');
+    expect(await page.evaluate(() => /** @type {any} */ (window).__torre.difficulty)).toBe('dificil');
+    // en partida: errarle a la pausa por unos px no suelta el bloque ni pausa
+    const rows = (await T(page)).rows;
+    const pause = /** @type {any} */ (await page.locator('.mla-bar button[aria-label="Pausa"]').boundingBox());
+    await page.touchscreen.tap(pause.x + pause.width / 2, pause.y - 8);
+    await page.touchscreen.tap(pause.x + pause.width + 4, pause.y + pause.height / 2);
+    await wait(page, 300);
+    expect((await T(page)).rows).toBe(rows);
+    expect((await T(page)).paused).toBe(false);
+    // un toque lejos de los controles (sobre los chips de misiones) sí suelta
+    const chip = (await rects(page, '.mlm-hud .mlm-m'))[0];
+    await tapAct(page, (chip[0] + chip[2]) / 2, (chip[1] + chip[3]) / 2);
+    // fin de partida: errarle a «Menú y dificultad» no reinicia
+    await page.evaluate(() => /** @type {any} */ (window).__torreDebug.dropAt(9999));
+    await expect(page.locator('#over')).not.toHaveClass(/hidden/, { timeout: TM });
+    await wait(page, 700);
+    const mb = /** @type {any} */ (await page.locator('#menuBtn').boundingBox());
+    // (el ajuste táctil del navegador puede llevar ese toque al botón: lo que no puede pasar es que reinicie)
+    await page.touchscreen.tap(mb.x + mb.width / 2, mb.y + mb.height + 8);
+    await wait(page, 300);
+    expect((await T(page)).state).not.toBe('playing');
+    if ((await T(page)).state === 'over') await page.touchscreen.tap(mb.x + mb.width / 2, mb.y + mb.height / 2);
+    await expect.poll(async () => (await T(page)).state, { timeout: TM }).toBe('menu');
+    await page.evaluate(() => /** @type {any} */ (window).MLMissions.setDifficulty('normal'));
+    expectNoErrors(errors);
+  });
+
+  test('gestos, calidad y segundo plano: sin bloqueo de zoom, lienzo sin pan/zoom, calidad media, pausa al ocultar', async ({ page }) => {
+    const { errors } = await openGame(page, FILE);
+    await page.waitForFunction(() => !!(/** @type {any} */ (window).__torre) && !!(/** @type {any} */ (window).MLArcade));
+    const r = await page.evaluate(() => ({
+      meta: document.querySelector('meta[name=viewport]')?.getAttribute('content'),
+      ta: getComputedStyle(/** @type {Element} */ (document.getElementById('c'))).touchAction,
+      q: /** @type {any} */ (window).__torre.quality, dpr: /** @type {any} */ (window).__torre.dpr,
+    }));
+    expect(r.meta).not.toMatch(/user-scalable=no|maximum-scale/);
+    expect(r.ta).toBe('none');
+    expect(r.q).toBe('medium');
+    expect(r.dpr).toBeLessThanOrEqual(2);
+    await tapPlay(page);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(async () => (await T(page)).paused).toBe(true);
+    const rows = (await T(page)).rows;
+    await page.touchscreen.tap(200, 300);          // tocar el fondo de la pausa no suelta bloques
+    expect((await T(page)).rows).toBe(rows);
     expectNoErrors(errors);
   });
 });
