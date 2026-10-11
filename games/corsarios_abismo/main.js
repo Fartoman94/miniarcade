@@ -58,6 +58,7 @@ function sanitize() {
     cam: ['lejos', 'cerca'].includes(o.cam) ? o.cam : 'lejos',
     motion: ['auto', 'reduce', 'full'].includes(o.motion) ? o.motion : 'auto',
     aim: o.aim !== false,
+    haptics: o.haptics !== false,
     binds: { ...dO.binds, ...(o.binds && typeof o.binds === 'object' && !Array.isArray(o.binds) ? o.binds : {}) },
   };
   for (const k of Object.keys(dO.binds)) if (typeof s.opts.binds[k] !== 'string' || !s.opts.binds[k]) s.opts.binds[k] = dO.binds[k];
@@ -77,6 +78,8 @@ const diff = () => DIFF[diffName()] || DIFF.normal;
 const reducedMQ = matchMedia('(prefers-reduced-motion: reduce)');
 const reduced = () => { const m = S().opts.motion; return m === 'reduce' || (m === 'auto' && reducedMQ.matches); };
 const emit = (ev, v) => M.emit(ev, v);
+/** Vibración corta (sólo táctil; se apaga en Opciones o con movimiento reducido). @param {number|number[]} ms */
+const buzz = ms => { try { if (input.isTouch && S().opts.haptics && !reduced() && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* sin vibración */ } };
 
 /* ======================= juego base ======================= */
 const ACTIVE = new Set(['sail', 'foot', 'docked', 'board', 'cutscene', 'sinking', 'travel']);
@@ -160,11 +163,20 @@ const TIPS = {
 function tip(id) {
   const t = S().tutorial;
   if (t.off || t.seen[id] || tipId || !ACTIVE.has(state) || state === 'cutscene') return;
+  // celular (vertical u horizontal): el consejo y el título grande comparten el centro de la pantalla; el consejo espera a que se apague el título
+  if (ui.bigText && (innerWidth <= 760 || innerHeight <= 500)) { setTimeout(() => tip(id), 600); return; }
   t.seen[id] = true; persist();
   tipId = id; tipT = 10;
   ui.tip(TIPS[id](), a => { if (a === 'skip') { S().tutorial.off = true; persist(); toast('Tutorial desactivado (reactivalo desde «Cómo jugar»)', 2200); } closeTip(); });
 }
 function closeTip() { tipId = ''; ui.tip(null); }
+/** Celular en vertical: sugerencia suave (una vez por sesión, no bloquea) de girar a horizontal, donde se ve más mar a babor y estribor. */
+let rotHinted = false;
+function rotateHint() {
+  if (rotHinted || !input.isTouch || innerWidth >= innerHeight) return;
+  rotHinted = true;
+  setTimeout(() => { if (ACTIVE.has(state) && innerWidth < innerHeight) toast('📱 Girá el teléfono: en horizontal ves más mar a los costados', 3200); }, 2600);
+}
 
 /* ======================= regiones ======================= */
 function maxHull() { return diff().hull + 25 * S().up.armor; }
@@ -223,6 +235,7 @@ function enterRegion(id, via) {
   ui.show(true); input.showTouch(true); input.clear();
   ui.big(world.R.name.toUpperCase(), `REGIÓN ${world.R.idx} DE 3`, 2.4);
   if (id === 'coral') setTimeout(() => tip('fort'), 2500);
+  rotateHint();
   hudTick(1);
 }
 
@@ -293,6 +306,7 @@ function hurtPlayer(dmg, part = 'hull', src = null) {
   P.hp -= dmg; P.flashT = 0.1;
   sfx.hurt(); fx.shake(Math.min(0.7, dmg * 0.04));
   if (!reduced() && dmg > 5) ui.flash();
+  if (dmg > 5) buzz(dmg > 20 ? [40, 30, 40] : 30);
   fx.splinters(P.x + (Math.random() - 0.5) * 3, P.y + 2, P.z + (Math.random() - 0.5) * 6, 5);
   if (P.hp <= 0) { P.hp = 0; playerSinks(); }
   void src;
@@ -409,7 +423,7 @@ function playerFire(side) {
   for (const b of r.out) fx.muzzle(b.x, b.y, b.z, r.rx, r.rz);
   P.reload[k] = P.reloadMax;
   P.roll += -side * 0.06; P.vx -= r.rx * 0.6; P.vz -= r.rz * 0.6;
-  sfx.volley(P.balls); fx.shake(0.18);
+  sfx.volley(P.balls); fx.shake(0.18); buzz(18);
   S().stats.shots++;
   emit('fire');
   return true;
@@ -530,7 +544,7 @@ function dockIn(d) {
 }
 function leaveDock() {
   const d = run.dock; if (!d) return;
-  marketScreen.hide(); d.docked = false; run.dock = null;
+  marketScreen.hide(); d.docked = false; run.dock = null; input.showTouch(true);
   state = 'sail'; P.sail = 0.35; P.speed = 2; P.yaw = d.yaw; input.clear();
   sfx.sail(true);
 }
@@ -1126,6 +1140,8 @@ function showMarket() {
   const s = S(), d = run.dock;
   const items = marketItems();
   const travel = s.unlocked.filter(id => id !== world.id).map(id => `<button type="button" data-travel="${id}"><span>🧭 Navegar a ${/** @type {any} */ (REGIONS)[id].name}</span><b>gratis</b></button>`).join('');
+  if (tipId) closeTip();
+  input.showTouch(false); // en el mercado no hay timón ni cañones: los controles no tapan la tienda
   marketScreen.show(`<span class="k3-kicker">${d.name.toUpperCase()}</span><h1 style="font-size:32px">MERCADO</h1>
     <div class="ca-menu-prog">💰 <b>${s.gold}</b> oro · Casco ${Math.round(P.hp)}/${P.maxHp} · Mástil ${P.mastLost ? 'roto' : Math.round(P.mast / P.maxMast * 100) + ' %'} · 🩹 ${s.kits} · 💣 Nv ${s.up.cannons} · 🛡 Nv ${s.up.armor}</div>
     <div class="ca-shop">${items.map(it => `<button type="button" data-buy="${it.id}" ${!it.ok || s.gold < it.cost ? 'disabled' : ''}><span>${it.label}</span><b>${it.ok ? it.cost + ' oro' : '—'}</b></button>`).join('')}${travel}</div>
@@ -1188,12 +1204,13 @@ function openOptions(pause) {
   const row = (id, name) => `<div class="ca-bind"><span>${name}</span><button type="button" data-bind="${id}">${listening === id ? 'Apretá una tecla…' : keyLabel(o.binds[id])}</button></div>`;
   optScreen.show(`<span class="k3-kicker">OPCIONES</span><h1 style="font-size:30px">CONTROLES</h1>
     <div class="ca-opts">
-      ${row('port', 'Andanada babor')}${row('star', 'Andanada estribor')}${row('act', 'Acción')}${row('kit', 'Kit de reparación')}
+      ${input.isTouch ? '' : row('port', 'Andanada babor') + row('star', 'Andanada estribor') + row('act', 'Acción') + row('kit', 'Kit de reparación')}
       <label>Sensibilidad del timón <input type="range" min="0.5" max="1.6" step="0.1" value="${o.sens}" data-sens aria-label="Sensibilidad del timón"></label>
       <label>Ayuda de puntería <input type="checkbox" data-aim ${o.aim ? 'checked' : ''}></label>
+      ${input.isTouch ? `<label>Vibración al disparar y recibir daño <input type="checkbox" data-haptics ${o.haptics ? 'checked' : ''}></label>` : ''}
       <label>Cámara <select data-cam><option value="lejos"${o.cam === 'lejos' ? ' selected' : ''}>Lejos</option><option value="cerca"${o.cam === 'cerca' ? ' selected' : ''}>Cerca</option></select></label>
       <label>Movimiento (sacudidas y destellos) <select data-motion><option value="auto"${o.motion === 'auto' ? ' selected' : ''}>Según el sistema</option><option value="reduce"${o.motion === 'reduce' ? ' selected' : ''}>Reducido</option><option value="full"${o.motion === 'full' ? ' selected' : ''}>Completo</option></select></label>
-      <div class="ca-small">Velas y timón: W/A/S/D o flechas (fijo). Gamepad: stick timón y velas, LB babor, RB estribor, A acción, X kit, Start pausa. Sonido y calidad gráfica: botón ⚙/⏸ de la barra.</div>
+      <div class="ca-small">${input.isTouch ? 'Táctil: timón a la izquierda (arriba/abajo velas, costados girar); a la derecha ◀ BABOR y ESTRIB. ▶ disparan, ACCIÓN y KIT arriba. Sonido y calidad gráfica: botón ⚙ de la barra.' : `Velas y timón: W/A/S/D o flechas (fijo). Gamepad: stick timón y velas, LB babor, RB estribor, A acción, X kit, Start pausa. Sonido y calidad gráfica: botón ⚙/⏸ de la barra.`}</div>
     </div>
     <div class="k3-btnrow"><button class="k3-b" data-back>Listo</button><button class="k3-b alt" data-defaults>Valores por defecto</button></div>`);
 }
@@ -1204,6 +1221,7 @@ optScreen.el.addEventListener('input', e => {
   const t = /** @type {HTMLInputElement} */ (e.target), o = S().opts;
   if (t.matches('[data-sens]')) o.sens = +t.value;
   if (t.matches('[data-aim]')) o.aim = t.checked;
+  if (t.matches('[data-haptics]')) { o.haptics = t.checked; if (t.checked) buzz(20); }
   if (t.matches('[data-cam]')) o.cam = /** @type {any} */ (t.value);
   if (t.matches('[data-motion]')) o.motion = /** @type {any} */ (t.value);
   persist();
