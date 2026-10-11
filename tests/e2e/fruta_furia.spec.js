@@ -406,3 +406,161 @@ test.describe('Fruta Furia 3.0', () => {
     expectNoErrors(errors);
   });
 });
+
+/* ---------------- Móvil ---------------- */
+const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+/** @returns {Promise<number[][]>} rects [left, top, right, bottom] de los elementos visibles */
+const rects = (page, sel) => page.evaluate(s => [...document.querySelectorAll(s)]
+  .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; })
+  .map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }), sel);
+const hit = (a, b) => !!a && !!b && a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+/** Tajo táctil real (CDP) en coordenadas absolutas. */
+async function touchSwipe(page, x1, y1, x2, y2, steps = 10) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x1, y: y1, id: 1 }] });
+  for (let i = 1; i <= steps; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x1 + (x2 - x1) * i / steps, y: y1 + (y2 - y1) * i / steps, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
+test.describe('Fruta Furia móvil', () => {
+  test.beforeEach(({ isMobile }) => { test.skip(!isMobile, 'sólo en el proyecto táctil (Pixel 7)'); });
+
+  test('matriz de pantallas: menú, HUD, barra del jefe, avisos y misiones sin superposiciones; partida sólo con toques', async ({ page }) => {
+    test.setTimeout(300_000);
+    const { errors } = await openGame(page, DBG);
+    for (const [w, h] of SIZES) {
+      const tag = `${w}×${h}`;
+      await page.setViewportSize({ width: w, height: h });
+      await page.reload();
+      await page.waitForFunction(() => !!(/** @type {any} */ (window).__fruta));
+      await expect.poll(async () => (await snap(page)).W, { timeout: 15_000 }).toBe(w);
+      await wait(page, 300);
+      // menú: sin scroll, todo dentro de la pantalla y nada pisando la barra del arcade
+      const sc = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight, innerWidth, innerHeight]);
+      expect(sc[0], tag + ' scroll horizontal').toBeLessThanOrEqual(sc[2]);
+      expect(sc[1], tag + ' scroll vertical').toBeLessThanOrEqual(sc[3]);
+      const bar = (await rects(page, '.mla-bar'))[0];
+      expect(bar, tag + ' barra del arcade').toBeTruthy();
+      const menuEls = await rects(page, '#menu > *');
+      expect(menuEls.length).toBeGreaterThan(3);
+      for (const r of menuEls) {
+        expect(r[0] >= -0.5 && r[1] >= -0.5 && r[2] <= w + 0.5 && r[3] <= h + 0.5, tag + ' fuera de pantalla ' + r).toBe(true);
+        expect(hit(r, bar), tag + ' tapado por la barra ' + r).toBe(false);
+      }
+      for (const r of await rects(page, '#diffBox button, .mla-bar .mla-btn')) expect(Math.min(r[2] - r[0], r[3] - r[1]), tag + ' objetivo chico').toBeGreaterThanOrEqual(44);
+      const fs = await page.evaluate(() => [...document.querySelectorAll('#menu .legend .chip, #menu .credit-k, #diffBox button, #playBtn, .watermark')]
+        .filter(e => /** @type {HTMLElement} */ (e).offsetParent).map(e => parseFloat(getComputedStyle(e).fontSize)));
+      for (const f of fs) expect(f, tag + ' texto chico').toBeGreaterThanOrEqual(11);
+      const play = page.locator('#playBtn');
+      await expect(play).toBeVisible();
+      const pb = /** @type {any} */ (await play.boundingBox());
+      expect(pb.height, tag + ' botón principal').toBeGreaterThanOrEqual(56);
+
+      // arranque con un toque real en el botón
+      await page.touchscreen.tap(pb.x + pb.width / 2, pb.y + pb.height / 2);
+      await expect.poll(async () => (await snap(page)).state, { timeout: 10_000 }).toBe('playing');
+      await page.evaluate(() => { const d = /** @type {any} */ (window).__fruta.debug; d.hold(); d.clear(); });
+      await wait(page, 300);
+      // HUD propio vs barra del arcade y chips de misiones
+      const hudEls = await rects(page, '#hud .label, #hud .num, #hud .lives');
+      const mis = await rects(page, '.mlm-hud');
+      expect(mis.length, tag + ' chips de misiones').toBeGreaterThan(0);
+      for (const r of hudEls) {
+        expect(r[0] >= 0 && r[1] >= 0 && r[2] <= w && r[3] <= h, tag + ' HUD fuera ' + r).toBe(true);
+        expect(hit(r, bar), tag + ' HUD bajo la barra').toBe(false);
+        for (const m of mis) expect(hit(r, m), tag + ' HUD bajo misiones').toBe(false);
+      }
+      for (const m of mis) expect(hit(m, bar), tag + ' misiones sobre la barra').toBe(false);
+      // la marca de agua no pisa los chips de misiones
+      for (const r of await rects(page, '.watermark')) for (const m of mis) expect(hit(r, m), tag + ' marca sobre misiones').toBe(false);
+
+      // barra del jefe (canvas): dentro de la pantalla, sin pisar puntos, vidas ni la barra del arcade
+      await page.evaluate(() => { const d = /** @type {any} */ (window).__fruta.debug; d.boss(); d.bossNow(); });
+      const bb = (await snap(page)).bossBar, br = [bb.x - 4, bb.y - 4, bb.x + bb.w + 4, bb.y + bb.h + 4];
+      expect(br[0] >= 0 && br[2] <= w, tag + ' barra del jefe fuera').toBe(true);
+      for (const r of hudEls) expect(hit(br, r), tag + ' barra del jefe pisa el HUD ' + r).toBe(false);
+      expect(hit(br, bar)).toBe(false);
+      await page.evaluate(() => { const d = /** @type {any} */ (window).__fruta.debug; d.hold(); });
+
+      // avisos de bomba en los bordes: por encima de la barra del arcade y de los chips de misiones
+      await page.evaluate(() => { const d = /** @type {any} */ (window).__fruta.debug; d.launch('bomba', 20); d.launch('petardo', innerWidth - 20); });
+      const s = await snap(page);
+      expect(s.warns.length).toBe(2);
+      for (let i = 0; i < 2; i++) {
+        const wr = [s.warns[i].x - 32, s.warnYs[i] - 42, s.warns[i].x + 32, s.warnYs[i] + 22];
+        expect(hit(wr, bar), tag + ' aviso bajo la barra').toBe(false);
+        for (const m of mis) expect(hit(wr, m), tag + ' aviso bajo misiones').toBe(false);
+        expect(wr[1]).toBeGreaterThan(0);
+      }
+
+      // acción principal con el dedo: un tajo real corta una fruta quieta
+      await page.evaluate(() => { const d = /** @type {any} */ (window).__fruta.debug; d.clear(); });
+      const sliced0 = (await snap(page)).sliced;
+      await put(page, 'kiwi', 0.5, 0.62);
+      await touchSwipe(page, w * 0.2, h * 0.62, w * 0.8, h * 0.62);
+      await expect.poll(async () => (await snap(page)).sliced, { timeout: 8_000 }).toBeGreaterThan(sliced0);
+      expect(await page.evaluate(() => [scrollX, scrollY, visualViewport ? visualViewport.scale : 1])).toEqual([0, 0, 1]);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('gestos: sin zoom bloqueado por meta, superficie con touch-action:none y sin scroll al deslizar', async ({ page }) => {
+    const { errors } = await openGame(page, DBG);
+    const m = await page.evaluate(() => ({
+      meta: document.querySelector('meta[name=viewport]')?.getAttribute('content'),
+      body: getComputedStyle(document.body).touchAction,
+    }));
+    expect(m.meta).not.toMatch(/user-scalable\s*=\s*no|maximum-scale/);
+    expect(m.body).toBe('none');
+    await startHeld(page, true);
+    const vp = page.viewportSize() || { width: 400, height: 800 };
+    // deslizar en todas direcciones (incluido hacia abajo desde arriba: «tirar para recargar»)
+    await touchSwipe(page, vp.width / 2, 10, vp.width / 2, vp.height * 0.8);
+    await touchSwipe(page, 5, vp.height / 2, vp.width * 0.9, vp.height / 2);
+    await touchSwipe(page, vp.width / 2, vp.height * 0.9, vp.width / 2, 20);
+    expect(await page.evaluate(() => [scrollX, scrollY, visualViewport ? visualViewport.scale : 1])).toEqual([0, 0, 1]);
+    expect((await snap(page)).state).toBe('playing');
+    expectNoErrors(errors);
+  });
+
+  test('girar el teléfono en plena partida: la fruta en vuelo se reubica y no cuesta vidas', async ({ page }) => {
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 412, height: 915 });
+    await startHeld(page, true);
+    await page.evaluate(() => { const d = /** @type {any} */ (window).__fruta.debug; d.spawn('manzana', 200, 780, false); d.spawn('naranja', 300, 820, false); });
+    await page.setViewportSize({ width: 915, height: 412 });
+    await expect.poll(async () => (await snap(page)).W, { timeout: 10_000 }).toBe(915);
+    let s = await snap(page);
+    for (const f of s.fruits) { expect(f.y).toBeLessThan(412 + 80); expect(f.x).toBeLessThan(915); }
+    // y de vuelta a vertical, también sin perder nada
+    await page.setViewportSize({ width: 412, height: 915 });
+    await expect.poll(async () => (await snap(page)).W, { timeout: 10_000 }).toBe(412);
+    s = await snap(page);
+    expect(s.misses).toBe(0);
+    expect(s.state).toBe('playing');
+    expectNoErrors(errors);
+  });
+
+  test('asistencia táctil: el dedo corta con más margen, pero nunca agranda las bombas', async ({ page }) => {
+    const { errors } = await openGame(page, DBG);
+    await startHeld(page, true);
+    const near = (type, touch) => page.evaluate(([t, touch]) => {
+      const d = /** @type {any} */ (window).__fruta.debug, y = innerHeight * 0.5, x = innerWidth * 0.5;
+      d.clear(); d.spawn(t, x, y);
+      const r = /** @type {any} */ (window).__fruta.snap().fruits[0].r;
+      // pasada a r+8 px del centro: fuera del margen del mouse (r+4), dentro del táctil (r+12)
+      d.cut(20, y - r - 8, innerWidth - 20, y - r - 8, 16, touch);
+      return /** @type {any} */ (window).__fruta.snap();
+    }, [type, touch]);
+    let s = await near('kiwi', false);
+    expect(s.sliced).toBe(0);
+    s = await near('kiwi', true);
+    expect(s.sliced).toBe(1);
+    s = await near('bomba', true);
+    expect(s.state).toBe('playing');
+    s = await near('petardo', true);
+    expect(s.misses).toBe(0);
+    expectNoErrors(errors);
+  });
+});
