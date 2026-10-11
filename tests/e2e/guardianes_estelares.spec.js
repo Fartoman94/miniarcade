@@ -519,4 +519,134 @@ test.describe('GUARDIANES ESTELARES', () => {
     await cdp.detach();
     expectNoErrors(errors);
   });
+  /* ======================= móvil (proyecto 'mobile', Pixel 7 con toque) ======================= */
+  const SIZES = [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 412, height: 915 }, { width: 915, height: 412 }, { width: 844, height: 390 }];
+  /** Cajas de la UI propia + barra del SDK, texto chico y objetivos táctiles chicos (sólo lo visible). */
+  const layoutProbe = (page) => page.evaluate(() => {
+    const vis = (/** @type {Element} */ el) => { for (let p = el; p; p = p.parentElement) { const cs = getComputedStyle(p); if (/** @type {HTMLElement} */ (p).hidden || cs.display === 'none' || cs.visibility === 'hidden') return false; } const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const sels = ['.ge-status', '.ge-obj', '.ge-radar', '.ge-tut', '.k3-joy', '.k3-btns', '.mla-bar'];
+    const boxes = sels.map(s => { const e = document.querySelector(s); return e && vis(e) ? { s, r: e.getBoundingClientRect().toJSON() } : null; }).filter(Boolean);
+    const tiny = [], small = [];
+    for (const el of document.querySelectorAll('.ge-hud *, .ge-tut *, .k3-touch *')) {
+      if (!vis(el) || getComputedStyle(el).opacity === '0') continue;
+      if ([...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) { const fs = parseFloat(getComputedStyle(el).fontSize); if (fs < 11) tiny.push(el.textContent.trim().slice(0, 24) + ' ' + fs); }
+    }
+    for (const el of document.querySelectorAll('.k3-btn, .ge-tut button, .mla-bar .mla-btn')) if (vis(el)) { const r = el.getBoundingClientRect(); if (r.width < 44 || r.height < 44) small.push((el.getAttribute('aria-label') || el.textContent) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
+    const fire = document.querySelector('.k3-btn[aria-label="fire"]')?.getBoundingClientRect();
+    const goal = ['.ge-goal', '.ge-prog', '.ge-sm span'].flatMap(s => [...document.querySelectorAll(s)]).filter(vis).map(e => parseFloat(getComputedStyle(e).fontSize));
+    return { boxes, tiny, small, fire: fire ? Math.min(fire.width, fire.height) : 0, goalMin: Math.min(...goal, 99), w: innerWidth, h: innerHeight,
+      sw: document.documentElement.scrollWidth, sh: document.documentElement.scrollHeight };
+  });
+  const overlap = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+
+  test('móvil: matriz de pantallas — menú entra con el botón principal tocable; HUD, tutorial y controles sin superposición', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    test.setTimeout(150_000);
+    const { errors } = await open(page, '?debug', { tutorial: true });
+    for (const vp of SIZES) {
+      await page.setViewportSize(vp); await wait(page, 250);
+      const m = await page.evaluate(() => {
+        const go = /** @type {HTMLElement} */ (document.querySelector('#ge-menu [data-go]')).getBoundingClientRect();
+        const bar = /** @type {HTMLElement} */ (document.querySelector('.mla-bar')).getBoundingClientRect();
+        const scr = /** @type {HTMLElement} */ (document.querySelector('#ge-menu'));
+        const els = [...scr.querySelectorAll('.k3-panel *')].filter(e => e.getBoundingClientRect().width > 0);
+        const kick = scr.querySelector('.k3-kicker')?.getBoundingClientRect();
+        const hit = document.elementFromPoint(go.left + go.width / 2, go.top + go.height / 2);
+        return { go: go.toJSON(), bar: bar.toJSON(), kick: kick && kick.toJSON(), hitGo: !!hit && !!hit.closest('[data-go]'), w: innerWidth, h: innerHeight,
+          maxRight: Math.max(...els.map(e => e.getBoundingClientRect().right)), sw: scr.scrollWidth, docW: document.documentElement.scrollWidth,
+          btnH: Math.min(...[...scr.querySelectorAll('button')].map(b => b.getBoundingClientRect().height)) };
+      });
+      const tag = `${vp.width}x${vp.height}`;
+      expect(m.go.bottom <= m.h && m.go.top >= 0, `${tag}: botón principal visible`).toBe(true);
+      expect(m.go.height, `${tag}: botón principal ≥ 48 px`).toBeGreaterThanOrEqual(48);
+      expect(m.btnH, `${tag}: botones del menú ≥ 44 px`).toBeGreaterThanOrEqual(44);
+      expect(m.hitGo, `${tag}: nada tapa al botón principal`).toBe(true);
+      expect(m.maxRight, `${tag}: sin desborde horizontal`).toBeLessThanOrEqual(m.w + 1);
+      expect(m.docW).toBeLessThanOrEqual(m.w);
+      if (m.kick) expect(overlap(m.kick, m.bar), `${tag}: el título no queda bajo la barra del arcade`).toBe(false);
+    }
+    // arranque con toque real; el tutorial (primera vez) queda visible
+    await page.setViewportSize(SIZES[0]);
+    await page.locator('#ge-menu [data-go]').tap();
+    await toPlay(page);
+    await expect(page.locator('.ge-tut')).toBeVisible();
+    for (const vp of SIZES) {
+      await page.setViewportSize(vp); await wait(page, 400);
+      const m = await layoutProbe(page);
+      const tag = `${vp.width}x${vp.height}`;
+      // en vertical el tutorial ocupa el lugar del panel de objetivo (que se oculta mientras dura)
+      expect(m.boxes.map(b => b.s), tag).toEqual(expect.arrayContaining(['.ge-status', '.ge-radar', '.ge-tut', '.k3-joy', '.k3-btns', '.mla-bar']));
+      for (let i = 0; i < m.boxes.length; i++) {
+        const b = m.boxes[i].r;
+        expect(b.left >= -1 && b.right <= m.w + 1 && b.top >= -1 && b.bottom <= m.h + 1, `${tag}: ${m.boxes[i].s} dentro de la pantalla`).toBe(true);
+        for (let j = i + 1; j < m.boxes.length; j++) expect(overlap(b, m.boxes[j].r), `${tag}: ${m.boxes[i].s} / ${m.boxes[j].s}`).toBe(false);
+      }
+      expect(m.tiny, `${tag}: texto < 11 px`).toEqual([]);
+      expect(m.goalMin, `${tag}: objetivo y misiones ≥ 12 px`).toBeGreaterThanOrEqual(12);
+      expect(m.small, `${tag}: objetivos táctiles < 44 px`).toEqual([]);
+      expect(m.fire, `${tag}: FUEGO ≥ 56 px`).toBeGreaterThanOrEqual(56);
+      expect(m.sw).toBeLessThanOrEqual(m.w); expect(m.sh).toBeLessThanOrEqual(m.h);
+    }
+    // sin tutorial: el panel de objetivo vuelve y tampoco choca con nada
+    await page.locator('.ge-tut [data-skip]').tap();
+    for (const vp of [SIZES[0], SIZES[4]]) {
+      await page.setViewportSize(vp); await wait(page, 400);
+      const m = await layoutProbe(page);
+      for (let i = 0; i < m.boxes.length; i++) for (let j = i + 1; j < m.boxes.length; j++) expect(overlap(m.boxes[i].r, m.boxes[j].r), `${vp.width}: ${m.boxes[i].s} / ${m.boxes[j].s}`).toBe(false);
+    }
+    expect((await H(page)).state).toBe('play');
+    expectNoErrors(errors);
+  });
+
+  test('móvil: partida sólo táctil — stick y FUEGO a la vez (multitáctil), vibración corta, girar el teléfono a mitad de partida', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    await page.addInitScript(() => { /** @type {any} */ (window).__buzz = []; Object.defineProperty(navigator, 'vibrate', { configurable: true, value: (/** @type {any} */ p) => { /** @type {any} */ (window).__buzz.push(p); return true; } }); });
+    const { errors } = await open(page);
+    await page.setViewportSize({ width: 412, height: 915 });
+    await page.locator('#ge-menu [data-go]').tap();
+    await toPlay(page);
+    await D(page, 'invulnerable', true); await D(page, 'clearEnemies');
+    // vertical: FOV más abierto (≥ 48° horizontales) para ver amenazas a los costados
+    const fovH = () => page.evaluate(() => { const c = /** @type {any} */ (window).__guardianes_estelares.debug.three.camera; return 2 * Math.atan(Math.tan(c.fov * Math.PI / 360) * c.aspect) * 180 / Math.PI; });
+    await D(page, 'simulate', 1);
+    expect(await fovH()).toBeGreaterThan(48);
+    const a = await H(page);
+    const joy = await page.locator('.k3-joy').boundingBox();
+    const fire = await page.locator('.k3-btn[aria-label="fire"]').boundingBox();
+    const cdp = await page.context().newCDPSession(page);
+    const jx = joy.x + joy.width / 2, jy = joy.y + joy.height / 2, fx = fire.x + fire.width / 2, fy = fire.y + fire.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy, id: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: jx - 55, y: jy, id: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx - 55, y: jy, id: 1 }, { x: fx, y: fy, id: 2 }] });
+    await expect(page.locator('.k3-btn[aria-label="fire"]')).toHaveClass(/\bon\b/);
+    await expect.poll(async () => { const h = await H(page); return h.player.yaw - a.player.yaw > 0.15 && h.counts.pbolts > 0; }, { timeout: 30_000 }).toBe(true);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    expect(await page.evaluate(() => /** @type {any} */ (window).__buzz.length)).toBeGreaterThan(0);
+    // girar a apaisado en plena partida: sigue jugando, FOV vuelve al normal, controles reubicados dentro de la pantalla
+    const before = await H(page);
+    await page.setViewportSize({ width: 915, height: 412 }); await wait(page, 300);
+    await D(page, 'simulate', 1);
+    const after = await H(page);
+    expect(after.state).toBe('play'); expect(after.sector).toBe(before.sector); expect(after.score).toBeGreaterThanOrEqual(before.score);
+    const fh = await fovH(); expect(fh).toBeGreaterThan(90);
+    const btns = await page.locator('.k3-btns').boundingBox();
+    expect(btns.y + btns.height).toBeLessThanOrEqual(412); expect(btns.x + btns.width).toBeLessThanOrEqual(915);
+    await page.setViewportSize({ width: 412, height: 915 }); await D(page, 'simulate', 0.5);
+    expect((await H(page)).state).toBe('play');
+    await cdp.detach();
+    expectNoErrors(errors);
+  });
+
+  test('móvil: disparo asistido activo por defecto en táctil — dispara solo al alinear con un enemigo', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    const { errors } = await open(page);
+    expect((await page.evaluate(() => /** @type {any} */ (window).__guardianes_estelares.settings)).autoFire).toBe(true);
+    await page.locator('#ge-menu [data-go]').tap();
+    await toPlay(page);
+    await D(page, 'invulnerable', true); await D(page, 'clearEnemies');
+    const k0 = (await H(page)).kills;
+    await D(page, 'spawn', 'interceptor', 70);
+    await expect.poll(async () => { await D(page, 'simulate', 0.25); const h = await H(page); return h.counts.pbolts > 0 || h.kills > k0; }, { timeout: 30_000 }).toBe(true);
+    expectNoErrors(errors);
+  });
 });

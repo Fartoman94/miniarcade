@@ -10,35 +10,36 @@ html,body{margin:0;height:100%;overflow:hidden;background:#020409;overscroll-beh
 .ge-hud[hidden]{display:none}
 .ge-panel{background:linear-gradient(180deg,rgba(6,14,24,.78),rgba(6,12,20,.55));border:1px solid rgba(255,177,59,.28);border-radius:12px;
   box-shadow:0 0 0 1px rgba(0,0,0,.25),0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-.ge-status{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));width:206px;padding:8px 10px 9px;display:grid;gap:5px}
+.ge-status,.ge-obj{box-sizing:border-box}
+.ge-status{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));width:228px;padding:8px 10px 9px;display:grid;gap:5px}
 .ge-score{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .ge-score b{font:400 20px/1 'Bungee',system-ui,sans-serif;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em}
-.ge-score small,.ge-lbl{font-size:9px;font-weight:800;letter-spacing:.2em;color:#9fb6c8}
+.ge-score small,.ge-lbl{font-size:11px;font-weight:800;letter-spacing:.14em;color:#a9c0d2}
 .ge-bar{position:relative;height:9px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden}
 .ge-bar i{position:absolute;inset:0;transform-origin:left;border-radius:5px}
-.ge-row{display:grid;grid-template-columns:52px 1fr;align-items:center;gap:6px}
+.ge-row{display:grid;grid-template-columns:58px 1fr;align-items:center;gap:6px}
 .ge-sh i{background:linear-gradient(90deg,#3fc8ff,#9ff0ff)}
 .ge-hu i{background:linear-gradient(90deg,#ff8a2a,var(--ge))}
 .ge-hu.low i{background:linear-gradient(90deg,#ff3040,#ff7a5a)}
 .ge-mini{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .ge-mini .ge-bar{height:5px}
 .ge-bo i{background:#c8a6ff}.ge-en i{background:#7dffb0}
-.ge-wpn{display:flex;gap:6px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#cfe3f2}
+.ge-wpn{display:flex;gap:6px;font-size:12px;font-weight:800;letter-spacing:.06em;color:#cfe3f2}
 .ge-wpn span{padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08)}
 .ge-wpn em{font-style:normal;color:var(--ge)}
-.ge-obj{position:absolute;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(380px,calc(100vw - 460px));min-width:250px;padding:7px 12px 8px;text-align:center}
-.ge-obj .ge-sec{font:400 11px 'Bungee',system-ui,sans-serif;letter-spacing:.12em;color:var(--ge)}
+.ge-obj{position:absolute;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(400px,calc(100vw - 500px));min-width:270px;padding:7px 12px 8px;text-align:center}
+.ge-obj .ge-sec{font:400 12px 'Bungee',system-ui,sans-serif;letter-spacing:.12em;color:var(--ge)}
 .ge-obj .ge-goal{font-size:13px;font-weight:700;line-height:1.3;margin-top:2px}
-.ge-obj .ge-prog{font-size:11px;color:#bcd3e3;margin-top:2px;font-variant-numeric:tabular-nums}
+.ge-obj .ge-prog{font-size:12px;color:#bcd3e3;margin-top:2px;font-variant-numeric:tabular-nums}
 .ge-sm{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:5px}
-.ge-sm span{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);white-space:nowrap}
+.ge-sm span{font-size:12px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);white-space:nowrap}
 .ge-sm span.done{background:rgba(40,140,70,.55);border-color:#6be38a}
 .ge-sm span.failed{opacity:.45;text-decoration:line-through}
 .ge-boss{margin-top:6px}
 .ge-boss[hidden]{display:none}
 .ge-boss .ge-bar{height:8px}.ge-boss .ge-bar i{background:linear-gradient(90deg,#ff3a4a,#ff9a5a)}
 .ge-boss .ge-lbl{color:#ff9aa4}
-.ge-radar{position:absolute;top:calc(max(6px,env(safe-area-inset-top)) + 44px);right:max(8px,env(safe-area-inset-right));width:104px;height:104px;border-radius:50%;
+.ge-radar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 62px);right:max(8px,env(safe-area-inset-right));width:104px;height:104px;border-radius:50%;
   background:radial-gradient(circle,rgba(10,30,40,.75),rgba(4,12,18,.8));border:1px solid rgba(255,177,59,.35)}
 .ge-ret{position:absolute;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;will-change:transform}
 .ge-lead{position:absolute;left:0;top:0;width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid #ff5a5a;transform-origin:center;will-change:transform}
@@ -50,15 +51,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#020409;overscroll-beh
 .ge-tgt i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}.ge-tgt i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
 .ge-tgt b{position:absolute;left:0;right:0;bottom:-10px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden}
 .ge-tgt b u{position:absolute;inset:0;background:#ff6a6a;transform-origin:left}
-.ge-tgt span{position:absolute;left:50%;top:-16px;transform:translateX(-50%);font-size:10px;font-weight:800;letter-spacing:.08em;color:#ffb0b0;white-space:nowrap}
+.ge-tgt span{position:absolute;left:50%;top:-18px;transform:translateX(-50%);font-size:11px;text-shadow:0 1px 3px #000;font-weight:800;letter-spacing:.08em;color:#ffb0b0;white-space:nowrap}
 .ge-mk{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:1px;will-change:transform;font-weight:800}
 .ge-mk .ic{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:13px;background:rgba(4,10,18,.7);border:2px solid currentColor;line-height:1}
-.ge-mk .d{font-size:9px;letter-spacing:.06em;color:#dfeefa;text-shadow:0 1px 3px #000;white-space:nowrap}
-.ge-mk[hidden]{display:none}.ge-mk.edge .ic{border-style:dashed}
+.ge-mk .d{font-size:12px;letter-spacing:.06em;color:#dfeefa;text-shadow:0 1px 3px #000;white-space:nowrap}
+.ge-mk[hidden]{display:none}.ge-mk .d.hid{visibility:hidden}.ge-mk.edge .ic{border-style:dashed}
 .ge-mk .ar{position:absolute;left:50%;top:50%;width:0;height:0;margin:-6px 0 0 -6px;border:6px solid transparent;border-left:9px solid currentColor;transform-origin:6px 6px}
 .ge-scan{position:absolute;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;
   background:conic-gradient(var(--ge) calc(var(--p,0)*1turn),rgba(255,255,255,.12) 0);-webkit-mask:radial-gradient(closest-side,transparent 80%,#000 82%);mask:radial-gradient(closest-side,transparent 80%,#000 82%)}
-.ge-hint{position:absolute;left:50%;bottom:max(22px,env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));padding:8px 14px;border-radius:12px;
+.ge-hint{position:absolute;left:50%;bottom:max(22px,env(safe-area-inset-bottom));transform:translateX(-50%);width:max-content;box-sizing:border-box;max-width:min(560px,calc(100vw - 32px));padding:8px 14px;border-radius:12px;
   background:rgba(6,12,20,.82);border:1px solid rgba(255,177,59,.4);font-size:13px;font-weight:700;text-align:center;opacity:0;transition:opacity .25s}
 .ge-hint.on{opacity:1}
 .ge-banner{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity .35s;width:min(720px,calc(100vw - 32px))}
@@ -72,14 +73,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#020409;overscroll-beh
 .ge-keys{position:absolute;left:max(10px,env(safe-area-inset-left));bottom:max(10px,env(safe-area-inset-bottom));font-size:10px;font-weight:700;color:#9fb6c8;letter-spacing:.04em;line-height:1.6;
   background:rgba(4,10,16,.5);padding:6px 9px;border-radius:9px;border:1px solid rgba(255,255,255,.08)}
 .ge-keys kbd{font:800 10px system-ui;padding:0 4px;border-radius:4px;background:rgba(255,255,255,.12);color:#fff}
-.ge-wm{position:absolute;right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));font:400 9px 'Bungee',system-ui,sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.35)}
+.ge-wm{position:absolute;right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));font:400 11px 'Bungee',system-ui,sans-serif;letter-spacing:.14em;color:rgba(255,255,255,.35)}
 .ge-tut{position:fixed;left:50%;bottom:max(70px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:41;width:min(460px,calc(100vw - 24px));pointer-events:auto;
   padding:10px 12px;display:flex;gap:10px;align-items:center;font-family:system-ui,sans-serif;color:#fff}
 .ge-tut[hidden]{display:none}
 .ge-tut .st{font:400 18px 'Bungee',system-ui,sans-serif;color:var(--ge);min-width:34px;text-align:center}
 .ge-tut p{margin:0;font-size:13px;line-height:1.35;flex:1}
-.ge-tut p small{display:block;font-size:9px;font-weight:800;letter-spacing:.22em;color:#9fb6c8}
-.ge-tut button{appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:8px 10px;font:800 11px system-ui;cursor:pointer;touch-action:manipulation}
+.ge-tut p small{display:block;font-size:11px;font-weight:800;letter-spacing:.22em;color:#9fb6c8}
+.ge-tut button{appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:8px 12px;min-height:44px;min-width:56px;font:800 13px system-ui;cursor:pointer;touch-action:manipulation}
+.ge-tut button:active{background:rgba(255,255,255,.22)}
 /* menú */
 .ge-menu h1{font-size:clamp(30px,7vw,58px)!important;line-height:.95!important}
 .ge-menu .k3-panel{width:min(600px,100%)}
@@ -95,7 +97,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#020409;overscroll-beh
 }
 .ge-menu h1 span{color:var(--ge)}
 .ge-sectors{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
-.ge-sectors button{appearance:none;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#fff;padding:9px 6px;cursor:pointer;font:700 11px system-ui;
+.ge-sectors button{appearance:none;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#fff;padding:9px 6px;min-height:48px;cursor:pointer;font:700 12px system-ui;
   display:flex;flex-direction:column;gap:3px;align-items:center;touch-action:manipulation}
 .ge-sectors button b{font:400 12px 'Bungee',system-ui,sans-serif;letter-spacing:.04em}
 .ge-sectors button[aria-pressed="true"]{border-color:var(--ge);background:rgba(255,177,59,.16);box-shadow:0 0 0 1px var(--ge) inset}
@@ -103,40 +105,95 @@ html,body{margin:0;height:100%;overflow:hidden;background:#020409;overscroll-beh
 .ge-sectors button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .ge-camp{width:100%;font-size:12px;color:#cfe2ea;display:grid;gap:3px;text-align:left;background:rgba(0,0,0,.25);border-radius:10px;padding:8px 10px}
 .ge-camp div{display:flex;justify-content:space-between;gap:8px}
-.ge-dfx{font-size:11px;color:#9fb6c8;min-height:1.3em}
+.ge-dfx{font-size:12px;color:#9fb6c8;min-height:1.3em}
 .ge-credit{display:flex;align-items:center;gap:6px;font:400 11px 'Bungee',system-ui,sans-serif;letter-spacing:.16em;color:#cfe2ea}
 .ge-credit img{width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(46,230,230,.55)}
-.ge-credit small{font:800 9px system-ui;letter-spacing:.24em;color:#8fa6b5}
+.ge-credit small{font:800 11px system-ui;letter-spacing:.24em;color:#8fa6b5}
 .ge-opt{width:100%;display:grid;gap:8px;text-align:left;font-size:13px}
 .ge-opt label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(255,255,255,.05);border-radius:10px;padding:8px 10px}
 .ge-opt input[type=range]{width:140px;accent-color:var(--ge)}
 .ge-opt input[type=checkbox]{width:20px;height:20px;accent-color:var(--ge)}
+@media (pointer:coarse){.ge-opt label{min-height:46px;box-sizing:border-box}.ge-opt input[type=checkbox]{width:24px;height:24px}.ge-opt input[type=range]{height:32px}}
+/* opciones largas en pantallas chicas: el contenido se desplaza y «LISTO» queda siempre a mano, abajo */
+#ge-opts .k3-btnrow{position:sticky;bottom:0;width:100%;padding:10px 0 max(6px,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(2,4,8,0),rgba(2,4,8,.92) 40%)}
 .ge-map{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
 .ge-map td,.ge-map th{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}
-.ge-map th{font-size:10px;letter-spacing:.14em;color:#9fb6c8}
+.ge-map th{font-size:11px;letter-spacing:.14em;color:#9fb6c8}
 .ge-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
-.ge-stats div{background:rgba(255,255,255,.06);border-radius:10px;padding:8px 4px;font-size:10px;font-weight:800;letter-spacing:.12em;color:#9fb6c8}
+.ge-stats div{background:rgba(255,255,255,.06);border-radius:10px;padding:8px 4px;font-size:11px;font-weight:800;letter-spacing:.12em;color:#9fb6c8}
 .ge-stats b{display:block;font:400 18px 'Bungee',system-ui,sans-serif;color:#fff;letter-spacing:0;margin-top:2px}
 .ge-rec{color:var(--ge);font-weight:800;letter-spacing:.2em;font-size:12px}
-.k3-touch .k3-btn{width:66px;height:66px;font-size:11px;letter-spacing:.04em}
-.k3-touch .k3-btn[aria-label="fire"]{background:rgba(255,150,40,.42);border-color:rgba(255,190,90,.8)}
-@media (pointer:coarse){.ge-keys{display:none}.ge-hint{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 160px)}.ge-tut{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 150px)}
-  .ge-wm{right:50%;transform:translateX(50%)}}
+/* controles táctiles: racimo para el pulgar derecho, FUEGO (principal) grande en la esquina */
+.k3-touch .k3-btns{display:grid;grid-template-columns:64px 78px;grid-template-rows:64px 78px;gap:10px;align-items:center;justify-items:center;max-width:none;
+  right:max(14px,env(safe-area-inset-right));bottom:max(22px,env(safe-area-inset-bottom))}
+.k3-touch .k3-joy{left:max(18px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom))}
+.k3-touch .k3-btn{width:64px;height:64px;font-size:13px;letter-spacing:.04em;text-shadow:0 1px 2px #000}
+.k3-touch .k3-btn[aria-label="fire"]{grid-area:2/2;width:78px;height:78px;font-size:14px;background:rgba(255,150,40,.42);border-color:rgba(255,190,90,.8)}
+.k3-touch .k3-btn[aria-label="laser"]{grid-area:2/1;border-color:rgba(125,255,176,.6)}
+.k3-touch .k3-btn[aria-label="boost"]{grid-area:1/2;border-color:rgba(200,166,255,.6)}
+.k3-touch .k3-btn[aria-label="scan"]{grid-area:1/1}
+.k3-touch .k3-btn.on{background:rgba(255,177,59,.55);box-shadow:0 0 0 3px rgba(255,177,59,.35)}
+.k3-touch .k3-btn.ge-off{opacity:.45}
+.ge-menu,.k3-screen{touch-action:pan-y}
+.ge-menu .k3-b,.k3-screen .k3-b{min-height:48px}
+.k3-screen .mlm-diff-t,.k3-screen .k3-panel .k3-kicker{font-size:12px}
+.ge-banner small{font-size:12px}
+@media (pointer:coarse){.ge-keys{display:none}
+  .ge-hint{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 172px)}
+  .ge-tut{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 166px)}
+  body:has(.ge-tut:not([hidden])) .ge-hint{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 166px + var(--ge-tuth,96px))}
+  body:has(.ge-tut:not([hidden])) .ge-wm{display:none}
+  /* vertical: la nave queda a la altura del tutorial; el tutorial ocupa el lugar del objetivo (arriba) mientras dura */
+  @media (orientation:portrait){
+    .ge-tut{top:calc(max(8px,env(safe-area-inset-top)) + var(--ge-sth,150px));bottom:auto}
+    body:has(.ge-tut:not([hidden])) .ge-obj{visibility:hidden}
+    body:has(.ge-tut:not([hidden])) .ge-hint{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 172px)}
+  }
+  /* vertical corto: la nave queda justo encima de los controles; los avisos pasan arriba, sobre el panel de objetivo */
+  @media (orientation:portrait) and (max-height:740px){
+    .ge-hint,body:has(.ge-tut:not([hidden])) .ge-hint{top:calc(max(8px,env(safe-area-inset-top)) + var(--ge-sth,150px));bottom:auto;z-index:2}
+    body:has(.ge-tut:not([hidden])) .ge-hint{top:calc(max(8px,env(safe-area-inset-top)) + var(--ge-sth,150px) + var(--ge-tuth,96px))}
+  }
+  .ge-wm{right:50%;transform:translateX(50%);bottom:max(4px,env(safe-area-inset-bottom))}}
 @media (max-width:760px){
-  .ge-status{width:176px;padding:6px 8px;gap:4px}.ge-score b{font-size:16px}
-  .ge-obj{top:calc(max(8px,env(safe-area-inset-top)) + 150px);left:8px;right:8px;transform:none;width:auto;min-width:0;padding:5px 10px}
-  .ge-obj .ge-goal{font-size:12px}
+  .ge-status{width:194px;padding:6px 8px;gap:4px}.ge-score b{font-size:16px}
+  .ge-obj{top:calc(max(8px,env(safe-area-inset-top)) + var(--ge-sth,150px));left:8px;right:8px;transform:none;width:auto;min-width:0;padding:5px 10px}
+  .ge-obj .ge-goal{font-size:13px}
   .ge-radar{width:86px;height:86px}
 }
+/* teléfono angosto en vertical: el panel de estado no puede invadir la barra del arcade (4 botones de 44 px a la derecha) */
+@media (max-width:430px){
+  .ge-status{width:calc(100vw - 224px);min-width:132px}
+  .ge-score small,.ge-lbl{letter-spacing:.06em}
+  .ge-row{grid-template-columns:50px 1fr}
+  .ge-mini{grid-template-columns:1fr}
+  .ge-mini .ge-row{grid-template-columns:50px 1fr!important}
+  .ge-wpn{display:none}
+}
+/* vertical: el menú arranca debajo de la barra del arcade (botones de 44 px arriba a la derecha) */
+@media (max-width:560px) and (orientation:portrait){#ge-menu,#ge-opts,#ge-end,#ge-clear{padding-top:calc(env(safe-area-inset-top,0px) + 60px)}}
+@media (max-height:700px) and (max-width:500px){
+  .ge-menu h1{font-size:clamp(26px,8.6vw,36px)!important}
+  .ge-menu p.ge-sub{font-size:13px;line-height:1.3}
+  .ge-menu .k3-panel{gap:8px}
+  .ge-mcol{gap:8px}
+  .ge-menu .k3-b{padding:11px 18px}
+  .ge-camp{padding:6px 10px;gap:1px}
+}
 @media (max-height:500px){
-  .ge-status{width:176px;padding:5px 8px;gap:3px}.ge-score b{font-size:15px}.ge-wpn{display:none}
-  .ge-obj{top:max(6px,env(safe-area-inset-top));left:50%;right:auto;transform:translateX(-50%);width:min(330px,calc(100vw - 420px));padding:4px 10px}
-  .ge-obj .ge-goal{font-size:11px}.ge-sm span{font-size:9px;padding:1px 6px}
-  .ge-radar{width:78px;height:78px;top:calc(max(6px,env(safe-area-inset-top)) + 42px)}
+  .ge-status{width:194px;padding:5px 8px;gap:3px}.ge-score b{font-size:15px}.ge-wpn{display:none}
+  .ge-obj{top:max(6px,env(safe-area-inset-top));left:50%;right:auto;transform:translateX(-50%);width:min(410px,calc(100vw - 440px));min-width:0;padding:4px 8px}
+  .ge-obj .ge-goal{font-size:12px}.ge-sm{gap:3px;margin-top:3px}.ge-sm span{font-size:12px;padding:0 6px}
+  .ge-radar{width:78px;height:78px;top:calc(env(safe-area-inset-top,0px) + 60px)}
   .ge-banner{top:38%}
   .ge-menu .k3-panel{gap:7px}
 }
-@media (pointer:coarse) and (max-height:500px){.ge-hint{bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100vw - 420px)}.ge-tut{bottom:max(10px,env(safe-area-inset-bottom));width:calc(100vw - 400px)}}
+@media (pointer:coarse) and (max-height:500px){
+  .ge-hint{bottom:max(12px,env(safe-area-inset-bottom));max-width:calc(100vw - 2 * max(196px, calc(env(safe-area-inset-right) + 188px)))}
+  .ge-tut{bottom:max(8px,env(safe-area-inset-bottom));width:min(460px,calc(100vw - 2 * max(196px, calc(env(safe-area-inset-right) + 188px))))}
+  body:has(.ge-tut:not([hidden])) .ge-hint{bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--ge-tuth,80px) + 8px)}
+  .ge-banner b{font-size:clamp(22px,4.4vw,34px)}
+}
 @media (prefers-reduced-motion:reduce){.ge-hint,.ge-banner,.ge-warp{transition:none}}
 `;
 
@@ -197,6 +254,28 @@ export function createUI(h) {
     marks.push({ el, ic: /** @type {HTMLElement} */ (el.children[0]), d: /** @type {HTMLElement} */ (el.children[1]), ar: /** @type {HTMLElement} */ (el.children[2]), on: false, key: '' });
   }
   let hintT = 0, bannerT = 0, lastText = { score: '', goal: '', prog: '', sm: '', sec: '' };
+  const statusEl = /** @type {HTMLElement} */ (hud.querySelector('.ge-status'));
+  const objEl = /** @type {HTMLElement} */ (hud.querySelector('.ge-obj'));
+  /** Zona libre para marcadores (px desde arriba / abajo), medida sobre el HUD real tras cada cambio de tamaño. */
+  const safe = { top: 170, bottom: 80 };
+  /** Mide el HUD: el panel de objetivo se ubica debajo del estado y el radar (vertical) y los avisos encima del tutorial. */
+  function layout() {
+    if (hud.hidden) return;
+    const st = statusEl.getBoundingClientRect(), rd = radar.getBoundingClientRect();
+    document.body.style.setProperty('--ge-sth', Math.round(Math.max(st.bottom, rd.bottom) + 8 - st.top) + 'px');
+    document.body.style.setProperty('--ge-tuth', (tut.hidden ? 0 : Math.round(tut.getBoundingClientRect().height + 10)) + 'px');
+    const ob = objEl.getBoundingClientRect();
+    safe.top = Math.max(st.bottom, rd.bottom, ob.bottom) + 8;
+    let bot = 0;
+    for (const el of document.querySelectorAll('.k3-touch:not([hidden]) .k3-joy, .k3-touch:not([hidden]) .k3-btns')) bot = Math.max(bot, innerHeight - el.getBoundingClientRect().top);
+    safe.bottom = Math.max(60, bot + 8);
+  }
+  let layoutRaf = 0;
+  const relayout = () => { if (!layoutRaf) layoutRaf = requestAnimationFrame(() => { layoutRaf = 0; layout(); }); };
+  addEventListener('resize', relayout);
+  addEventListener('orientationchange', relayout);
+  if (window.visualViewport) visualViewport.addEventListener('resize', relayout);
+  new ResizeObserver(relayout).observe(objEl);
 
   const setW = (/** @type {HTMLElement} */ el, /** @type {number} */ k) => { el.style.transform = `scaleX(${Math.max(0, Math.min(1, k)).toFixed(3)})`; };
   const setT = (/** @type {'score'|'goal'|'prog'|'sm'|'sec'} */ key, /** @type {string} */ v, html = false) => { if (lastText[key] === v) return; lastText[key] = v; if (html) els[key].innerHTML = v; else els[key].textContent = v; };
@@ -208,8 +287,8 @@ export function createUI(h) {
   const clear = screen('', { accent: ACCENT, id: 'ge-clear' }); clear.hide();
 
   return {
-    hud, menu, opts, end, clear, tut, radar, rctx,
-    showHud(v) { hud.hidden = !v; },
+    hud, menu, opts, end, clear, tut, radar, rctx, safe, layout,
+    showHud(v) { hud.hidden = !v; if (v) relayout(); },
     /** @param {any} s */
     status(s) {
       setT('score', String(s.score));
@@ -240,6 +319,7 @@ export function createUI(h) {
     scan(show, x = 0, y = 0, p = 0) { scan.hidden = !show; if (show) { scan.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)`; scan.style.setProperty('--p', p.toFixed(3)); } },
     /** @param {{x:number,y:number,edge:boolean,angle:number,icon:string,color:string,label:string}[]} list */
     markers(list) {
+      let shown = 0;
       for (let i = 0; i < marks.length; i++) {
         const m = marks[i], it = list[i];
         if (!it) { if (m.on) { m.on = false; m.el.hidden = true; } continue; }
@@ -247,6 +327,11 @@ export function createUI(h) {
         const key = it.icon + it.color + it.edge;
         if (m.key !== key) { m.key = key; m.ic.textContent = it.icon; m.el.style.color = it.color; m.el.classList.toggle('edge', it.edge); m.ar.hidden = !it.edge; }
         if (m.d.textContent !== it.label) m.d.textContent = it.label;
+        // etiquetas que se pisan (convoy en fila, pantallas chicas): sólo la primera conserva el texto
+        let clash = false;
+        for (let j = 0; j < shown; j++) { const o = list[j]; if (Math.abs(o.x - it.x) < 26 + (o.label.length + it.label.length) * 3.3 && Math.abs(o.y - it.y) < 30) { clash = true; break; } }
+        m.d.classList.toggle('hid', clash);
+        shown = i + 1;
         m.el.style.transform = `translate3d(${(it.x - 14).toFixed(1)}px,${(it.y - 14).toFixed(1)}px,0)`;
         if (it.edge) m.ar.style.transform = `rotate(${it.angle.toFixed(3)}rad) translateX(20px)`;
       }
@@ -261,9 +346,10 @@ export function createUI(h) {
     vignette(k) { vig.style.opacity = String(Math.max(0, Math.min(1, k))); },
     warp(on) { warp.style.opacity = on ? '1' : '0'; },
     tutorial(show, n = 0, total = 0, text = '') {
-      tut.hidden = !show; if (!show) return;
+      const was = tut.hidden; tut.hidden = !show; if (was !== tut.hidden) relayout(); if (!show) return;
       /** @type {HTMLElement} */ (tut.querySelector('[data-k="n"]')).textContent = `${n}/${total}`;
       /** @type {HTMLElement} */ (tut.querySelector('[data-k="t"]')).textContent = text;
+      relayout();
     },
     menuHTML,
     optionsHTML,
@@ -302,9 +388,10 @@ function optionsHTML(st, touch) {
   <div class="ge-opt">
     <label>Sensibilidad de giro <input type="range" min="0.5" max="1.6" step="0.1" value="${st.sens}" data-o="sens" aria-label="Sensibilidad"></label>
     <label>Invertir eje vertical <input type="checkbox" data-o="invertY" ${st.invertY ? 'checked' : ''}></label>
-    <label>Dirigir con el mouse (PC) <input type="checkbox" data-o="mouseSteer" ${st.mouseSteer ? 'checked' : ''}></label>
+    ${touch ? '' : `<label>Dirigir con el mouse (PC) <input type="checkbox" data-o="mouseSteer" ${st.mouseSteer ? 'checked' : ''}></label>`}
     <label>Disparo asistido (dispara solo al alinear) <input type="checkbox" data-o="autoFire" ${st.autoFire ? 'checked' : ''}></label>
     <label>Reducir movimiento (sin sacudidas ni destellos) <input type="checkbox" data-o="calm" ${st.calm ? 'checked' : ''}></label>
+    ${touch ? `<label>Vibración al disparar y recibir daño <input type="checkbox" data-o="haptics" ${st.haptics ? 'checked' : ''}></label>` : ''}
   </div>
   <table class="ge-map"><tr><th>ACCIÓN</th><th>PC</th><th>${touch ? 'TÁCTIL' : 'TÁCTIL'}</th><th>GAMEPAD</th></tr>
     <tr><td>Pilotear</td><td>WASD / flechas / mouse</td><td>Stick izq.</td><td>Stick izq.</td></tr>
