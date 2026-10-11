@@ -100,7 +100,7 @@ scene.add(PR.root);
 const focusRing = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 28).rotateX(-Math.PI / 2), mats.focus); focusRing.visible = false; scene.add(focusRing);
 const P = {
   x: 0, z: 0, ry: 0, vx: 0, vz: 0, hp: 6, maxHp: 6, alive: true, inv: 0, atkCd: 0, atkT: 0, atkHit: false, rollT: 0, rollCd: 0, rdx: 0, rdz: 0,
-  knockT: 0, kx: 0, kz: 0, stepT: 0, moving: 0,
+  knockT: 0, kx: 0, kz: 0, stepT: 0, moving: 0, aimT: 0,
 };
 const R_PLAYER = 0.36;
 let input = createInput(game.root, {
@@ -110,6 +110,8 @@ let input = createInput(game.root, {
 if (input.isTouch) document.body.classList.add('ra-touch');
 input.showTouch(false);
 const useBtn = /** @type {HTMLElement|null} */ (document.querySelector('.k3-btn[aria-label="use"]'));
+/** vibración breve (sólo táctil; respeta «Movimiento: reducido» y la preferencia del sistema) */
+function buzz(ms) { if (!input.isTouch || reduced() || typeof navigator.vibrate !== 'function') return; try { navigator.vibrate(ms); } catch (e) { /* sin permiso */ } }
 // clic del mouse (sin arrastrar) = atacar
 let clickAtk = false;
 { let dx = 0, dy = 0, t0 = 0;
@@ -117,12 +119,12 @@ let clickAtk = false;
   game.root.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; if (Math.hypot(e.clientX - dx, e.clientY - dy) < 6 && performance.now() - t0 < 350) clickAtk = true; }); }
 
 /* ======================= partida ======================= */
-const run = { time: 0, transitions: 0, lastTransMs: 0, deaths: 0, kills: 0 };
+const run = { time: 0, transitions: 0, lastTransMs: 0, deaths: 0, kills: 0, swings: 0 };
 /** @type {any} */ let scn = null;
 /** @type {any} */ let focus = null;
 /** @type {any} */ let trans = null;
 /** @type {any} */ let dlg = null;
-let armed = false, dyingT = 0, tipId = '', tipT = 0, moved = 0, bubbleCd = 0, hudAcc = 0, lightAcc = 0, mapAcc = 0;
+let layAcc = 0, armed = false, dyingT = 0, tipId = '', tipT = 0, moved = 0, bubbleCd = 0, hudAcc = 0, lightAcc = 0, mapAcc = 0;
 const cam = { yaw: Math.PI, pitch: 0.78, tx: 0, ty: 1.4, tz: 0, dist: 9, menuA: 0 };
 /** temporizadores en tiempo de simulación (deterministas con simulate) */
 /** @type {{t:number, fn:()=>void}[]} */ let timers = [];
@@ -341,9 +343,14 @@ function startRun(fresh) {
   ui.show(true); input.showTouch(true); input.clear(); ui.fade(false);
   M.runStart();
   for (const q of QUEST_ORDER) if (Q.done(q)) emit(Q.QUESTS[q].event);
-  A.started();
+  A.started(); ui.layout();
   moved = 0;
   later(0.4, () => tip('move'));
+  // celular en vertical: se juega igual, pero se sugiere (una vez por sesión, sin bloquear) girarlo para ver más
+  if (input.isTouch && innerHeight > innerWidth * 1.2) {
+    let seen = false; try { seen = !!sessionStorage.getItem(GAME_ID + ':girar'); sessionStorage.setItem(GAME_ID + ':girar', '1'); } catch (e) { /* sin almacenamiento */ }
+    if (!seen) later(3, () => { if (state === 'play' && innerHeight > innerWidth * 1.2) toast('📱↻ Con el teléfono horizontal ves más del reino (también se juega así)', 2800); });
+  }
   persist();
 }
 function endRun(won) { M.runEnd({ won }); A.ended({ score: S().fame }); }
@@ -368,7 +375,7 @@ function hurtPlayer(n, fromX, fromZ) {
   const dx = P.x - fromX, dz = P.z - fromZ, l = Math.hypot(dx, dz) || 1;
   P.kx = dx / l * 7; P.kz = dz / l * 7; P.knockT = 0.18;
   if (!reduced()) ui.flash();
-  fx.shake(0.25); sfx.hurt(); emit('hurt');
+  fx.shake(0.25); sfx.hurt(); emit('hurt'); buzz(40);
   if (P.hp <= 2 && P.hp > 0 && S().inv.potions > 0) tip('potion');
   if (P.hp <= 0) die();
 }
@@ -403,7 +410,7 @@ function onBossPhase(kind, ph) {
   const T = { guardian: { 2: ['FASE 2 · ESCUDO DE RUNAS', 'Destruí los fuegos fatuos para romper el escudo. ¡Cuidado con las raíces!'], 3: ['FASE 3 · FURIA DEL BOSQUE', '¡Más rápido y con más raíces! Rodá a tiempo.'] },
     carcelero: { 2: ['FASE 2 · CADENAS Y ALIADOS', '¡Tus aliados atacan al Carcelero! Alejate de su giro.'] } };
   const t = T[kind] && T[kind][ph]; if (!t) return;
-  ui.title(t[0], kind === 'guardian' ? 'GUARDIÁN DEL BOSQUE' : 'MALVOR, EL CARCELERO'); toast(t[1], 3000); emit('bossPhase', ph);
+  ui.title(t[0], kind === 'guardian' ? 'GUARDIÁN DEL BOSQUE' : 'MALVOR, EL CARCELERO'); toast(t[1], 3000); emit('bossPhase', ph); buzz(70);
 }
 function spawnBoss(kind) {
   if (!scn || combat.boss && !combat.boss.dead) return;
@@ -529,7 +536,8 @@ function control(dt) {
   if (P.knockT > 0) { P.knockT -= dt; vx = P.kx; vz = P.kz; }
   else if (P.rollT > 0) { P.rollT -= dt; vx = P.rdx * 10.5; vz = P.rdz * 10.5; }
   else { const k = Math.min(1, dt * 14); P.vx += (mx * speed - P.vx) * k; P.vz += (mz * speed - P.vz) * k; vx = P.vx; vz = P.vz; }
-  if (P.rollT <= 0 && P.knockT <= 0 && ml > 0.15) { P.ry = Math.atan2(mx, mz); moved += ml * speed * dt; }
+  P.aimT -= dt;
+  if (P.rollT <= 0 && P.knockT <= 0 && ml > 0.15) { if (P.aimT <= 0) P.ry = Math.atan2(mx, mz); moved += ml * speed * dt; }
   const bx = P.x, bz = P.z;
   const pos = { x: P.x, z: P.z };
   moveCircle(scn.cols, pos, R_PLAYER, vx * dt, vz * dt);
@@ -541,10 +549,11 @@ function control(dt) {
   if (P.moving > 1 && (P.stepT -= dt) <= 0) { sfx.step(); P.stepT = 0.33; }
   // atacar
   if ((input.hit('Space', 'KeyJ', 'btn:atk') || clickAtk) && P.atkCd <= 0 && P.rollT <= 0) {
-    P.atkCd = 0.42; P.atkT = 0.12; P.atkHit = false; PR.atk = 0.3; sfx.swing(); emit('swing');
+    P.atkCd = 0.42; P.atkT = 0.12; P.atkHit = false; PR.atk = 0.3; sfx.swing(); emit('swing'); run.swings++;
+    if (input.isTouch) aimAssist();
   }
   clickAtk = false;
-  if (P.atkT > 0) { P.atkT -= dt; if (P.atkT <= 0 && !P.atkHit) { P.atkHit = true; const n = combat.playerAttack(P.x, P.z, P.ry); if (n) emit('hit', n); } }
+  if (P.atkT > 0) { P.atkT -= dt; if (P.atkT <= 0 && !P.atkHit) { P.atkHit = true; const n = combat.playerAttack(P.x, P.z, P.ry); if (n) { emit('hit', n); buzz(15); } } }
   // poción
   if (input.hit('KeyF', 'btn:potion')) usePotion();
   // diario
@@ -557,6 +566,19 @@ function control(dt) {
   if (focus) { tip(focus.kind === 'door' ? 'door' : focus.kind === 'npc' ? 'talk' : 'interact'); }
   if (combat.enemies.some(e => !e.dead && e.state !== 'idle' && e.state !== 'wander')) tip('combat');
   if (S().quests.A >= 1 && run.time > 20) tip('journal');
+}
+/** Ayuda de puntería táctil: al atacar, gira hacia el enemigo vivo más cercano a tiro (sin muro en medio). En PC no se usa. */
+const AIM_R = 3.4;
+function aimAssist() {
+  let best = null, bd = Infinity;
+  for (const e of combat.enemies) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - P.x, e.z - P.z);
+    if (d < bd && d <= AIM_R + (e.r || 0.5) && !losBlocked(scn.cols, P.x, P.z, e.x, e.z, 1.6)) { best = e; bd = d; }
+  }
+  if (!best) return false;
+  P.ry = Math.atan2(best.x - P.x, best.z - P.z); P.aimT = 0.2;
+  return true;
 }
 function usePotion() {
   const s = S();
@@ -667,7 +689,12 @@ function updateCamera(dt) {
   const k = Math.min(1, dt * 10);
   cam.tx += (P.x - cam.tx) * k; cam.tz += (P.z - cam.tz) * k; cam.ty = 1.4;
   const inside = scn.kind === 'interior';
-  let want = (inside ? 11 : 9.5) * (camera.aspect < 0.8 ? 1.2 : 1) + (combat.boss && !combat.boss.dead ? 2.5 : 0);
+  // retrato (celular vertical): con FOV vertical fijo el horizontal quedaba en ~32° y no se veían amenazas a los costados.
+  // Se abre el FOV vertical hasta ~44° horizontales (tope 72°) y la cámara casi no se aleja.
+  const portrait = camera.aspect < 0.8;
+  const fov = portrait ? clamp(2 * Math.atan(Math.tan(22 * Math.PI / 180) / camera.aspect) * 180 / Math.PI, 55, 72) : 55;
+  if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  let want = (inside ? 11 : 9.5) * (portrait ? 1.05 : 1) + (combat.boss && !combat.boss.dead ? 2.5 : 0);
   const pitch = inside ? Math.max(cam.pitch, 1.08) : cam.pitch;
   let ox = Math.sin(cam.yaw) * Math.cos(pitch), oy = Math.sin(pitch), oz = Math.cos(cam.yaw) * Math.cos(pitch);
   // interiores sin techo: la cámara se queda dentro de la habitación (sube por encima de las paredes, nunca las cruza)
@@ -692,7 +719,11 @@ function updateCamera(dt) {
   const sh = fx.shakeAmt * 0.3;
   camera.position.set(cam.tx + ox * cam.dist + (rand() - 0.5) * sh, cam.ty + oy * cam.dist + (rand() - 0.5) * sh, cam.tz + oz * cam.dist);
   // en interiores mira un poco hacia adelante: se ve más habitación y menos vacío detrás de la pared
-  if (inside) { const hl = Math.hypot(ox, oz) || 1; camera.lookAt(cam.tx - ox / hl * 1.8, cam.ty - 0.4, cam.tz - oz / hl * 1.8); camera.position.x -= ox / hl * 1.2; camera.position.z -= oz / hl * 1.2; }
+  // (en táctil se mira menos hacia adelante: si no, el jugador quedaba abajo, tapado por el joystick y los botones)
+  if (inside) {
+    const hl = Math.hypot(ox, oz) || 1, ahead = portrait ? 0.3 : input.isTouch ? 0.5 : 1.8, push = portrait ? 0.4 : input.isTouch ? 0.5 : 1.2;
+    camera.lookAt(cam.tx - ox / hl * ahead, cam.ty - 0.4, cam.tz - oz / hl * ahead); camera.position.x -= ox / hl * push; camera.position.z -= oz / hl * push;
+  }
   else camera.lookAt(cam.tx, cam.ty, cam.tz);
   const e = scn.env.sunDir;
   sun.target.position.set(cam.tx, 0, cam.tz); sun.position.set(cam.tx + e[0], e[1], cam.tz + e[2]);
@@ -708,7 +739,8 @@ function menuCamera(dt) {
 /* ======================= HUD ======================= */
 function hudTick(dt) {
   if (tipId) { tipT -= dt; if (tipT <= 0 || (tipId === 'move' && moved > 8)) closeTip(); }
-  hudAcc += dt; mapAcc += dt;
+  hudAcc += dt; mapAcc += dt; layAcc += dt;
+  if (layAcc >= 1) { layAcc = 0; ui.layout(); }
   if (hudAcc >= 0.1) {
     hudAcc = 0;
     const s = S(), h = s.time, hh = Math.floor(h), mm = Math.floor((h - hh) * 60 / 10) * 10;
@@ -805,7 +837,7 @@ function openOptions() {
       <label>Sensibilidad de cámara <input type="range" min="0.4" max="2" step="0.1" value="${o.sens}" data-sens aria-label="Sensibilidad de cámara"></label>
       <label>Invertir cámara vertical <input type="checkbox" data-invert ${o.invert ? 'checked' : ''}></label>
       <label>Movimiento (sacudidas y destellos) <select data-motion><option value="auto"${o.motion === 'auto' ? ' selected' : ''}>Según el sistema</option><option value="reduce"${o.motion === 'reduce' ? ' selected' : ''}>Reducido</option><option value="full"${o.motion === 'full' ? ' selected' : ''}>Completo</option></select></label>
-      <div class="ra-dtab">Sonido y calidad gráfica: botón ⚙ de la barra. ${KEY_HELP.pc}</div>
+      <div class="ra-dtab">Sonido y calidad gráfica: botón ⚙ de la barra. ${input.isTouch ? KEY_HELP.touch : KEY_HELP.pc}</div>
     </div>
     <div class="k3-btnrow"><button class="k3-b" data-back>Listo</button></div>`);
 }
@@ -826,8 +858,13 @@ function openJournal() {
   if (s.inv.ore) inv.push(`⛏ Mineral ×${s.inv.ore}`); if (s.inv.herbs) inv.push(`🌿 Hierbas ×${s.inv.herbs}`);
   journalScreen.show(`<span class="k3-kicker">DIARIO</span><h1 style="font-size:30px">MISIONES</h1>
     <div class="ra-j">${J.map(q => `<div class="${q.main ? 'main' : ''} ${q.done ? 'done' : ''} ${q.locked ? 'locked' : ''}" data-q="${q.id}"><b>${q.main ? '★' : '◆'} ${q.title} ${q.done ? '✔' : `(${q.stage}/${q.total})`}</b>${q.text}${q.where ? `<br><small>📍 ${q.where}</small>` : ''}</div>`).join('')}</div>
+    <div class="ra-more" data-more hidden>▼ deslizá para ver más misiones</div>
     <div class="ra-inv">Mochila: ${inv.length ? inv.join(' · ') : 'vacía'} · 🪙 ${s.inv.coins} · 🧪 ${s.inv.potions}</div>
-    <div class="k3-btnrow"><button class="k3-b" data-close>Cerrar (L)</button></div>`);
+    <div class="k3-btnrow"><button class="k3-b" data-close>${input.isTouch ? 'Cerrar' : 'Cerrar (L)'}</button></div>`);
+  // lista larga en pantallas chicas: se avisa que hay más (desvanecido + «deslizá») hasta llegar al final
+  const list = /** @type {HTMLElement} */ (journalScreen.el.querySelector('.ra-j')), more = /** @type {HTMLElement} */ (journalScreen.el.querySelector('[data-more]'));
+  const upd = () => { const m = list.scrollHeight - list.clientHeight - list.scrollTop > 6; list.classList.toggle('more', m); more.hidden = !m; };
+  list.addEventListener('scroll', upd, { passive: true }); upd();
   emit('journal');
 }
 journalScreen.on('[data-close]', closeJournal);
@@ -858,10 +895,12 @@ const hook = {
   get runTime() { return run.time; }, get simTime() { return game.simTime; }, get paused() { return game.paused; },
   get hour() { return S().time; },
   get transitions() { return run.transitions; }, get lastTransitionMs() { return run.lastTransMs; }, get buildMs() { return scn ? scn.buildMs : 0; },
-  get tip() { return tipId; },
+  get tip() { return tipId; }, get swings() { return run.swings; },
   get focus() { return focus ? { id: focus.id, kind: focus.kind, label: focus.label() } : null; },
   get dialog() { return dlg ? { npc: dlg.npc, i: dlg.i, total: dlg.lines.length, line: dlg.lines[dlg.i], choices: dlg.choices ? dlg.choices.map(c => c.label) : null } : null; },
-  get camDist() { return cam.dist; }, get camYaw() { return cam.yaw; },
+  get camDist() { return cam.dist; }, get camYaw() { return cam.yaw; }, get fov() { return camera.fov; },
+  /** posición del jugador en pantalla (px CSS, a la altura del pecho) */
+  get playerScreen() { const v = new THREE.Vector3(P.x, 1.0, P.z).project(camera); return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; },
   get camera() { return { x: camera.position.x, y: camera.position.y, z: camera.position.z }; },
   get npcs() { return Object.values(npcs.list).map(n => ({ id: n.id, role: n.def.role, name: n.def.name, scene: n.scene, state: n.state, x: +n.x.toFixed(2), z: +n.z.toFixed(2), ry: +n.ry.toFixed(3), marker: n.marker, talking: n.talking, extra: !!n.def.extra })); },
   get roles() { return ROLES.slice(); },
@@ -943,6 +982,7 @@ if (DEBUG) {
     /** ¿el segmento cámara→jugador cruza algún muro? */
     camClear() { for (const c of scn.cols) { if (!c.on || c.h < 1.5 || c.tag === 'tree' || c.tag === 'prop' || c.tag === 'water' || c.tag === 'field' || c.tag === 'fence' || c.tag === 'post' || c.tag === 'doorleaf') continue; const t = segBox3(cam.tx, cam.ty, cam.tz, camera.position.x, camera.position.y, camera.position.z, c); if (t < 0.97) return false; } return true; },
     defeatNow() { P.inv = 0; P.rollT = 0; hurtPlayer(99, P.x + 1, P.z); },
+    spawnEnemy(kind, x, z) { combat.spawn(kind, x, z); },
   };
 }
 /** nombres de spawns de una escena (para goto sin argumento) */

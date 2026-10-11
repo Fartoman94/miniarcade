@@ -147,6 +147,56 @@ Resultados reales (esta máquina, con otros 3 agentes corriendo, carga ~25):
 - `ML_WORKERS=4`: 38 ✓, 0 fallas, 0 flaky.
 - `salva_al_rey.spec.js` (con la prueba nueva del botón): 55 ✓ en ambos proyectos.
 
+## Móvil
+Pasada mobile-first (2026-10-11), verificada con Playwright emulando Pixel 7 (táctil, DPR 2) en 360×640, 390×844, 412×915,
+915×412 y 844×390. **No probado en teléfonos reales** (no hay dispositivos disponibles).
+
+Capturas antes/después (`.perf/mobile-audit/reino_alba/`): `antes-<ancho>x<alto>-<pantalla>.png` y
+`despues-<ancho>x<alto>-<pantalla>.png`, pantallas `menu, play, prompt, dialog, choices, journal, interior, torre` (los 5
+tamaños) y `help, opts, text, pause` (360×640 y 844×390). El contador de FPS de las capturas es del modo `?debug`.
+
+Problemas encontrados → arreglos:
+- **Diálogo salteaba la primera línea en táctil** (bug real, reproducido): el toque en USAR (o en el aviso) abría el diálogo y
+  el clic sintético del mismo toque caía sobre el cuadro recién abierto → avanzaba una línea. Ahora el diálogo sólo acepta
+  clics cuyo toque empezó sobre él.
+- **Tocar el texto de un diálogo con opciones elegía la primera** (p. ej. comprar semillas sin querer). Ahora sólo cuentan los
+  botones de opción (el teclado E/Enter sigue eligiendo la primera, como antes).
+- **Jugador tapado por los controles en interiores (vertical)**: la cámara de interiores miraba 1,8 u hacia adelante y el
+  jugador quedaba al 76 % de la altura, debajo de ⤳/USAR (360×640). En táctil ahora mira 0,3 u (vertical) / 0,5 u (apaisado):
+  el jugador queda por encima de los controles en vertical y por encima del 62 % en apaisado (escritorio sin cambios).
+- **FOV en vertical**: con 55° verticales el horizontal era ~32°. En retrato el FOV vertical se abre hasta ~44° horizontales
+  (tope 72°) y la distancia pasa de ×1,2 a ×1,05; al girar vuelve a 55°.
+- **HUD contra la barra del SDK**: en 844×390 el tutorial/objetivo empezaba en y=48 y la barra termina en ~50 (encimados); en
+  360×640 los chips podían meterse bajo la barra con más monedas. Ahora el HUD mide la barra (`--ra-bar-b`, `--ra-bar-x`, al
+  mostrar, al redimensionar y cada 1 s) y se ubica debajo / a su izquierda.
+- **Tutorial en vertical**: «Saltar tutorial» se partía en dos líneas y el cuadro + objetivo bajaban hasta tapar al jugador.
+  En vertical angosto el panel derecho es más ancho, el botón dice «Saltar» y el objetivo se oculta mientras hay tutorial.
+- **Objetivos táctiles**: diario 📜 32→44 px, ✕ de los carteles 36→44, botones del tutorial y opciones de diálogo ≥44/48,
+  aviso tocable 44→50 (con respuesta visual al apretar), botón principal del menú/fin ≥56 px (en apaisado era 40 px).
+- **Texto**: zona/hora 11→12 px, objetivo 11→12 px en pantallas chicas, fase del jefe 11→12, «Tocá para seguir» 11→12.
+- **Diario**: en pantallas chicas la lista se corta sin aviso; ahora se desvanece abajo con «▼ deslizá para ver más» hasta el
+  final. En táctil el botón dice «Cerrar» (sin «(L)»). Opciones muestra la ayuda táctil en vez de las teclas.
+- **Gestos**: aviso, diálogo, tutorial, carteles y 📜 con `touch-action:none`; pantallas del juego con `pan-y` (se puede
+  desplazar el diario pero no pellizcar/zoom que después quede aplicado al juego). El lienzo ya tenía `touch-action:none`.
+- **Ayudas táctiles** (escritorio sin cambios): al atacar con ⚔ el jugador gira hacia el enemigo vivo más cercano a ≤3,4 u sin
+  muro en medio. Vibración corta opcional (golpe recibido 40 ms, golpe dado 15 ms, fase de jefe 70 ms) sólo en táctil y nunca
+  con «Movimiento: reducido» o `prefers-reduced-motion`.
+- **Orientación**: se juega en ambas. En vertical aparece una vez por sesión un aviso no bloqueante («con el teléfono
+  horizontal ves más del reino»). Girar en plena partida reacomoda HUD, controles y cámara sin perder el estado.
+- Sin cambios necesarios: pausa al pasar a segundo plano (SDK), calidad automática en táctil = media (DPR ≤1,5, sin sombras),
+  multitáctil joystick + botones + arrastre de cámara (kit3d).
+
+Pruebas móviles nuevas (proyecto `mobile`): matriz de los 5 tamaños (menú: botón principal ≥56 px y visible, sin scroll
+horizontal; en juego: HUD/SDK/joystick/botones/aviso/tutorial/objetivo/diálogo sin encimarse ni salirse, objetivos ≥44 px,
+textos de juego ≥12 px, jugador fuera de la franja de controles en aldea, herrería, torre y taberna; diálogo con opciones y
+diario tocables), clic sintético del toque que abre un diálogo, multitáctil joystick + ⚔ con ayuda de puntería, giro en plena
+partida + pausa por `visibilitychange`. Reemplazan a las dos pruebas de layout 412×915/915×412 anteriores.
+
+Resultados (`tests/e2e/reino_alba.spec.js`, 2026-10-11, máquina compartida con otros agentes, carga ~30): 28 pruebas por
+proyecto. `ML_WORKERS=1`: escritorio 19 ✓ / 9 omitidas (sólo celular), celular 25 ✓ / 3 omitidas → 44 ✓, 0 fallas.
+`ML_WORKERS=4`: 44 ✓, 12 omitidas, 0 fallas, 0 flaky. La prueba del diálogo falla con el código anterior (línea salteada:
+esperado 0, recibido 1) y la de la matriz falla con la cámara de interiores anterior (jugador a la altura de los controles).
+
 ## Rendimiento (SwiftShader headless, máquina cargada: los FPS no son representativos)
 - `node tests/perf/measure.mjs reino_alba reino_alba` (menú): fps 2,7 (templo_ecos en el mismo momento: 2,7), heap 11,1 MB,
   DCL 512 ms, load 1082 ms, 23 requests, 1131 KB, 0 errores.
