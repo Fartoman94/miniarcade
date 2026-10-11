@@ -139,14 +139,14 @@ Con `?debug`: `simulate(s)`, `goto(region)`, `teleport`, `toNextRing`, `toMarker
 
 ## Pruebas
 
-`tests/e2e/academia_dragones.spec.js` — 19 casos (algunos sólo escritorio o sólo celular). `ML_WORKERS=1 npx playwright test tests/e2e/academia_dragones.spec.js`, 2026-10-10, con la máquina muy cargada (load ~40 por otros agentes):
+`tests/e2e/academia_dragones.spec.js` — 24 casos (algunos sólo escritorio o sólo celular; resultados actuales en «Móvil»). `ML_WORKERS=1 npx playwright test tests/e2e/academia_dragones.spec.js`, 2026-10-10, con la máquina muy cargada (load ~40 por otros agentes):
 
 | Proyecto | Resultado |
 |---|---|
 | desktop | 16 pasaron, 3 omitidos (táctil y diseño celular) |
 | mobile (Pixel 7) | 18 pasaron, 1 omitido (teclado) |
 
-Cubre: carga sin errores; arranque con Enter / toque; tutorial (visible, saltable, se reabre desde la pausa); vuelo con teclado (giro, ascenso, nivelación automática, turbo, aliento); táctil (joystick por CDP touch, ▲, 🔥); los 5 tipos de marcador; aros en orden y graduación; huevos, nidos, posadas y persistencia de sesión entre regiones; murciélago derribado, autómata blindado/recalentado y fijación de blanco; géiser (aviso → erupción → daño); las 4 escenas y viaje por portal; carrera (largada, rival avanza, rival gana → reinicio); misión principal + secundaria y persistencia tras recargar; guardado corrupto (JSON roto y tipos inválidos); dificultad (vidas/daño/jefe); calidad (far, nubes, partículas, sombras, espejo); jefe fases 1→2→3 y victoria; derrota y reintento; pausa congela 1 s, reanudar y reiniciar; celular 412×915 y 915×412 sin scroll ni superposición (HUD, tutorial, barra, joystick, botones).
+Cubre: carga sin errores; arranque con Enter / toque; tutorial (visible, saltable, se reabre desde la pausa); vuelo con teclado (giro, ascenso, nivelación automática, turbo, aliento); táctil (joystick por CDP touch, ▲, 🔥); los 5 tipos de marcador; aros en orden y graduación; huevos, nidos, posadas y persistencia de sesión entre regiones; murciélago derribado, autómata blindado/recalentado y fijación de blanco; géiser (aviso → erupción → daño); las 4 escenas y viaje por portal; carrera (largada, rival avanza, rival gana → reinicio); misión principal + secundaria y persistencia tras recargar; guardado corrupto (JSON roto y tipos inválidos); dificultad (vidas/daño/jefe); calidad (far, nubes, partículas, sombras, espejo); jefe fases 1→2→3 y victoria; derrota y reintento; pausa congela 1 s, reanudar y reiniciar; matriz de 5 tamaños de celular, multitáctil y rotación (ver «Móvil»).
 
 ## Rendimiento
 
@@ -168,6 +168,39 @@ Medido en esta máquina con SwiftShader (render por CPU) y carga alta de otros p
 | alta | Lago (espejo) | 55 | 91,6 k | 0,41 | 4,76 | 12,2 |
 
 Técnicas: repeticiones instanciadas (nubes, peñascos, islas, pinos, cristales, columnas, cuerpo de la serpiente), modelos fusionados con colores por vértice, partículas y proyectiles en pool (1 draw call), temporales reutilizados, HUD a 10 Hz con escrituras sólo si cambia, regiones liberadas al cambiar (geometrías, materiales, texturas, PMREM, Reflector).
+
+## Móvil
+
+Pasada «mobile-first» del 2026-10-11. Capturas reales (Chromium headless con táctil emulado, DPR 2,6–3) en `.perf/mobile/academia_dragones/before/` y `.perf/mobile/academia_dragones/after/` (`<ancho>x<alto>-menu.png`, `-play.png`; en `after/` también `-settings`, `-help`, `-regions`, `-boss`, `-end` para 360×640 y 844×390; `report.json` con las cajas medidas). Guion: el mismo para antes/después.
+
+| Problema (antes) | Dónde se vio | Arreglo |
+|---|---|---|
+| Menú cortado abajo: «Cómo jugar» fuera de pantalla (scroll interno sin aviso) | 915×412, 844×390 (panel 502 px en 390–412 px) | En horizontal bajo el menú pasa a 2 columnas: título + dragones a la izquierda; dificultad, **Volar** (ancho completo, 56 px, bajo el pulgar derecho), Regiones/Ajustes/Cómo jugar, progreso y crédito a la derecha. Entra entero sin scroll. |
+| Menú desbordaba 48 px y el rótulo quedaba bajo la barra del SDK | 360×640 | En vertical angosto el menú arranca debajo de la barra (padding superior), se oculta la bajada descriptiva en pantallas < 760 px de alto y el rótulo «MATELABS · …». Entra entero. |
+| Botones de dificultad de 33 px, menú sin respuesta al toque | todas | Dificultad ≥ 44 px, botones de menú ≥ 48 px, Volar ≥ 56 px; `:active` con escala/brillo. «Saltar tutorial» 44 px. |
+| Panel de puntos debajo de la barra del SDK | 360×640 (158 px de ancho contra la barra en x=148) | En ≤ 640 px el panel se achica al hueco libre, la fila se parte en dos y el objetivo/jefe se corre debajo del panel (ResizeObserver), así no se pisan con récords largos o 5 vidas. |
+| Píldoras de misión en 3 filas que tapaban el cartel/pantalla | 844×390 y 360×640 | Horizontal: una sola fila con elipsis (el detalle está en la pausa). Vertical: hasta 2 por fila. |
+| Texto chico: «PTS»/«ENERGÍA» 8–9 px, estadísticas de dragones 9 px, misiones 10 px | todas | Rótulos ≥ 11 px, información ≥ 12 px (barra de energía más alta para que entre el rótulo). |
+| Ajustes/Cómo jugar/Regiones/Fin: «Listo»/«Volver» quedaban fuera de vista; casillas de 13 px; Regiones bajo la barra del SDK | 844×390, 360×640 | Fila de acciones pegada abajo (sticky, con degradé como indicio de scroll), filas de ajustes ≥ 48 px, casillas 24 px, deslizador 32 px, selector 40 px; ajustes en 2 columnas en horizontal; sub-pantallas debajo de la barra. |
+| Cartel de región encima del objetivo | 360×640, 844×390 | En celular el cartel va al 44 % de alto. |
+| Vuelo táctil: el temblor del pulgar desviaba | — | Joystick con zona muerta (12 %) y curva suave (^1,35) sólo en táctil; teclado/gamepad sin cambios. |
+| Sin respuesta háptica | — | `navigator.vibrate` corto al recibir daño (35 ms) y al juntar un huevo (15 ms); sólo táctil y se apaga con «Sacudidas de cámara» o con movimiento reducido. Botones táctiles en ámbar y achicados al apretarlos. |
+| Audio en iOS | — | Cada toque reanuda el AudioContext si quedó suspendido (sólo si el juego no está en pausa ni silenciado). |
+
+Ya resuelto antes de esta pasada (verificado, sin cambios): en vertical la cámara se aleja y el FOV sube a 72°; asistencia de vuelo automática en táctil; calidad automática del SDK no elige «alta» con puntero grueso y Kit3D limita el DPR (1/1,5/2); el SDK pausa al pasar a segundo plano; `touch-action:none` en la superficie de juego (Kit3D) y sin `user-scalable=no` en la página; giro en pleno vuelo lo resuelve el ResizeObserver de Kit3D.
+
+**Orientación:** se juega en las dos. Horizontal muestra más cielo, así que en vertical aparece una vez por sesión un aviso suave («Consejo: en horizontal ves más cielo», 2,6 s, no bloquea).
+
+**Pruebas móviles** (proyecto `mobile`, Pixel 7) en `tests/e2e/academia_dragones.spec.js`:
+- Matriz 360×640, 390×844, 412×915, 915×412, 844×390: el menú entra sin scroll (ni de página ni interno), ningún control del menú sale de pantalla ni queda bajo la barra del SDK, todos los botones ≥ 44 px y Volar ≥ 56 px; se arranca **sólo tocando**; en vuelo no se pisan panel de puntos, objetivo, tutorial, barra, joystick ni cada botón táctil (≥ 56 px); texto del HUD ≥ 11 px; 🔥 tocado dispara el aliento.
+- Multitáctil: joystick a fondo + 🔥 a la vez (CDP touch con 2 dedos) gira y dispara; 5 px de temblor no gira; el botón muestra estado apretado.
+- Rotación 412×915 → 915×412 → 412×915 en pleno vuelo: sigue en juego, mismos puntos y vidas, el lienzo toma la nueva proporción, controles dentro de pantalla; al ocultar la página se pausa.
+
+**Resultados 2026-10-11** (máquina con carga ~35–40 por otros agentes; spec completo, 24 casos por proyecto):
+- `ML_WORKERS=1`: mobile 23 pasaron / 1 omitido; desktop 15 pasaron / 8 omitidos / 1 falló por tiempo («regiones», 60 s bajo carga; solo pasó en 30 s). Se le agregó `test.slow()`.
+- `ML_WORKERS=4` (Playwright usó 2 workers): 39 pasaron, 9 omitidos, 0 fallos (desktop 16 + 8 omitidos; mobile 23 + 1 omitido).
+
+**NO PROBADO en teléfonos reales** (no hay dispositivos disponibles): vibración, audio en iOS Safari, áreas seguras reales (muesca/barra de inicio, sólo por `env()`), rendimiento/FPS reales y comodidad real del pulgar.
 
 ## Pendiente / NO PROBADO
 
