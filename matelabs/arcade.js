@@ -97,6 +97,14 @@
   .mla-btn:active{transform:scale(.92)}
   .mla-btn:focus-visible{outline:2px solid #2ee6e6;outline-offset:2px}
   .mla-btn[hidden]{display:none}
+  /* táctil: objetivos de 44 px (pautas de accesibilidad) y juegos sin gestos del navegador que estorben */
+  @media (pointer:coarse){
+    .mla-bar{gap:8px}
+    .mla-btn{width:44px;height:44px;font-size:18px;border-radius:12px}
+    .mla-card button,.mla-card a{min-height:48px;font-size:15px}
+    html.mla-game,html.mla-game body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+    html.mla-game input,html.mla-game textarea{-webkit-user-select:text;user-select:text}
+  }
   .mla-pause{position:fixed;inset:0;z-index:2147482500;display:flex;align-items:center;justify-content:center;
     background:rgba(2,8,12,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
     font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#fff;padding:16px}
@@ -508,6 +516,9 @@
         onQuality: o.onQuality || null,
       });
       const ready = () => {
+        document.documentElement.classList.add('mla-game');
+        // pulsación larga en táctil: sin menú contextual del navegador dentro del juego
+        addEventListener('contextmenu', e => { if (/** @type {any} */ (e).pointerType !== 'mouse' && matchMedia('(pointer:coarse)').matches) e.preventDefault(); });
         buildUI();
         if (settings.showFps || state.debug) fps.toggle(true);
       };
