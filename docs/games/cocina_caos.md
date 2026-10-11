@@ -22,7 +22,7 @@ Sos el chef de un reino caótico. Bucle: **sacar ingredientes de la nevera → p
 
 - La estación que mirás se marca con **marco + relleno + flecha** (rosa si la acción es posible, blanco si no) y el texto exacto de la acción aparece abajo (`#prompt`) y en el botón táctil. Roedores y derrames se marcan con un anillo. En el tutorial, una flecha amarilla grande indica a dónde ir.
 - **⌨ Controles** (menú principal o de pausa): remapeo de Acción / Ayudante / Impulso (se guardan) y **sensibilidad del stick** (Suave / Normal / Rápida). Pausa, silencio, calidad y ayuda vienen del SDK. `prefers-reduced-motion`: sin temblor de cámara ni animaciones de banner/tickets.
-- Cámara fija isométrica que encuadra toda la cocina y el salón; en celular vertical se acerca y sigue al chef en horizontal.
+- Cámara fija isométrica que encuadra toda la cocina y el salón; en celular vertical encuadra la cocina completa hasta la cinta (el salón queda fuera; los pedidos se leen en los tickets).
 
 **Cómo arrancar una partida con entrada real:** en el menú, **Enter** (o clic/toque en «▶ Jugar · Taberna» `#ccMenu [data-play]`).
 
@@ -137,19 +137,46 @@ Contextual y guiado en el primer turno de la Taberna (el reloj y el pedido esper
 
 `window.__cocina_caos` (congelado): `state, scene, endKind, banquet, player, hold, hp, score, shift, orders, stations, station(id), conveyor, focus, spills, rats, chaos, helper, events, save, missions, difficulty, tutorial, counts, perf, camera, goldHat, simTime, paused, screenOf(id)`. Con `?debug`: `simulate, goto, banquetPhase, startBanquet, skipCut, tp, face, at(id), act(), holdAct(s), give, put, spawn('rat'|'spill'|'fire:<id>'|'order:<receta>'), startChaos, clearOrders, noSpawn, setScore, setTime, setTask, unlock, deliverDirty, endTut, flush`. `act()` y `holdAct()` usan el mismo camino que el teclado.
 
-## Pruebas (`tests/e2e/cocina_caos.spec.js`, 18 casos)
+## Pruebas (`tests/e2e/cocina_caos.spec.js`, 24 casos)
 
-Carga sin errores; arranque con entrada real + movimiento + tutorial (saltar/reabrir); nevera/tabla/mesada/platos/cinta con entrada real y resaltado; horno (asar, quemar, fuego) + extintor; olla + retorno + fregadero + escurridor; roedor/derrame/ayudante; ayudante lavar/picar autónomo; 3 cocinas + eventos propios + transición a la siguiente con entrada real; misión principal y secundaria + persistencia tras recargar; guardado corrupto/malformado/v1; dificultad (tabla + tiempo medido); calidad (pixel ratio, sombras, niebla, luz, partículas); Gran Banquete (intro salteada con entrada real, oleadas telegrafiadas, pedido real, erupciones, gravedad cero, victoria + recompensa + misión); derrota + reintento; pausa congela 1 s / reanuda / reiniciar; remapeo de tecla; celular 412×915 y 915×412 (sin superposiciones ni scroll, botón ≥ 90 px, ACCIÓN contextual e impulso táctil).
+Carga sin errores; arranque con entrada real + movimiento + tutorial (saltar/reabrir); nevera/tabla/mesada/platos/cinta con entrada real y resaltado; horno (asar, quemar, fuego) + extintor; olla + retorno + fregadero + escurridor; roedor/derrame/ayudante; ayudante lavar/picar autónomo; 3 cocinas + eventos propios + transición a la siguiente con entrada real; misión principal y secundaria + persistencia tras recargar; guardado corrupto/malformado/v1; dificultad (tabla + tiempo medido); calidad (pixel ratio, sombras, niebla, luz, partículas); Gran Banquete (intro salteada con entrada real, oleadas telegrafiadas, pedido real, erupciones, gravedad cero, victoria + recompensa + misión); derrota + reintento; pausa congela 1 s / reanuda / reiniciar; remapeo de tecla; móvil (sólo proyecto `mobile`): matriz 360×640 / 390×844 / 412×915 / 915×412 / 844×390, multitáctil, rotación a mitad de partida y pausa en segundo plano (detalle en «Móvil»).
 
-Resultados reales (esta máquina, 2026-10-10):
+Resultados reales (esta máquina, 2026-10-11, tras el pase móvil):
 
-- `ML_WORKERS=1`: **desktop 16/16 ✓ (2 de celular se saltean en desktop) · mobile 18/18 ✓** (34 passed, 2 skipped, 2.1 min).
-- `ML_WORKERS=4` (simula el runner lento): **34 passed, 2 skipped** en ambos proyectos; en una corrida, el caso de celular 412×915 falló por un `net::ERR_NETWORK_CHANGED` de la red de la máquina (consola, ajeno al juego) y pasó al repetirlo con `ML_WORKERS=4`.
+- `ML_WORKERS=1`: **desktop 16 passed (8 de celular se saltean) · mobile 24 passed** → 40 passed, 8 skipped (10.1 min, con otros agentes usando la CPU).
+- `ML_WORKERS=4`: **40 passed, 8 skipped** (4.2 min). Tras el último ajuste de CSS (chip de fase en vertical) se repitió `--project=mobile` con 4 workers: 24 passed.
 
 ## Rendimiento (Chromium headless + SwiftShader, 1280×800 — sólo comparativo)
 
 - `node tests/perf/measure.mjs cocina_caos cocina_caos` (menú, calidad automática): 18.5 fps, DCL 276 ms, load 415 ms, heap 8.8 MB, 22 requests, 1112 KB, 217 nodos DOM, 0 errores. Con `ML_QUALITY=low`: 22.8 fps, heap 8.6 MB.
 - En juego (gancho `perf`, tras 40 s simulados): **media** — Taberna 71 draw calls / 10.5 k tris / render 1.5 ms / heap 9.0 MB; Volcán 77 / 10.1 k / 3.9 ms / 10.5 MB; Espacial 76 / 11.0 k / 1.7 ms / 11.7 MB. **baja** — 71–76 draw calls, 9.8–11.0 k tris, render 1.7–2.0 ms, heap 9.7–11.8 MB. Lógica (`updateMs`) < 1 ms por cuadro.
+
+## Móvil
+
+Pase mobile-first (2026-10-11), verificado con Chromium + toque emulado (`isMobile`, `hasTouch`, DPR 2–3) en 360×640, 390×844, 412×915 (vertical) y 915×412, 844×390 (apaisado). **No probado en teléfonos reales.**
+
+Problemas encontrados → arreglados:
+
+| Problema (dónde se vio) | Arreglo |
+|---|---|
+| Menú apaisado cortado: «Jugar», dificultad y botones secundarios fuera de pantalla (915×412, 844×390: el menú medía 677 px) | Menú compacto para alto ≤ 520 px: título en una línea, sin bajada, 4 cocinas en una fila, dificultad en línea. Ahora entra entero (412/390 px). Además la fila de «Jugar» (y la de la pantalla de fin) es `sticky` abajo: si algún menú no entra, el botón principal sigue visible en la zona del pulgar |
+| Tarjetas de cocinas cortadas a la derecha en vertical angosto (360, 390) | `min-width:0` en las tarjetas del grid (el texto `nowrap` ensanchaba la columna); textos con elipsis |
+| Barra del SDK tapando «MATELABS PRESENTA» (vertical) y el HUD superior (`#hTop` debajo de la barra, 3.ª estrella oculta en 360/390) | En vertical táctil el menú baja 56 px y el HUD pasa a una fila completa debajo de la barra; tickets y tutorial se corren en consecuencia |
+| 11 objetivos táctiles < 44 px: dificultad 33 px de alto, «Cómo jugar/Controles/Misiones» 38 px, ✕ de paneles 38 px, «Saltar tutorial» | En `pointer:coarse`: dificultad ≥ 44 px, secundarios ≥ 44 px, ✕ 44 px, «Saltar tutorial» 44 px; «Jugar» y botones del fin ≥ 56 px (los 4 del SDK ya eran 44 px desde el cambio central) |
+| Texto < 12 px: «DIFICULTAD» 10 px, kicker 11, subtítulos de cocinas 11.5, cartel de Pipo 11, nombre de cocina 11, insignias de los tickets 9 px | 12 px (insignias 11 px) |
+| Vertical: la cámara seguía al chef mostrando 13 u de ancho → la cinta, ollas y horno quedaban fuera de cuadro casi siempre (360, 390, 412) | Encuadre vertical = cocina completa hasta la cinta (sin seguimiento), el salón queda afuera |
+| Vertical alto (390×844, 412×915): la cocina se veía velada por la niebla (la cámara se aleja más que la distancia fija de niebla) | La niebla se corre con la distancia de cámara |
+| **Bug (también en PC al redimensionar)**: al rotar a mitad de partida la cámara se encuadraba con el aspecto viejo (el `resize` llega antes que el ResizeObserver del motor) → 640×360 quedaba con distancia 50 y la cocina diminuta | `fitCamera` actualiza el aspecto antes de encuadrar |
+| Tutorial en vertical tapaba la fila de neveras y la tabla justo cuando pide usarlas | En vertical va compacto abajo (texto + «Saltar» a la derecha), en el lugar del aviso contextual (que se oculta mientras tanto; la acción sigue escrita en el botón ACCIÓN) |
+| Chip de fase del Gran Banquete partido en 3 líneas en medio de la cocina (360×640, fase 3) | En vertical: chip a lo ancho (1–2 líneas), sobre los controles |
+| Sin `touch-action` en la superficie de juego | `touch-action:none` en canvas/HUD (el menú sigue scrolleable) |
+| Sin respuesta háptica / presión poco visible | `navigator.vibrate(8)` al tocar ACCIÓN/⚡/ayudante (sólo táctil, se omite con «reducir movimiento»); botón presionado se achica y se ilumina |
+
+Ya estaba bien y se verificó: joystick + botones del kit con captura por puntero (multitáctil real: mover y actuar a la vez), ACCIÓN de 104 px abajo a la derecha con el texto de la acción contextual, calidad automática «media» en táctil (DPR tope 1.5), pausa al pasar a segundo plano (SDK).
+
+Capturas reales (DPR 2–3) en `.perf/mobile-audit/cocina_caos-movil/`: antes `before-360x640-menu.png`, `before-360x640-play.png`, `before-360x640-tut.png`, `before-390x844-play.png`, `before-844x390-menu.png`, `before-844x390-tut.png`; después `after3-360x640-menu.png`, `after3-360x640-play.png`, `after3-360x640-tut.png`, `after3-390x844-play.png`, `after3-412x915-play.png`, `after3-844x390-menu.png`, `after3-915x412-menu.png`, `after3-844x390-play.png`, rotación a mitad de partida `x-360x640-rotated.png` / `x-844x390-rotated.png`, fin de turno apaisado `x-844x390-end.png`, Gran Banquete fase 3 `k-360x640-espacial.png` / `k-844x390-espacial.png`. Las pruebas guardan además `test-results/cocina_caos-<ancho>x<alto>.png`.
+
+Pruebas móviles (proyecto `mobile`, Pixel 7): matriz de 5 tamaños (menú sin desborde ni tarjetas cortadas, «Jugar» ≥ 56 px dentro de pantalla y tocado de verdad, sin superposición con la barra del SDK, tutorial sin pisar controles/HUD, HUD/tickets/joystick/botones/barra sin superponerse ni salirse, todos los botones visibles ≥ 44 px, ACCIÓN ≥ 90 px en el cuarto inferior derecho, texto de HUD ≥ 12 px, AGARRAR + impulso con toques reales, vertical sin cámara de seguimiento); multitáctil por CDP (joystick sostenido + ACCIÓN a la vez); rotación a mitad de partida (estado, ítem en mano y pedidos intactos, cámara reencuadrada, controles reubicados); segundo plano → pausa → reanudar tocando.
 
 ## Pendiente / NO PROBADO
 

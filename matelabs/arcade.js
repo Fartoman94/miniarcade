@@ -127,7 +127,7 @@
     background:#2a0e12;border:1px solid #ff6b6b;color:#ffe3e3;border-radius:12px;padding:10px 12px;display:flex;gap:8px;align-items:center;
     font:600 13px system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:calc(100vw - 32px)}
   .mla-toast button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 10px;font:700 12px system-ui;cursor:pointer}
-  .mla-fps{position:fixed;left:6px;bottom:6px;z-index:2147482000;font:700 11px ui-monospace,monospace;color:#7fffd4;
+  .mla-fps{position:fixed;left:50%;transform:translateX(-50%);top:max(6px,env(safe-area-inset-top));z-index:2147482000;font:700 11px ui-monospace,monospace;color:#7fffd4;
     background:rgba(0,0,0,.6);padding:4px 6px;border-radius:6px;pointer-events:none;white-space:pre}
   .mla-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   `;
