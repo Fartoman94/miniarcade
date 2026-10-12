@@ -164,6 +164,40 @@ En juego (gancho `perf`, navegando en la Bahía con 3 barcos enemigos, promedio 
 
 Optimización aplicada: la distancia a las costas (bucle sobre las islas) se calcula por vértice y no por píxel, y el ruido del agua se reemplazó por sumas de senos: en SwiftShader el menú pasó de ~4 a ~15 FPS. El terreno de cada región es una sola malla; palmeras, rocas y coral son `InstancedMesh`; balas y partículas son pools instanciados (sin asignaciones por cuadro).
 
+## Móvil
+
+Pasada mobile-first (2026-10-11). Auditoría con Playwright + Chromium (SwiftShader), `isMobile`, `hasTouch`, DPR 2, en 360×640, 390×844, 412×915 (vertical) y 915×412, 844×390 (horizontal), recorriendo menú → zarpar con toque → consejo + aviso de ACCIÓN → mercado → jefe (fase 1) → derrota → opciones → ayuda. **No se probó en teléfonos reales** (sólo emulación).
+
+Capturas reales (carpeta `.perf/`, ignorada por git): antes `.perf/mobile-audit/corsarios_abismo/antes/<tamaño>-<pantalla>.png`, después `.perf/mobile-audit/corsarios_abismo/despues/<tamaño>-<pantalla>.png` (pantallas: `menu`, `play-tip`, `play-prompt`, `market`, `boss`, `defeat`, `opts`, `help`; medidas en `res.json` de cada carpeta).
+
+| Problema encontrado (antes) | Dónde | Arreglo |
+|---|---|---|
+| El panel de estado (casco/mástil/oro) tapaba los botones ⌂ y ⚙ de la barra del SDK | todos los verticales | En vertical el estado y la carta bajan a la fila de debajo de la barra (`top: safe-area + 62px`); la carta pasa a 112 px |
+| La carta náutica se montaba sobre la barra del SDK | todos los tamaños | `#ca-map` arranca a 62 px (antes 50) |
+| El consejo del contramaestre pisaba el aviso de ACCIÓN | todos los verticales | En vertical el consejo se apoya justo encima del aviso de ACCIÓN (cerca del pulgar); con el jefe en pantalla va debajo de su barra; en ≤700 px de alto se oculta el rótulo «CONSEJO…» para que entre |
+| La barra del jefe pisaba la carta y las misiones | todos los verticales | Ocupa el lugar de la píldora de misión (que se oculta durante la pelea) |
+| Títulos grandes («BAHÍA DEL CONTRABANDISTA», «ALMIRANTE ESPECTRAL») salían de la pantalla y tapaban el consejo | todos | `#ca-big` hace salto de línea con `max-width:94vw`, tamaño menor en horizontal bajo; el consejo espera a que se apague el título en celular |
+| Botones del consejo 34 px; botones de menú 38–40 px en horizontal; selects/teclas de Opciones 34 px; checkbox 13 px; slider 16 px | horizontal / todos | Todos ≥44 px (`.k3-b`, consejo, filas de opciones, select); checkbox 24 px dentro de fila de 44 px; slider 44 px de alto |
+| Texto de juego de 9–10,5 px (CASCO, MÁSTIL, VIENTO, rótulo del consejo, fase del jefe, objetivo, misiones, botones táctiles 11 px) | todos | Mínimo 11 px para rótulos y 12 px para info de juego |
+| Cañones arriba y ACCIÓN/KIT abajo en el racimo táctil | todos | Racimo 2×2 por grid: abajo (zona del pulgar derecho) **◀ BABOR** a la izquierda y **ESTRIB. ▶** a la derecha (72 px), arriba ACCIÓN (64 px) y KIT (60 px); el timón queda para el pulgar izquierdo |
+| Controles táctiles y consejo visibles detrás del mercado | todos | Al abrir el mercado se ocultan los controles y se cierra el consejo; vuelven al zarpar |
+| Mercado: «Zarpar» quedaba fuera de pantalla | 844×390, 915×412 | Mercado compacto en 2 columnas en horizontal bajo; botón principal pegajoso (`sticky`) al pie en mercado/opciones/ayuda |
+| Opciones mostraban teclas (Q/E/Espacio/R) en táctil | todos | En táctil se ocultan las filas de teclas y el texto de teclado; se agrega **Vibración** (on por defecto, `opts.haptics`) |
+| Las pantallas (opciones, mercado) quedaban bajo la barra del SDK | verticales | `padding-top: safe-area + 62px` en vertical |
+| Se mostraban 3 píldoras de misión en táctil | verticales | Sólo la principal en curso (`.cur`) |
+
+Agregados táctiles: vibración corta al disparar (18 ms) y al recibir daño (>5), apagable en Opciones y desactivada con movimiento reducido; feedback visual de pulsación (brillo + aro). Sugerencia suave, una vez por sesión, de girar a horizontal (toast de 3 s, no bloquea): en horizontal se ve más mar a babor y estribor; el juego es completamente jugable en vertical.
+
+Ya estaba bien y se verificó: `touch-action:none` en la superficie del juego (kit3d), cámara en vertical con FOV +10 y más distancia (también a pie y en el menú), ayuda de puntería activada por defecto, calidad automática «media» en punteros gruesos (DPR tope 1,5), pausa al ocultar la pestaña (SDK), rotación en plena partida sin perder el estado (ResizeObserver + CSS).
+
+Pruebas nuevas (proyecto `mobile`, Pixel 7) en `tests/e2e/corsarios_abismo.spec.js`, bloque «Corsarios del Abismo · celular»:
+- **matriz de tamaños**: en los 5 tamaños, botón «Zarpar» visible, dentro de pantalla, ≥44 px, sin tocar la barra del SDK y tocable (`elementFromPoint`); arranque sólo táctil; en juego (consejo + aviso visibles) y en la pelea con el jefe (barra + consejo) ningún elemento del HUD/controles se superpone ni sale de pantalla, botones ≥44 px (cañones ≥56), sin scroll; rotar en plena partida no cambia el estado; ACCIÓN táctil atraca; en el mercado los controles se ocultan y «Zarpar» es ≥44 px y tocable en los 5 tamaños.
+- **multitáctil**: dos dedos a la vez (CDP) — timón arriba + BABOR: las velas suben y dispara sólo babor; geometría del racimo (cañones abajo, babor a la izquierda, mitad derecha); vibración llamada; en Opciones táctiles no hay filas de teclas y se puede apagar la vibración.
+
+Resultados (spec completo): con `ML_WORKERS=1` 33 pasan y 3 se saltean (las 3 pruebas sólo-celular en desktop): desktop 15/15, mobile 18/18; con `ML_WORKERS=4` mismo resultado (Playwright usa 2 workers: un archivo por proyecto).
+
+Pendiente: probar en teléfonos reales (iOS Safari: vibración no existe, el resto es CSS estándar); la ayuda de «Cómo jugar» sigue mencionando el gamepad en táctil (inofensivo).
+
 ## Pendiente / NO PROBADO
 
 - Gamepad físico: el mapa está configurado (`lb/lt` babor, `rb/rt` estribor, `a` acción, `x` kit, stick) pero no se probó con un mando real (Playwright ignora los mandos).

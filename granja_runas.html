@@ -26,13 +26,13 @@
   #stat .r1 b{color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #stat .r2{display:flex;gap:10px;margin-top:4px;font-weight:800;flex-wrap:wrap}
   #hSeed{opacity:.92}
-  .ebar{position:relative;height:9px;margin-top:6px;border-radius:6px;background:rgba(0,0,0,.45);overflow:hidden}
+  .ebar{position:relative;height:12px;margin-top:6px;border-radius:6px;background:rgba(0,0,0,.45);overflow:hidden}
   .ebar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#f6d04d,#86efac);transition:width .3s}
   .ebar i.low{background:linear-gradient(90deg,#ff6b6b,#ffa94d)}
-  #hEnTx{position:absolute;right:4px;top:-1px;font-size:8px;font-weight:900;line-height:11px;color:#0b1a10}
+  #hEnTx{position:absolute;right:5px;top:0;font-size:11px;font-weight:900;line-height:12px;color:#0b1a10}
   #quest{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 84px);left:max(8px,env(safe-area-inset-left));padding:7px 11px;width:min(250px,calc(100vw - 196px));min-width:190px;font-size:12px;line-height:1.3}
   #quest[hidden]{display:none}
-  #quest .qk{font-size:9px;font-weight:900;letter-spacing:.2em;color:#ffe066}
+  #quest .qk{font-size:11px;font-weight:900;letter-spacing:.2em;color:#ffe066}
   #quest b{font-size:13px}
   #quest .qs{opacity:.85;margin-top:2px}
   .hbtn{position:absolute;pointer-events:auto;top:calc(max(6px,env(safe-area-inset-top)) + 44px);right:max(8px,env(safe-area-inset-right));width:42px;height:42px;border-radius:12px;
@@ -57,8 +57,9 @@
   #coach{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 84px);left:max(8px,env(safe-area-inset-left));width:min(340px,calc(100vw - 16px));padding:10px 12px;pointer-events:auto;
     border-color:#ffe066;font-size:14px;font-weight:800;line-height:1.35}
   #coach[hidden]{display:none}
-  #coach .ck{font-size:9px;letter-spacing:.22em;color:#ffe066;font-weight:900}
-  #coach button{margin-top:6px;appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:9px;padding:6px 10px;font:800 12px 'Nunito',system-ui;cursor:pointer}
+  #coach .ck{font-size:11px;letter-spacing:.22em;color:#ffe066;font-weight:900}
+  #coach button{margin-top:6px;appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:8px 14px;min-height:44px;font:800 13px 'Nunito',system-ui;cursor:pointer;touch-action:manipulation}
+  #coach button:active{background:rgba(255,255,255,.2)}
   .wm{position:absolute;right:10px;bottom:8px;font:400 10px 'Bungee',system-ui;letter-spacing:.12em;opacity:.55}
   #pops{position:fixed;inset:0;pointer-events:none;z-index:29;overflow:hidden}
   .gr-pop{position:absolute;left:0;top:0;font-weight:900;font-size:15px;text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 8px rgba(0,0,0,.4);white-space:nowrap;will-change:transform}
@@ -72,28 +73,32 @@
   #flash.on{animation:grFlash .35s ease-out}
   @keyframes grFlash{0%{opacity:.55}100%{opacity:0}}
   /* paneles */
-  #panel{position:fixed;inset:0;z-index:48;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(5,12,8,.55)}
+  #panel{position:fixed;inset:0;z-index:48;display:flex;align-items:center;justify-content:center;padding:var(--gr-top,12px) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:rgba(5,12,8,.55);touch-action:pan-y}
   #panel[hidden]{display:none}
   .gr-card{width:min(470px,100%);max-height:min(86vh,100%);display:flex;flex-direction:column;background:linear-gradient(180deg,#1d3a27,#122418);border:1.5px solid var(--line);border-radius:18px;
     box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden}
-  .gr-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 6px}
-  .gr-head h2{margin:0;font:400 19px 'Bungee',system-ui,sans-serif;color:var(--acc)}
-  .gr-x{appearance:none;border:none;background:rgba(255,255,255,.1);color:#fff;border-radius:10px;width:36px;height:36px;font-size:16px;cursor:pointer}
+  .gr-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 10px 6px 14px}
+  .gr-head h2{margin:0;font:400 clamp(15px,4.6vw,19px)/1.2 'Bungee',system-ui,sans-serif;color:var(--acc);min-width:0}
+  .gr-x{appearance:none;border:none;background:rgba(255,255,255,.1);color:#fff;border-radius:12px;width:44px;height:44px;flex:none;font-size:18px;cursor:pointer;touch-action:manipulation}
+  .gr-x:active{background:rgba(255,255,255,.22)}
   .gr-intro{margin:0 14px 8px;font-size:13px;color:#cfe8d6;line-height:1.4}
-  .gr-rows{overflow:auto;padding:0 10px 10px;display:flex;flex-direction:column;gap:6px}
+  .gr-rows{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 10px 10px;display:flex;flex-direction:column;gap:6px}
+  /* hay más filas abajo: degradé como pista de desplazamiento */
+  .gr-rows.more{-webkit-mask-image:linear-gradient(#000 calc(100% - 28px),transparent);mask-image:linear-gradient(#000 calc(100% - 28px),transparent)}
   .gr-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.06)}
   .gr-row.main{border:1px solid rgba(255,224,102,.45)}
   .gr-row.done{opacity:.7}
   .gr-ic{font-size:22px;width:28px;text-align:center;flex:none}
   .gr-tx{flex:1;min-width:0;font-size:14px}
   .gr-tx small{display:block;font-size:12px;color:#b9d8c2;font-weight:600;margin-top:1px}
-  .gr-row button{flex:none;appearance:none;border:none;border-radius:10px;padding:9px 12px;background:var(--acc);color:var(--ink);font:900 13px 'Nunito',system-ui;cursor:pointer;min-height:38px}
+  .gr-row button{flex:none;appearance:none;border:none;border-radius:10px;padding:9px 12px;background:var(--acc);color:var(--ink);font:900 13px 'Nunito',system-ui;cursor:pointer;min-height:44px;min-width:64px;touch-action:manipulation}
+  .gr-row button:not([disabled]):active{filter:brightness(.85);transform:scale(.96)}
   .gr-row button[disabled]{background:rgba(255,255,255,.12);color:rgba(255,255,255,.45);cursor:default}
   .gr-row button:focus-visible,.gr-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
   .gr-foot{padding:8px 14px 12px;font-size:12px;color:#b9d8c2;border-top:1px solid rgba(255,255,255,.08)}
   /* menú */
   #grMenu .k3-panel h1,#grEnd .k3-panel h1{color:#f4fff7}
-  .k3-b.sm{padding:10px 14px;font-size:12px}
+  .k3-b.sm{padding:10px 14px;font-size:12px;min-height:44px}
   .gr-small{font-size:12px!important;color:#b9d8c2!important}
   .gr-score{font-size:18px!important;color:#ffe066!important}
   .gr-credit{margin-top:6px;font:400 12px 'Bungee',system-ui;letter-spacing:.14em;color:#cfe8d6}
@@ -102,22 +107,37 @@
   .k3-btn[aria-label="act"]{width:84px;height:84px;font-size:15px;background:rgba(60,140,90,.6);border-color:var(--acc)}
   @media (pointer:coarse){
     #bSeed,#bDiary,.wm{display:none}
+    #grMenu [data-go],#grEnd .k3-b:not(.alt){min-height:56px}
+    #grMenu .k3-b,#grEnd .k3-b{touch-action:manipulation}
     #prompt{bottom:calc(max(28px,env(safe-area-inset-bottom)) + 182px);font-size:14px}
-    #stat{width:min(232px,calc(100vw - 186px));min-width:0}
-    #quest,#coach{width:min(232px,calc(100vw - 186px));min-width:0}
+    #stat,#quest,#coach{min-width:0}
+    /* misión plegada en táctil: tocá para ver el detalle */
+    #quest{pointer-events:auto;cursor:pointer;min-height:44px;padding-right:30px}
+    #quest::after{content:'▾';position:absolute;right:10px;top:10px;font-size:14px;opacity:.8}
+    #quest.open::after{content:'▴'}
+    #quest:not(.open) .qs{display:none}
     #stormHud{top:auto;bottom:calc(max(28px,env(safe-area-inset-bottom)) + 230px);width:calc(100vw - 24px);min-width:0}
   }
   @media (pointer:coarse) and (orientation:landscape){
     #prompt{bottom:max(18px,env(safe-area-inset-bottom));max-width:calc(100vw - 420px)}
     #stormHud{top:max(8px,env(safe-area-inset-top));bottom:auto;width:min(340px,calc(100vw - 480px))}
-    #quest{display:none}
   }
-  @media (max-height:520px){#quest{top:calc(max(8px,env(safe-area-inset-top)) + 80px);font-size:11px}}
+  /* menú compacto en pantallas bajas (celular apaisado): todo entra sin cortar */
+  @media (max-height:520px){
+    #grMenu{padding:10px 16px}
+    #grMenu .k3-panel{gap:6px;width:min(720px,100%)}
+    #grMenu .k3-panel h1{font-size:clamp(26px,6.5vh,34px)}
+    #grMenu .k3-panel h1 br{display:none}
+    #grMenu .k3-panel>p:first-of-type{font-size:13px;line-height:1.35;max-width:72ch}
+    #grMenu .k3-b:not(.sm){padding:11px 22px}
+    #grDiffInfo{max-width:80ch}
+  }
   @media (prefers-reduced-motion:reduce){#banner,#fade,.ebar i{transition:none}}
 </style>
 </head>
 <body>
 <script src="matelabs/intro.js" data-game="GRANJA DE RUNAS" data-accent="#86efac"></script>
+<div id="grSafe" aria-hidden="true" style="position:fixed;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));pointer-events:none;visibility:hidden"></div>
 <div id="hud" hidden>
   <div id="stat" class="plate" aria-live="off">
     <div class="r1"><b id="hDay">Día 1</b><span id="hClock">06:00</span></div>

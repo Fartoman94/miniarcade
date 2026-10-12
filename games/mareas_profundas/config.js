@@ -64,7 +64,7 @@ export const SAVE_DEFAULTS = {
   beacon: false,
   wins: 0,
   tutorial: { off: false, seen: /** @type {Record<string, boolean>} */ ({}) },
-  opts: { sens: 1, invert: false, motion: 'auto', binds: { up: 'Space', down: 'ShiftLeft', sonar: 'KeyQ', use: 'KeyE', photo: 'KeyC', light: 'KeyL' } },
+  opts: { sens: 1, invert: false, motion: 'auto', haptics: true, binds: { up: 'Space', down: 'ShiftLeft', sonar: 'KeyQ', use: 'KeyE', photo: 'KeyC', light: 'KeyL' } },
 };
 export const BIND_NAMES = { up: 'Subir', down: 'Bajar', sonar: 'Sonar', use: 'Usar / escanear', photo: 'Foto', light: 'Luz' };
 /** Teclas del mando (sintetizadas por el SDK) por acción. */

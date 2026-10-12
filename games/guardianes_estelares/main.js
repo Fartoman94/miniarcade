@@ -23,7 +23,7 @@ const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const DEFAULTS = {
   unlocked: 1, best: 0, campaign: { convoy: false, transmisores: false, nemesis: false }, trophy: false, victories: 0, runs: 0,
   kills: 0, capsulesTotal: 0, lastSector: 0,
-  settings: { sens: 1, invertY: false, mouseSteer: true, autoFire: false, calm: false, tutorialDone: false },
+  settings: { sens: 1, invertY: false, mouseSteer: true, autoFire: false, calm: false, haptics: true, tutorialDone: false },
 };
 const save = createSave(SAVE_KEY, SAVE_VERSION, DEFAULTS, (old, v) => {
   // v1 (prototipo): { sector, best, tutorial }
@@ -41,7 +41,7 @@ function sanitize() {
   const c = d.campaign && typeof d.campaign === 'object' ? d.campaign : {};
   d.campaign = { convoy: c.convoy === true, transmisores: c.transmisores === true, nemesis: c.nemesis === true };
   const s = d.settings && typeof d.settings === 'object' ? d.settings : {};
-  d.settings = { sens: num(s.sens, 1, 0.5, 1.6), invertY: s.invertY === true, mouseSteer: s.mouseSteer !== false, autoFire: s.autoFire === true, calm: s.calm === true, tutorialDone: s.tutorialDone === true };
+  d.settings = { sens: num(s.sens, 1, 0.5, 1.6), invertY: s.invertY === true, mouseSteer: s.mouseSteer !== false, autoFire: s.autoFire === true, calm: s.calm === true, haptics: s.haptics !== false, tutorialDone: s.tutorialDone === true };
   if (d.campaign.transmisores) d.unlocked = Math.max(d.unlocked, 3); else if (d.campaign.convoy) d.unlocked = Math.max(d.unlocked, 2);
   save.flush();
 }
@@ -63,7 +63,7 @@ const G = {
   tut: { on: false, step: 0, t: 0, acc: 0, shots: 0, forced: false },
   target: /** @type {any} */ (null), targetT: 0, lead: V(), leadOk: false, leadValid: false,
   hints: /** @type {Record<string, number>} */ ({}),
-  bossLabel: '',
+  bossLabel: '', rotHint: false,
 };
 const P = {
   pos: V(), vel: V(), fwd: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0), right: V(),
@@ -98,6 +98,12 @@ input = createInput(game.root, { joystick: 'left', buttons: [
   { id: 'fire', label: 'FUEGO', key: 'Space' }, { id: 'laser', label: 'LÁSER', key: 'KeyF' },
   { id: 'boost', label: 'TURBO', key: 'ShiftLeft' }, { id: 'scan', label: 'SCAN', key: 'KeyE' }] });
 input.showTouch(false);
+/** Vibración corta (táctil): se apaga en Opciones, con «reducir movimiento» o si el sistema pide menos movimiento. */
+function buzz(/** @type {number|number[]} */ ms) {
+  if (!input.isTouch || !S.settings.haptics || reducedMotion() || !navigator.vibrate) return;
+  try { navigator.vibrate(ms); } catch (e) { /* nada */ }
+}
+for (const el of document.querySelectorAll('.k3-touch .k3-btn')) el.addEventListener('pointerdown', () => buzz(8));
 
 /* SDK: una acción del menú de pausa reanuda sin onResume; se re-sincroniza con pausa+reanudar inmediato. */
 function resumeAfterAction(fn) { setTimeout(() => { if (A && A.pause()) A.resume(); fn(); }, 0); }
@@ -236,6 +242,8 @@ function beginSector(idx, retry = false) {
   ui.banner(`SECTOR ${idx + 1} DE 3`, d.name.toUpperCase(), d.goal, 2600);
   sfx.warp();
   if (idx === 0 && (!S.settings.tutorialDone || G.tut.forced)) startTutorial(G.tut.forced);
+  // aviso suave (no bloquea): en vertical se juega igual, pero apaisado se ve mucho más espacio
+  if (input.isTouch && innerHeight > innerWidth && !G.rotHint) { G.rotHint = true; ui.hint('📱↻ Tip: girá el teléfono para ver más espacio. También se puede jugar así.', 4200); }
   A && A.refresh && A.refresh();
 }
 function retrySector() {
@@ -510,7 +518,7 @@ function damagePlayer(amt, from, kind = 'hit') {
   if (P.shield > 0) {
     P.shield -= amt; P.shieldFlash = 1; sfx.shieldHit();
     if (P.shield <= 0) { P.hull += P.shield; P.shield = 0; G.sec.shieldBroken = true; sfx.shieldDown(); hint('shield', 'Escudo caído: alejate y cubrite para que se recargue.'); }
-  } else { P.hull -= amt; sfx.hullHit(); G.sec.shieldBroken = true; }
+  } else { P.hull -= amt; sfx.hullHit(); G.sec.shieldBroken = true; buzz(amt >= 15 ? 45 : 25); }
   P.flash = 1; G.vign = Math.min(1, G.vign + (P.shield > 0 ? 0.25 : 0.6)); shakeIt(kind === 'beam' || kind === 'pulse' ? 0.9 : 0.35);
   if (from && (kind === 'pulse')) { _a.subVectors(P.pos, from).normalize(); P.vel.addScaledVector(_a, 40); }
   if (P.hull <= 0) { P.hull = 0; killPlayer(); }
@@ -1180,13 +1188,21 @@ function startBoss() {
 
 /* ======================= cámara ======================= */
 let camFov = 62;
-function baseFov() { return camera.aspect < 0.8 ? 78 : camera.aspect < 1.2 ? 70 : 62; }
+/** FOV vertical: en vertical se abre para conservar ~50° horizontales (amenazas a los costados visibles), con tope para no deformar. */
+function baseFov() {
+  const a = camera.aspect;
+  if (a >= 1.2) return 62;
+  if (a >= 0.8) return 70;
+  return clamp(2 * Math.atan(Math.tan(28 * Math.PI / 180) / a) * 180 / Math.PI, 78, 92);
+}
+/** Distancia de la cámara detrás de la nave: en vertical, algo más cerca para que la nave no se pierda con el FOV amplio. */
+const camBack = () => (camera.aspect < 0.8 ? 17.5 : 19.5);
 function snapCamera() {
-  _cam.copy(P.pos).addScaledVector(P.fwd, -19.5).addScaledVector(P.up, 5.6);
+  _cam.copy(P.pos).addScaledVector(P.fwd, -camBack()).addScaledVector(P.up, 5.6);
   camera.position.copy(_cam); camera.up.copy(P.up); _look.copy(P.pos).addScaledVector(P.fwd, 30); camera.lookAt(_look);
 }
 function camFollow(dt, dying) {
-  const back = P.boosting ? 22 : 19.5;
+  const back = camBack() + (P.boosting ? 2.5 : 0);
   _cam.copy(P.pos).addScaledVector(P.fwd, -back).addScaledVector(P.up, 5.6);
   camera.position.lerp(_cam, 1 - Math.exp(-dt * (dying ? 1 : 9)));
   _look.copy(P.pos).addScaledVector(P.fwd, 30).addScaledVector(P.up, 3.2);
@@ -1201,7 +1217,7 @@ function camIntro(dt) {
   const k = Math.min(1, G.stateT / 2.4), e = k * k * (3 - 2 * k);
   // de adelante-costado a la persecución
   _a.copy(P.pos).addScaledVector(P.fwd, 22).addScaledVector(P.right, 12).addScaledVector(P.up, 4);
-  _b.copy(P.pos).addScaledVector(P.fwd, -19.5).addScaledVector(P.up, 5.6);
+  _b.copy(P.pos).addScaledVector(P.fwd, -camBack()).addScaledVector(P.up, 5.6);
   camera.position.lerpVectors(_a, _b, reducedMotion() ? 1 : e);
   camera.up.copy(P.up);
   _look.copy(P.pos).addScaledVector(P.fwd, 30 * e);
@@ -1335,12 +1351,13 @@ function pushMarker(pos, icon, color, important, label) {
   if (_mk.length >= _mkPool.length) return;
   const m = _mkPool[_mk.length];
   _a.copy(pos).applyMatrix4(camera.matrixWorldInverse);
-  const w = innerWidth, h = innerHeight, mx = 26, portrait = h > w;
-  const myT = portrait ? 250 : h < 520 ? 120 : 170, myB = input.isTouch ? (portrait ? 230 : 120) : 80;
+  const w = innerWidth, h = innerHeight, mx = 26;
+  const myT = Math.min(h * 0.45, ui.safe.top), myB = Math.min(h * 0.4, ui.safe.bottom);
   const dist = pos.distanceTo(P.pos);
   if (_a.z < 0 && toScreen(pos, _sp) && _sp.x > mx && _sp.x < w - mx && _sp.y > 40 && _sp.y < h - 40) {
     if (!important && dist > 380) return;
-    m.x = _sp.x; m.y = _sp.y; m.edge = false;
+    // visible pero debajo del HUD o de los controles: se acerca al borde de la zona libre para no quedar tapado
+    m.x = _sp.x; m.y = clamp(_sp.y, myT, Math.max(myT, h - myB)); m.edge = false;
   } else {
     if (!important) return;
     // flecha en el borde, en la dirección del objetivo

@@ -74,7 +74,7 @@ test.describe('Derby de Chatarra', () => {
       await touch(page, 'touchStart', [gas]);
       await expect.poll(() => T(page, 'return T.player.speed'), POLL).toBeGreaterThan(3);
       // volante a la derecha mientras acelera: la dirección cambia
-      const joy = await center(page, '.k3-joy');
+      const joy = await center(page, '.dc-wheel');
       await touch(page, 'touchMove', [gas, [joy[0] + 60, joy[1]]]).catch(() => {});
       await touch(page, 'touchEnd', []);
       await touch(page, 'touchStart', [gas, [joy[0] + 1, joy[1]]]);
@@ -528,7 +528,7 @@ test.describe('Derby de Chatarra', () => {
     const check = async () => {
       await wait(page, 400);
       const r = await page.evaluate(() => {
-        const sel = ['#dc-status', '#dc-mis', '#dc-side', '.mla-bar', '.k3-joy', '.k3-btn[aria-label="gas"]', '.k3-btn[aria-label="brake"]', '.k3-btn[aria-label="nitro"]', '.k3-btn[aria-label="power"]'];
+        const sel = ['#dc-status', '#dc-mis', '#dc-timer', '#dc-side', '.mla-bar', '.dc-wheel', '.k3-btn[aria-label="gas"]', '.k3-btn[aria-label="brake"]', '.k3-btn[aria-label="nitro"]', '.k3-btn[aria-label="power"]'];
         const boxes = sel.map(s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return b.width && b.height && getComputedStyle(e).display !== 'none' ? { s, x: b.left, y: b.top, r: b.right, b: b.bottom } : null; }).filter(Boolean);
         const hits = [];
         for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
@@ -555,6 +555,212 @@ test.describe('Derby de Chatarra', () => {
     expect(await T(page, 'return T.player.nitro')).toBeLessThan(100);
     await touch(page, 'touchEnd', []);
     await page.setViewportSize({ width: 412, height: 915 });
+    expectNoErrors(errors);
+  });
+
+  test('menú principal: «Controles» y «Cómo jugar» abren sus pantallas y vuelven al menú', async ({ page, isMobile }) => {
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    const press = async sel => { if (isMobile) await page.locator(sel).tap(); else await page.locator(sel).click(); };
+    await press('#dc-menu [data-opts]');
+    await expect(page.locator('#dc-opts')).toBeVisible();
+    await expect(page.locator('#dc-menu')).toBeHidden();
+    await press('#dc-opts [data-back]');
+    await expect(page.locator('#dc-menu')).toBeVisible();
+    await press('#dc-menu [data-help]');
+    await expect(page.locator('#dc-help')).toBeVisible();
+    await expect(page.locator('#dc-help')).toContainText('Triturador Omega');
+    await press('#dc-help [data-back]');
+    await expect(page.locator('#dc-menu')).toBeVisible();
+    expect(await T(page, 'return T.state')).toBe('menu');
+    expectNoErrors(errors);
+  });
+
+  /* ======================= móvil (proyecto 'mobile', Pixel 7) ======================= */
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+  /** Cajas visibles, pares superpuestos y elementos fuera del viewport. */
+  const layout = (page, sels) => page.evaluate(sels => {
+    const vis = e => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return b.width > 0 && b.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' && !e.closest('[hidden]'); };
+    const boxes = [];
+    for (const s of sels) document.querySelectorAll(s).forEach((e, i) => { if (vis(e)) { const b = e.getBoundingClientRect(); boxes.push({ s: s + (i ? '#' + i : ''), x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }); } });
+    const hits = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], c = boxes[j];
+      if (a.x < c.r - 1 && a.r > c.x + 1 && a.y < c.b - 1 && a.b > c.y + 1) hits.push(a.s + ' × ' + c.s);
+    }
+    const out = boxes.filter(b => b.x < -1 || b.y < -1 || b.r > innerWidth + 1 || b.b > innerHeight + 1).map(b => b.s);
+    return { boxes, hits, out, sw: document.documentElement.scrollWidth, w: innerWidth };
+  }, sels);
+  /** Elementos con texto propio más chico que `min` px dentro de `root`. */
+  const tinyText = (page, root, min) => page.evaluate(([root, min]) => {
+    const bad = [];
+    document.querySelectorAll(root).forEach(r => r.querySelectorAll('*').forEach(e => {
+      const own = [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+      if (!own || !e.getClientRects().length || getComputedStyle(e).display === 'none') return;
+      const fs = parseFloat(getComputedStyle(e).fontSize);
+      if (fs < min) bad.push(e.textContent.trim().slice(0, 20) + ' ' + fs + 'px');
+    }));
+    return bad;
+  }, [root, min]);
+
+  test('celular: matriz de viewports (menú entra, objetivos ≥ 44 px, HUD sin choques y partida sólo táctil)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    test.setTimeout(420_000);
+    const { errors } = await openGame(page, DBG);
+    for (const [w, h] of SIZES) {
+      const tag = `${w}×${h}`;
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto('/' + DBG);
+      await ready(page);
+      // --- menú: entra sin scroll, nada pisa la barra del SDK, botón principal grande y visible ---
+      const m = await layout(page, ['#dc-menu .k3-panel > *', '.mla-bar > *']);
+      expect(m.out, tag).toEqual([]);
+      expect(m.hits.filter(x => x.includes('.mla-bar')), tag).toEqual([]);
+      expect(m.sw, tag).toBeLessThanOrEqual(m.w);
+      const fit = await page.evaluate(() => { const e = /** @type {HTMLElement} */ (document.querySelector('#dc-menu')); return e.scrollHeight - e.clientHeight; });
+      expect(fit, tag + ' menú sin scroll').toBeLessThanOrEqual(1);
+      const go = /** @type {any} */ (await page.locator('#dc-menu [data-go]').boundingBox());
+      expect(go.height, tag).toBeGreaterThanOrEqual(56);
+      expect(go.y + go.height, tag).toBeLessThanOrEqual(h);
+      const small = await page.evaluate(() => [...document.querySelectorAll('#dc-menu button')].filter(b => b.getClientRects().length).map(b => b.getBoundingClientRect()).filter(r => r.width < 44 || r.height < 44).length);
+      expect(small, tag + ' botones < 44 px').toBe(0);
+      expect(await tinyText(page, '#dc-menu', 11), tag).toEqual([]);
+      // --- partida arrancada con un toque real ---
+      await startDbg(page, true);
+      await D(page, 'give("iman")'); await sim(page, 0.2);
+      const HUD = ['#dc-status', '#dc-mis', '#dc-timer', '#dc-side', '#dc-tip', '.mla-bar', '.dc-wheel', '.k3-btn[aria-label="gas"]', '.k3-btn[aria-label="brake"]', '.k3-btn[aria-label="nitro"]', '.k3-btn[aria-label="power"]'];
+      const r = await layout(page, HUD);
+      expect(r.hits, tag).toEqual([]);
+      expect(r.out, tag).toEqual([]);
+      expect(r.sw, tag).toBeLessThanOrEqual(r.w);
+      for (const b of r.boxes.filter(b => b.s.startsWith('.k3-btn'))) { expect(b.w, tag + b.s).toBeGreaterThanOrEqual(56); expect(b.h, tag + b.s).toBeGreaterThanOrEqual(56); }
+      const gasBox = /** @type {any} */ (r.boxes.find(b => b.s.includes('gas')));
+      expect(gasBox.w, tag).toBeGreaterThanOrEqual(76);
+      // pedal en la zona del pulgar derecho; volante en la del izquierdo
+      expect(gasBox.r, tag).toBeGreaterThan(w * 0.75); expect(gasBox.b, tag).toBeGreaterThan(h * 0.75);
+      const wb = /** @type {any} */ (r.boxes.find(b => b.s === '.dc-wheel'));
+      expect(wb.x, tag).toBeLessThan(w * 0.25); expect(wb.b, tag).toBeGreaterThan(h * 0.75);
+      expect(await tinyText(page, '#dc-status, #dc-timer, #dc-side, #dc-mis, #dc-tip', 11), tag).toEqual([]);
+      expect(await tinyText(page, '.dc-b, .dc-m, .dc-top', 12), tag).toEqual([]);
+      expect(parseFloat(await page.locator('#dc-timer b').evaluate(e => getComputedStyle(e).fontSize)), tag).toBeGreaterThanOrEqual(16);
+      // --- acción principal sólo con toques: ACEL + volante a la vez ---
+      const gas = await center(page, '.k3-btn[aria-label="gas"]');
+      const wh = await center(page, '.dc-wheel');
+      await touch(page, 'touchStart', [gas, wh]);
+      await touch(page, 'touchMove', [gas, [wh[0] + 70, wh[1]]]);
+      await expect.poll(() => T(page, 'return T.touch.wheel'), { message: tag }).toBe(1);
+      await sim(page, 0.8);
+      const t = await T(page, 'return { sp: T.player.speed, steer: T.touch.steer, state: T.state }');
+      await touch(page, 'touchEnd', []);
+      expect(t.state, tag).toBe('play');
+      expect(t.sp, tag).toBeGreaterThan(3);
+      expect(t.steer, tag).toBeGreaterThan(0.8);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('celular: volante relativo (sin salto al apoyar, ancla que sigue al dedo, vuelve al centro) y multitáctil', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await startDbg(page, true);
+    const z = /** @type {any} */ (await page.locator('.dc-wheelzone').boundingBox());
+    // apoyar el pulgar lejos del dibujo del volante no gira nada
+    const p0 = [z.x + z.width * 0.85, z.y + z.height * 0.85]; // abajo: el consejo (z-index mayor) puede tapar la parte alta de la zona
+    // los pointermove se entregan alineados al cuadro: se espera por condición
+    const W = () => T(page, 'return T.touch.wheel');
+    await touch(page, 'touchStart', [p0]);
+    await expect.poll(() => T(page, 'return T.touch.wheelActive')).toBe(true);
+    expect(await W()).toBe(0);
+    await expect(page.locator('.dc-wheel')).toHaveClass(/on/);
+    await touch(page, 'touchMove', [[p0[0] - 29, p0[1] + 40]]); // el eje vertical se ignora
+    await expect.poll(W).toBeLessThan(-0.3);
+    expect(await W()).toBeGreaterThan(-0.7);
+    await touch(page, 'touchMove', [[p0[0] - 120, p0[1]]]);
+    await expect.poll(W).toBe(-1);
+    // el ancla siguió al dedo: volver 58 px ya centra la dirección (sin recorrer los 120 px)
+    await touch(page, 'touchMove', [[p0[0] - 62, p0[1]]]);
+    await expect.poll(async () => Math.abs(await W())).toBeLessThan(0.1);
+    await touch(page, 'touchEnd', []);
+    await expect.poll(() => T(page, 'return T.touch.wheelActive')).toBe(false);
+    expect(await W()).toBe(0);
+    // multitáctil: volante + ACEL + NITRO al mismo tiempo
+    const gas = await center(page, '.k3-btn[aria-label="gas"]'), ni = await center(page, '.k3-btn[aria-label="nitro"]');
+    await touch(page, 'touchStart', [p0, gas, ni]);
+    await touch(page, 'touchMove', [[p0[0] + 80, p0[1]], gas, ni]);
+    await expect(page.locator('.k3-btn[aria-label="gas"]')).toHaveClass(/on/);
+    await expect.poll(W).toBe(1);
+    await sim(page, 0.6);
+    const s = await T(page, 'return { sp: T.player.speed, steer: T.touch.steer, boost: T.player.nitro }');
+    await touch(page, 'touchEnd', []);
+    expect(s.sp).toBeGreaterThan(3);
+    expect(s.steer).toBeGreaterThan(0.8);
+    expect(s.boost).toBeLessThan(100);
+    expectNoErrors(errors);
+  });
+
+  test('celular: rotar en plena ronda reacomoda HUD, controles y cámara sin perder el estado; pausa al ir a segundo plano', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await ready(page);
+    await startDbg(page, true);
+    const gas = await center(page, '.k3-btn[aria-label="gas"]');
+    await touch(page, 'touchStart', [gas]); await sim(page, 0.5); await touch(page, 'touchEnd', []);
+    const before = await T(page, 'return { x: T.player.x, z: T.player.z, hp: T.player.hp, left: T.timeLeft, fov: T.touch.fov }');
+    expect(before.fov).toBeGreaterThan(70); // vertical: FOV abierto para ver los costados
+    await page.setViewportSize({ width: 844, height: 390 });
+    await wait(page, 300); await sim(page, 0.2);
+    const after = await T(page, 'return { state: T.state, x: T.player.x, hp: T.player.hp, left: T.timeLeft, fov: T.touch.fov }');
+    expect(after.state).toBe('play');
+    expect(after.hp).toBe(before.hp);
+    expect(after.left).toBeLessThan(before.left + 0.01);
+    expect(after.fov).toBeLessThan(before.fov);
+    const r = await layout(page, ['#dc-status', '#dc-timer', '#dc-side', '.mla-bar', '.dc-wheel', '.k3-btn']);
+    expect(r.hits).toEqual([]); expect(r.out).toEqual([]);
+    // el pedal sigue funcionando en la nueva posición
+    const g2 = await center(page, '.k3-btn[aria-label="gas"]');
+    expect(g2[0]).toBeGreaterThan(600);
+    // calidad automática razonable en pantalla táctil: media, sin sombras, DPR acotado
+    expect(await T(page, 'return T.quality')).toMatchObject({ q: 'medium', shadows: false });
+    expect((await T(page, 'return T.quality')).pixelRatio).toBeLessThanOrEqual(1.5);
+    // segundo plano: la partida se pausa sola
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect.poll(() => T(page, 'return T.paused')).toBe(true);
+    expectNoErrors(errors);
+  });
+
+  test('celular: opciones táctiles (vibración, sin teclas) y ayuda con botonera siempre alcanzable', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    await page.addInitScript(() => { /** @type {any} */ (window).__vib = []; Object.defineProperty(navigator, 'vibrate', { configurable: true, value: ms => { /** @type {any} */ (window).__vib.push(ms); return true; } }); });
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await ready(page);
+    await page.locator('#dc-menu [data-opts]').tap();
+    await expect(page.locator('#dc-opts')).toBeVisible();
+    await expect(page.locator('#dc-opts [data-bind]')).toHaveCount(0);
+    await expect(page.locator('#dc-opts [data-haptics]')).toBeChecked();
+    const back = /** @type {any} */ (await page.locator('#dc-opts [data-back]').boundingBox());
+    expect(back.y + back.height).toBeLessThanOrEqual(390);
+    await page.locator('#dc-opts [data-back]').tap();
+    await page.locator('#dc-menu [data-help]').tap();
+    await expect(page.locator('#dc-help')).toBeVisible();
+    const hb = /** @type {any} */ (await page.locator('#dc-help [data-back]').boundingBox());
+    expect(hb.y + hb.height).toBeLessThanOrEqual(390); // botonera pegada abajo aunque la ayuda scrollee
+    await page.locator('#dc-help [data-back]').tap();
+    await startDbg(page, true);
+    await page.locator('.k3-btn[aria-label="brake"]').tap();
+    expect((await page.evaluate(() => /** @type {any} */ (window).__vib)).length).toBeGreaterThan(0);
+    // apagar la vibración desde la pausa → Controles
+    await page.locator('.mla-bar button[aria-label="Pausa"]').tap();
+    await page.locator('.mla-pause [data-a="custom"]', { hasText: 'Controles' }).tap();
+    await page.locator('#dc-opts [data-haptics]').tap();
+    expect(await T(page, 'return T.save.opts.haptics')).toBe(false);
+    await page.locator('#dc-opts [data-back]').tap();
+    await page.locator('.mla-pause [data-a="resume"]').tap().catch(() => {});
+    await page.evaluate(() => { /** @type {any} */ (window).__vib.length = 0; });
+    await page.locator('.k3-btn[aria-label="brake"]').tap();
+    expect((await page.evaluate(() => /** @type {any} */ (window).__vib)).length).toBe(0);
     expectNoErrors(errors);
   });
 });

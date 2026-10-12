@@ -226,11 +226,18 @@ test.describe('Granja de Runas', () => {
 
   test('escenarios: granja → mercado → granja → bosque → granja caminando por las salidas', async ({ page }) => {
     const errors = await start(page, false);
+    // Determinista: con la tecla apretada se avanza la simulación a mano (no depende de los fps del CI) y,
+    // ya en el escenario nuevo, se sigue apretando 1,5 s más: antes eso hacía rebotar a la salida (la cámara
+    // del escenario nuevo mira al revés y la misma dirección volvía a la puerta) según cuánto tardara el keyup.
+    const sim = s => page.evaluate(x => /** @type {any} */ (window).__granja_runas.simulate(x), s);
     const walk = async (key, scene) => {
       await page.keyboard.down(key);
-      await expect.poll(() => hk(page, 'scene'), POLL).toBe(scene);
+      for (let i = 0; i < 60 && (await hk(page, 'scene')) !== scene; i++) await sim(0.25);
+      expect(await hk(page, 'scene')).toBe(scene);
+      await sim(1.5);
+      expect(await hk(page, 'scene'), 'no rebota a la salida con la tecla todavía apretada').toBe(scene);
+      expect(await hk(page, 'state')).toBe('play');
       await page.keyboard.up(key);
-      await expect.poll(() => hk(page, 'state'), POLL).toBe('play');
     };
     await stand(page, 0, 19.6, 0, 22);
     await walk('KeyS', 'mercado');
@@ -573,6 +580,145 @@ test.describe('Granja de Runas', () => {
       expect(r.off, `fuera de pantalla en ${w}×${h}`).toEqual([]);
       expect(r.sw).toBeLessThanOrEqual(r.w); expect(r.sh).toBeLessThanOrEqual(r.h);
     }
+    expectNoErrors(errors);
+  });
+  /* ======================= móvil ======================= */
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+  /** Rectángulos visibles de la UI propia + barra del SDK + controles táctiles; devuelve solapes, salidas de pantalla y blancos chicos. */
+  const layoutCheck = (page, extra = []) => page.evaluate(extra => {
+    const vis = el => { if (!el) return false; for (let e = el; e; e = e.parentElement) { if (e.hidden) return false; const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+    const R = (el, id) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height, id }; };
+    const sel = ['#stat', '#quest', '#coach', '#prompt', '#stormHud', '.k3-joy', ...extra];
+    const els = [];
+    for (const q of sel) document.querySelectorAll(q).forEach((el, i) => vis(el) && els.push(R(el, q + (i ? i : ''))));
+    document.querySelectorAll('.k3-btn').forEach(el => vis(el) && els.push(R(el, 'btn:' + el.getAttribute('aria-label'))));
+    const bar = document.querySelector('.mla-bar'); const btns = [...(bar ? bar.querySelectorAll('button') : [])].filter(vis).map(b => R(b, 'sdk:' + (b.getAttribute('aria-label') || '')));
+    const all = [...els, ...btns], over = [];
+    const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (!(all[i].id.startsWith('sdk:') && all[j].id.startsWith('sdk:')) && hit(all[i], all[j])) over.push(all[i].id + ' × ' + all[j].id);
+    const off = all.filter(e => e.l < -0.5 || e.t < -0.5 || e.r > innerWidth + 0.5 || e.b > innerHeight + 0.5).map(e => e.id);
+    const small = [...document.querySelectorAll('.k3-btn, #coachSkip, #quest, #panel button, .mla-bar button')].filter(vis).map(el => R(el, el.getAttribute('aria-label') || el.textContent.trim().slice(0, 20))).filter(r => r.w < 44 - 0.5 || r.h < 44 - 0.5).map(r => `${r.id} ${r.w | 0}×${r.h | 0}`);
+    return { over, off, small, sw: document.documentElement.scrollWidth, w: innerWidth };
+  }, extra);
+
+  test('móvil: matriz de tamaños (vertical/apaisado) — menú, HUD, tutorial, misión, paneles y rotación en partida', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    test.setTimeout(180_000);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    // menú: el botón principal entra en pantalla, mide ≥ 56 px y no se tapa con nada
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 150);
+      const m = await page.evaluate(() => {
+        const b = /** @type {HTMLElement} */ (document.querySelector('#grMenu [data-go]')).getBoundingClientRect();
+        const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        const sm = [...document.querySelectorAll('#grMenu button')].map(x => x.getBoundingClientRect()).filter(r => r.width && (r.height < 43.5 || r.width < 43.5)).length;
+        const panel = /** @type {HTMLElement} */ (document.querySelector('#grMenu .k3-panel')).getBoundingClientRect();
+        return { b: { t: b.top, b: b.bottom, h: b.height }, onTop: !!(top && top.closest('[data-go]')), sm, sw: document.documentElement.scrollWidth, fits: panel.bottom <= innerHeight + 0.5 && panel.top >= -0.5 };
+      });
+      expect(m.b.t, `menú ${w}×${h}`).toBeGreaterThanOrEqual(0); expect(m.b.b).toBeLessThanOrEqual(h);
+      expect(m.b.h).toBeGreaterThanOrEqual(55.5);
+      expect(m.onTop, `Jugar tapado en ${w}×${h}`).toBe(true);
+      expect(m.sm, `botones del menú < 44 px en ${w}×${h}`).toBe(0);
+      expect(m.fits, `menú cortado en ${w}×${h}`).toBe(true);
+      expect(m.sw).toBeLessThanOrEqual(w);
+    }
+    // arranque sólo con toques
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.locator('#grMenu [data-go]').first().tap();
+    await expect.poll(() => hk(page, 'state'), POLL).toBe('play');
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      // el evento resize llega con el siguiente cuadro (lento con SwiftShader): se espera a que el HUD se reacomode
+      await expect.poll(async () => (await layoutCheck(page)).over, { ...POLL, message: `solapes en ${w}×${h}` }).toEqual([]);
+      const r = await layoutCheck(page);
+      expect(r.over, `solapes con tutorial en ${w}×${h}`).toEqual([]);
+      expect(r.off, `fuera de pantalla en ${w}×${h}`).toEqual([]);
+      expect(r.small, `blancos < 44 px en ${w}×${h}`).toEqual([]);
+      expect(r.sw).toBeLessThanOrEqual(r.w);
+    }
+    // saltar el tutorial con un toque; la misión aparece plegada y se despliega tocándola (sin hacer caminar)
+    await page.locator('#coachSkip').tap();
+    await expect(page.locator('#coach')).toBeHidden();
+    await expect(page.locator('#quest')).toBeVisible();
+    const p0 = await hk(page, 'player');
+    await page.locator('#quest').tap();
+    await expect(page.locator('#quest')).toHaveClass(/open/);
+    await wait(page, 300);
+    expect((await hk(page, 'player')).x).toBeCloseTo(p0.x, 1);
+    await stand(page, -9.6, -1.0, -9.6, -2);
+    await expect(page.locator('#prompt')).toBeVisible();
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      await expect.poll(async () => (await layoutCheck(page)).over, { ...POLL, message: `solapes en ${w}×${h}` }).toEqual([]);
+      const r = await layoutCheck(page);
+      expect(r.over, `solapes en partida en ${w}×${h}`).toEqual([]);
+      expect(r.off, `fuera de pantalla en ${w}×${h}`).toEqual([]);
+      expect(r.small, `blancos < 44 px en ${w}×${h}`).toEqual([]);
+      // panel (diario) dentro de pantalla y debajo de la barra del SDK, con botones ≥ 44 px
+      await page.evaluate(() => /** @type {any} */ (window).__granja_runas.openDiary());
+      await expect(page.locator('#panel .gr-card')).toBeVisible();
+      const pr = await layoutCheck(page, ['#panel .gr-card']);
+      expect(pr.over.filter(x => x.includes('.gr-card') && x.includes('sdk:')), `panel bajo la barra en ${w}×${h}`).toEqual([]);
+      expect(pr.off.filter(x => x.includes('.gr-card'))).toEqual([]);
+      expect(pr.small, `botones del panel < 44 px en ${w}×${h}`).toEqual([]);
+      await page.locator('#panel .gr-x').tap();
+      await expect(page.locator('#panel')).toBeHidden();
+    }
+    // la rotación no rompió el estado: sigue jugando y USAR (toque) limpia la maleza
+    expect(await hk(page, 'state')).toBe('play');
+    await focusIs(page, 'parcela0');
+    await page.locator('.k3-btn[aria-label="act"]').tap();
+    await expect.poll(() => hk(page, 'plots[0].hits'), POLL).toBe(1);
+    expectNoErrors(errors);
+  });
+
+  test('móvil: multitáctil (joystick + USAR a la vez) y deslizar gira la cámara sin caminar', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    const errors = await start(page, true);
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })) });
+    const joy = /** @type {any} */ (await page.locator('.k3-joy').boundingBox()), act = /** @type {any} */ (await page.locator('.k3-btn[aria-label="seed"]').boundingBox());
+    const jx = joy.x + joy.width / 2, jy = joy.y + joy.height / 2, ax = act.x + act.width / 2, ay = act.y + act.height / 2;
+    const p0 = await hk(page, 'player'), seed0 = await hk(page, 'seedSel');
+    await touch('touchStart', [[jx, jy]]);
+    await touch('touchMove', [[jx, jy - 55]]);
+    // segundo dedo en 🌱 mientras el primero sigue en el joystick
+    await touch('touchStart', [[jx, jy - 55], [ax, ay]]);
+    await touch('touchEnd', [[jx, jy - 55]]);
+    await expect.poll(() => hk(page, 'seedSel'), POLL).not.toBe(seed0);
+    await expect.poll(async () => p0.z - (await hk(page, 'player')).z, POLL).toBeGreaterThan(1);
+    await touch('touchEnd', []);
+    // deslizar de costado sobre el campo: gira la cámara (evento camSwipe) y no deja marca de caminar
+    await wait(page, 300);
+    const p1 = await hk(page, 'player');
+    const W = page.viewportSize().width, H = page.viewportSize().height;
+    await touch('touchStart', [[W * 0.3, H * 0.45]]);
+    for (let k = 1; k <= 6; k++) await touch('touchMove', [[W * 0.3 + k * 30, H * 0.45]]);
+    await touch('touchEnd', []);
+    await expect.poll(() => hk(page, 'lastEvent'), POLL).toBe('camSwipe:1');
+    await wait(page, 400);
+    const p2 = await hk(page, 'player');
+    expect(Math.hypot(p2.x - p1.x, p2.z - p1.z), 'deslizar no es un toque para caminar').toBeLessThan(0.2);
+    expectNoErrors(errors);
+  });
+
+  test('móvil: panel largo en apaisado — se desplaza, comprar no lo vuelve arriba y avisa que hay más', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    const errors = await start(page, true);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.evaluate(() => { const h = /** @type {any} */ (window).__granja_runas; h.goto('mercado'); h.set({ coins: 900 }); h.act('decoracion'); });
+    const rows = page.locator('#panel .gr-rows');
+    await expect(rows).toHaveClass(/more/);
+    await rows.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await expect(rows).not.toHaveClass(/more/);
+    const top0 = await rows.evaluate(el => el.scrollTop);
+    expect(top0).toBeGreaterThan(20);
+    const last = page.locator('#panel .gr-row:last-child button');
+    await last.tap();
+    await expect.poll(() => hk(page, 'coins'), POLL).toBeLessThan(900);
+    expect(await rows.evaluate(el => el.scrollTop)).toBeGreaterThan(top0 - 2);
     expectNoErrors(errors);
   });
 });

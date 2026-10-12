@@ -181,6 +181,37 @@ En juego (gancho `perf`, 5 s con disparo continuo, 1280×800):
 
 Alta (con sombras) en el menú: 20 draw calls / 36 k triángulos. El costo de JS por cuadro (≈5–7 ms) deja margen para 60 FPS en GPU real; el cuello en headless es la rasterización por CPU. Optimizaciones: rocas/cristales/enemigos/proyectiles/minas/líneas de aviso con `InstancedMesh`, partículas en un solo `Points`, modelos fusionados, pools sin asignaciones en el bucle de simulación, HUD de texto cada 6 cuadros y radar cada 4, sombras sólo en alta, cielo/estrellas que acompañan a la cámara (no se recortan con el plano lejano reducido de baja).
 
+## Móvil
+
+Pasada mobile-first (2026-10-11). Verificado con Chromium + emulación táctil (`isMobile`, `hasTouch`, DPR 2) en 360×640, 390×844, 412×915 (vertical) y 915×412, 844×390 (apaisado). **No probado en teléfonos reales.**
+
+Capturas en `.perf/mobile-audit/guardianes_estelares-movil/`: `antes-<ancho>x<alto>-{menu,play}.png` y `despues-<ancho>x<alto>-{menu,play}.png`, más `despues-360x640-opciones.png`, `despues-844x390-opciones.png`, `despues-*-derrota.png` y `despues-desktop-1280x800-play.png` (PC sin cambios visibles).
+
+| Problema (antes) | Dónde | Arreglo |
+|---|---|---|
+| Panel de estado pisaba la barra del arcade (⌂ ⏸ 🔊 ⛶) | 360, 390, 412 vertical | Paneles con `box-sizing:border-box`; en ≤430 px el estado mide `100vw − 224px`, filas TURBO/LÁSER apiladas y sin la fila NV (los niveles se anuncian al mejorarse) |
+| Radar pisaba la barra del arcade | todos | Radar a 62 px del borde superior (debajo de la barra de 58 px) |
+| Panel de objetivo pisaba la barra del arcade | 844×390 | Ancho `min(410px, 100vw − 440px)` en apaisado |
+| Textos de 9–10 px (PUNTOS, ESCUDO, CASCO, chips de misiones, distancias de marcadores, TUTORIAL, crédito, NV1) | todos | Etiquetas ≥ 11 px; objetivo, progreso y chips de misiones ≥ 12 px (también en apaisado); marcadores 12 px |
+| Nave tapada por el cuadro del tutorial y por los avisos | 360×640 | En vertical el tutorial ocupa el lugar del panel de objetivo (arriba, que se oculta mientras dura); en vertical corto los avisos pasan arriba; el ancho de los avisos ya no se encoge a media pantalla (`width:max-content`) |
+| Botón «Saltar» del tutorial 54×33 | todos | ≥ 56×44 con realce al tocar |
+| Botones del menú 41 px de alto | apaisado | `min-height:48px` |
+| Título del menú bajo la barra del arcade | 360×640 | Menú/opciones/fin con `padding-top` de 60 px en vertical y versión compacta para alturas ≤ 700 px |
+| Opciones: «LISTO» quedaba fuera de pantalla | 360×640, 844×390 | Contenido desplazable con «LISTO» fijo abajo (degradado como pista de scroll); filas ≥ 46 px; se oculta «Dirigir con el mouse» en táctil |
+| FOV vertical: ~40° horizontales en vertical (amenazas a los costados invisibles) | vertical | FOV calculado para ~50° horizontales (tope 92° vertical) y cámara un poco más cerca (17,5 en vez de 19,5) para que la nave no se pierda |
+| Botones táctiles en 2×2 iguales, FUEGO no destacado; caja de botones (220 px) chocaba con el tutorial | todos | Racimo para el pulgar derecho: FUEGO 78 px en la esquina, LÁSER a su izquierda, TURBO arriba, SCAN en diagonal (64 px); colores por acción; respeta `safe-area` |
+| Etiquetas de marcadores encimadas (convoy en fila) | apaisado | Si dos etiquetas chocan, sólo la primera muestra texto |
+| Marcadores en pantalla debajo del HUD o de los controles | vertical | Se ciñen a la zona libre medida en vivo (HUD/controles reales, se recalcula al rotar o al cambiar la barra del navegador) |
+
+Agregado:
+- Aviso suave (no bloquea) en vertical: «girá el teléfono para ver más espacio. También se puede jugar así.» — una vez por partida.
+- Vibración corta (`navigator.vibrate`) al tocar botones (8 ms) y al recibir daño en el casco; se apaga en Opciones («Vibración…», sólo en táctil), con «Reducir movimiento» o con `prefers-reduced-motion`.
+- `touch-action:pan-y` en las pantallas de menú (el `body` sigue con `touch-action:none`; el juego no puede hacer zoom ni desplazarse).
+
+Ya estaba bien y se verificó: disparo asistido activo por defecto en táctil (+3° de asistencia de puntería), calidad automática «media» en táctil (DPR tope 1,5), pausa al ocultar la pestaña (SDK), rotación a mitad de partida sin perder el estado, multitáctil stick + botones por `pointerId`.
+
+Pruebas nuevas (proyecto `mobile`, Pixel 7): matriz de 5 pantallas (menú: botón principal visible, sin nada encima, ≥ 48 px, sin desborde; juego con tutorial: sin superposición entre estado/objetivo/radar/tutorial/stick/botones/barra del SDK, texto ≥ 11 px y objetivo ≥ 12 px, toques ≥ 44 px y FUEGO ≥ 56 px); partida sólo táctil con stick + FUEGO simultáneos, vibración y rotación vertical→apaisado→vertical; disparo asistido por defecto. Resultado: 40 pasan, 4 omitidas (sólo-móvil en desktop) con `ML_WORKERS=1` y `ML_WORKERS=4` (desktop 18 + 4 omitidas, mobile 22).
+
 ## Pendiente / NO PROBADO
 
 - Gamepad real: mapeado vía SDK, **NO PROBADO** con un mando físico (las pruebas ocultan los mandos).

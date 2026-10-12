@@ -91,6 +91,13 @@ const game = createGame({
 const { scene, camera, renderer } = game;
 renderer.toneMappingExposure = 1.25;
 const reduced = () => prefersReduced || S.settings.calm;
+/** Vibración corta (sólo táctil; se apaga con «reducir movimiento»). */
+let buzzT = 0;
+function buzz(/** @type {number|number[]} */ ms) {
+  if (!isTouchDevice || reduced() || typeof navigator.vibrate !== 'function') return;
+  const now = performance.now(); if (now - buzzT < 120) return; buzzT = now;
+  try { navigator.vibrate(ms); } catch (e) { /* sin vibración */ }
+}
 const root = new THREE.Group(); root.name = 'dinamico'; scene.add(root);
 scene.fog = new THREE.Fog(0x1c120b, 18, 70);
 input = createInput(game.root, { joystick: 'left', buttons: [
@@ -303,6 +310,7 @@ function beginArena(idx, retry = false) {
   ui.banner(`ARENA ${idx + 1} DE 3`, d.name.toUpperCase(), d.goal, 2600);
   sfx.wave();
   if (idx === 0 && (!S.settings.tutorialDone || G.tut.forced)) startTutorial(G.tut.forced);
+  else if (input.isTouch && innerHeight > innerWidth) hint('rotate', '📱↻ Se juega mejor con el teléfono acostado (también podés seguir en vertical).', 0);
   snapCamera();
   A && A.refresh && A.refresh();
 }
@@ -435,7 +443,7 @@ ui.clear.on('[data-menu]', () => toMenu());
 function nextArena() { ui.clear.hide(); beginArena(G.arenaIdx + 1); }
 function openCraft() {
   G.state = 'craft'; input.clear(); exitPointer();
-  ui.craft.show(ui.craftHTML(G.up, G.scrap));
+  ui.craft.show(ui.craftHTML(G.up, G.scrap, input.isTouch));
   hint('craft', 'Los módulos duran toda la partida.', 60);
 }
 function closeCraft() { if (G.state !== 'craft') return; ui.craft.hide(); G.state = 'play'; input.clear(); }
@@ -448,7 +456,7 @@ function buyUpgrade(id) {
   if (id === 'mag') P.ammo = WEAPON.mag[G.up.mag];
   MM.emit('upgrade');
   sfx.build();
-  if (G.state === 'craft') ui.craft.show(ui.craftHTML(G.up, G.scrap));
+  if (G.state === 'craft') ui.craft.show(ui.craftHTML(G.up, G.scrap, input.isTouch));
   return true;
 }
 ui.craft.el.addEventListener('click', e => {
@@ -503,6 +511,8 @@ addEventListener('pointerup', e => {
   if (e.pointerType === 'mouse' && e.button === 0) mouseFire = false;
   if (e.pointerId === dragId) dragId = -1;
 });
+// el navegador puede cancelar un toque (gesto del sistema, barra que aparece): sin esto el arrastre de cámara quedaba trabado
+addEventListener('pointercancel', e => { if (e.pointerId === dragId) dragId = -1; });
 addEventListener('pointermove', e => {
   if (G.state !== 'play') return;
   if (locked) { lookAcc.x += e.movementX; lookAcc.y += e.movementY; return; }
@@ -565,7 +575,7 @@ function placeCamera(k) {
   // en vertical la cámara sube y se aleja: se ve más piso y menos techo
   const portrait = clamp((1 - camera.aspect) / 0.5, 0, 1);
   _pivot.set(P.pos.x, 1.95 + portrait * 1.3, P.pos.z).addScaledVector(_right, zoom ? 0.7 : 0.95 - portrait * 0.35);
-  const want = (zoom ? 2.6 : 5.0) + portrait * 1.2;
+  const want = (zoom ? 2.6 : 5.0) + portrait * 1.6;
   _b.copy(_fwd).negate();
   let d = want;
   if (W) { const h = W.raycast(_pivot, _b, want + 0.3, false, true); if (h.t < want + 0.3) d = Math.max(0.5, h.t - 0.3); }
@@ -578,7 +588,7 @@ function placeCamera(k) {
   if (portrait > 0) _a.y -= portrait * 1.3;
   camera.lookAt(_a);
   // en vertical (celular) se abre el FOV para no perder visión lateral
-  const fov = (zoom ? 48 : 64) * clamp(1 / Math.max(0.01, camera.aspect), 1, 1.42);
+  const fov = (zoom ? 48 : 64) * clamp(1 / Math.max(0.01, camera.aspect), 1, 1.5);
   if (Math.abs(camera.fov - fov) > 0.1) { camera.fov += (fov - camera.fov) * Math.min(1, k * 0.25); camera.updateProjectionMatrix(); }
   if (G.shake > 0 && !reduced()) { camera.position.x += (Math.random() - 0.5) * G.shake * 0.5; camera.position.y += (Math.random() - 0.5) * G.shake * 0.5; }
 }
@@ -741,6 +751,7 @@ function hurtPlayer(dmg, src, kind, continuous = false) {
   if (dmg >= 0.5 || !continuous) {
     G.streak = 0; MM.emit('hurt');
     sfx.hurt();
+    if (!continuous) buzz(dmg >= 20 ? 45 : 22);
     G.stress += dmg;
     if (!continuous) { P.invuln = 0.35; ctx.hooks.shake(Math.min(0.5, dmg / 40)); }
     if (P.hold > 0 && P.holdTarget) P.hold = Math.max(0, P.hold - 0.12);
@@ -1238,7 +1249,7 @@ function updatePlayer(dt) {
     P.rollT = PLAYER.roll.time;
     if (P.moveAmt > 0.1) P.rollDir.set(mx, 0, mz).normalize(); else P.rollDir.set(-fx0, 0, -fz0);
     P.reloadT = P.reloadT > 0 ? P.reloadT : 0;
-    sfx.roll(); MM.emit('roll');
+    sfx.roll(); MM.emit('roll'); buzz(12);
   }
   const speed = PLAYER.speed * (P.zoom ? 0.6 : 1) * (P.hold > 0 ? 0 : 1);
   if (P.rollT > 0) {
@@ -1282,7 +1293,8 @@ function updatePlayer(dt) {
   P.assist = null;
   const assisted = S.settings.autoAim !== 'off' ? peekAssist() : null;
   P.assist = assisted;
-  let wantFire = mouseFire || input.button('fire') || input.down('KeyJ');
+  // hit('btn:fire'): un toque corto de FUEGO entre dos cuadros (celular lento) también dispara
+  let wantFire = mouseFire || input.button('fire') || input.hit('btn:fire') || input.down('KeyJ');
   if (!wantFire && input.isTouch && S.settings.autoFire && assisted && Math.hypot(assisted.pos.x - P.pos.x, assisted.pos.z - P.pos.z) < 26) wantFire = true;
   P.firing = wantFire;
   if (wantFire && P.rollT <= 0 && P.fireCd <= 0 && P.hold <= 0) {
@@ -1414,8 +1426,10 @@ function render() {
     let edge = false;
     if (behind) { x = w - x; yy = h - 30; edge = true; }
     const m = 34;
-    if (x < m || x > w - m || yy < m + 60 || yy > h - m) edge = true;
-    x = clamp(x, m, w - m); yy = clamp(yy, m + 60, h - m);
+    // táctil: los marcadores no quedan debajo de los paneles de arriba ni de los pulgares
+    const top = Math.max(m + 60, ui.topSafe + 22), bot = Math.max(top, h - (input.isTouch ? 178 : m));
+    if (x < m || x > w - m || yy < top || yy > bot) edge = true;
+    x = clamp(x, m, w - m); yy = clamp(yy, top, bot);
     const d = Math.round(Math.hypot(p.x - P.pos.x, p.z - P.pos.z));
     list.push({ x, y: yy, edge, icon, color, label: label || d + ' m' });
   };

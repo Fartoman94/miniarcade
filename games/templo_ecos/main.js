@@ -37,6 +37,7 @@ function sanitize() {
     sens: typeof o.sens === 'number' && o.sens >= 0.3 && o.sens <= 2.5 ? o.sens : 1,
     invert: !!o.invert,
     motion: ['auto', 'reduce', 'full'].includes(o.motion) ? o.motion : 'auto',
+    haptics: o.haptics !== false,
     binds: { ...dO.binds, ...(o.binds && typeof o.binds === 'object' ? o.binds : {}) },
   };
   for (const k of ['jump', 'use', 'eco']) if (typeof s.opts.binds[k] !== 'string' || !s.opts.binds[k]) s.opts.binds[k] = dO.binds[k];
@@ -100,8 +101,16 @@ let input = createInput(game.root, {
   joystick: 'left', look: true,
   buttons: [{ id: 'jump', label: 'SALTO' }, { id: 'use', label: 'USAR' }, { id: 'eco', label: 'ECO' }],
 });
-if (input.isTouch) document.body.classList.add('te-touch');
+let touchUse = false, ecoBuf = 0;
+if (input.isTouch) ui.setTouch(() => { if (state === 'play' && cur) { touchUse = true; buzz(12); } });
 input.showTouch(false);
+/** Vibración corta opcional (sólo táctil; se apaga con la opción o con «movimiento reducido»). @param {number|number[]} ms */
+function buzz(ms) {
+  if (!input.isTouch || !S().opts.haptics || reduced() || typeof navigator.vibrate !== 'function') return;
+  try { navigator.vibrate(ms); } catch (e) { /* algunos navegadores lo bloquean sin gesto */ }
+}
+// respuesta háptica al apretar SALTO/USAR/ECO (el realce visual lo pone el kit)
+document.querySelectorAll('.k3-btn').forEach(b => b.addEventListener('pointerdown', () => buzz(10)));
 const ecoBtn = /** @type {HTMLElement|null} */ (document.querySelector('.k3-btn[aria-label="eco"]'));
 const useBtn = /** @type {HTMLElement|null} */ (document.querySelector('.k3-btn[aria-label="use"]'));
 
@@ -111,6 +120,10 @@ const run = { score: 0, time: 0, flames: 5, roomT: /** @type {Record<string, num
 /** @type {any} */ let cur = null; // interactuable en foco
 /** @type {any} */ let cut = null; // cinemática
 let tipId = '', tipT = 0, moved = 0, cutSkip = false;
+/** Contadores monótonos para pruebas deterministas (no dependen de muestrear en el momento justo). */
+/** Pruebas: con «freeze» el bucle real no avanza la simulación (sólo simulate()); la entrada real queda guardada hasta el próximo paso. */
+let frozen = false, simulating = false;
+const stat = { jumps: 0, y0: 0, peak: 0, uses: 0, ecos: 0, promptTaps: 0 };
 const cam = { yaw: 0, pitch: 0.86, tx: 0, ty: 1, tz: 0, menuA: 0, dist: 10 };
 
 const emit = (ev, v) => M.emit(ev, v);
@@ -120,6 +133,7 @@ function addScore(n) { run.score += Math.round(n); }
 const ctx = {
   THREE, scene, mats, geos, S, persist, diff, reduced, sfx, fx, emit, addScore,
   get player() { return P; },
+  touchAssist: input.isTouch,
   toast: (t, ms) => toast(t, ms || 2000),
   tip: id => tip(id),
   hurt, persistNow: persist,
@@ -178,7 +192,7 @@ const ctx = {
 const K = id => input.isTouch ? ({ jump: 'SALTO', use: 'USAR', eco: 'ECO' })[id] : keyLabel(binds()[id]);
 const TIPS = {
   move: () => input.isTouch ? 'Movete con el <b>joystick</b>. Arrastrá el dedo por la pantalla para girar la cámara.' : 'Movete con <b>WASD</b> o flechas. Arrastrá el mouse o usá <b>Q/R</b> para girar la cámara.',
-  interact: () => `Acercate a algo que brille y apretá <b>${K('use')}</b> para interactuar.`,
+  interact: () => `Acercate a algo que brille y apretá <b>${K('use')}</b>${input.isTouch ? ' (o tocá el aviso de abajo)' : ''} para interactuar.`,
   push: () => 'Caminá contra un bloque para <b>empujarlo</b> una baldosa. ¿Se trabó? Usá el altar de reinicio junto a la entrada.',
   plates: () => 'Las <b>placas</b> se hunden con peso: un bloque o vos. Activá las tres a la vez.',
   sanctum: () => 'La puerta del santuario quedó abierta para siempre. Adentro te espera el <b>Sello del Eco</b>.',
@@ -250,7 +264,8 @@ function startRun(fresh) {
   loadArea(s.area, s.cp);
   state = 'play';
   menu.hide(); endScreen.hide(); helpScreen.hide(); optScreen.hide();
-  ui.show(true); input.showTouch(true); input.clear();
+  ui.show(true); input.showTouch(true); input.clear(); touchUse = false; ecoBuf = 0;
+  ui.layoutNow(); setTimeout(() => ui.rotateHint(), 900);
   M.runStart();
   if (s.relics.sello) emit('sello');
   const rooms = ['luz', 'eco', 'vacio'].filter(k => s.rooms[k]).length; if (rooms) emit('roomSolved', rooms);
@@ -282,7 +297,7 @@ function hurt(n, fromX, fromZ, kind, knock = 5) {
   const b = P.body, dx = b.pos.x - fromX, dz = b.pos.z - fromZ, l = Math.hypot(dx, dz) || 1;
   b.vel.x = dx / l * knock; b.vel.z = dz / l * knock; b.vel.y = 4.5; P.knock = 0.28;
   if (!reduced()) ui.flash();
-  fx.shake(0.3); sfx.hurt(); emit('hurt');
+  fx.shake(0.3); sfx.hurt(); emit('hurt'); buzz(35);
   if (P.hp <= 0) die(kind);
 }
 function die(kind) {
@@ -376,6 +391,10 @@ function fmtTime(t) { const m = Math.floor(t / 60), s = Math.floor(t % 60); retu
 /* ======================= actualización ======================= */
 const _sunOff = new THREE.Vector3();
 function update(dt) {
+  if (frozen && !simulating) return;
+  // en vertical el campo horizontal es angosto: más ángulo para ver amenazas y objetivos a los costados
+  const wantFov = camera.aspect < 0.8 ? 62 : 50;
+  if (camera.fov !== wantFov) { camera.fov = wantFov; camera.updateProjectionMatrix(); }
   if (state === 'menu' || state === 'victory' || state === 'defeat') {
     menuCamera(dt);
     if (level) { level.update(dt, Pidle); if (level.boss) level.boss.update(dt, Pidle); }
@@ -418,7 +437,7 @@ function control(dt) {
   if (input.hit(bd.jump, 'F13', 'btn:jump')) P.jumpBuf = 0.13; else P.jumpBuf -= dt;
   P.coyote = b.grounded ? 0.1 : P.coyote - dt;
   if (P.jumpBuf > 0) {
-    if (P.coyote > 0) { b.vel.y = 8.4; P.coyote = 0; P.jumpBuf = 0; P.jumps = 1; sfx.jump(); emit('jump'); }
+    if (P.coyote > 0) { b.vel.y = 8.4; P.coyote = 0; P.jumpBuf = 0; P.jumps = 1; sfx.jump(); emit('jump'); stat.jumps++; stat.y0 = b.pos.y; stat.peak = 0; }
     else if (S().relics.plumas && P.jumps < 2) { b.vel.y = 7.8; P.jumps = 2; P.jumpBuf = 0; sfx.djump(); fx.ring(b.pos.x, b.pos.y + 0.1, b.pos.z, 0xa9f3ff, 1.6, 0.35); emit('doubleJump'); }
   }
   const holding = input.down(bd.jump) || input.down('F13') || input.button('jump');
@@ -427,6 +446,7 @@ function control(dt) {
   if (b.grounded && b.ground && (b.ground.dx || b.ground.dz)) { b.pos.x += b.ground.dx; b.pos.z += b.ground.dz; }
   const wasG = b.grounded, vy = b.vel.y;
   moveBody(level.cols, b, dt);
+  if (stat.jumps && !b.grounded) stat.peak = Math.max(stat.peak, b.pos.y - stat.y0);
   if (b.grounded) { P.jumps = 0; if (!wasG && vy < -7) { sfx.land(); fx.burst(b.pos.x, b.pos.y + 0.05, b.pos.z, 0xcdb48a, 6, 1.5); } }
   P.pushing = level.tryPush(b, mx, mz, dt);
   if (b.grounded && ml > 0.3) { P.stepT -= dt; if (P.stepT <= 0) { sfx.step(); P.stepT = 0.32; } }
@@ -438,22 +458,36 @@ function control(dt) {
     if (d < (o.r ?? 1.8) && d < bestD && Math.abs(b.pos.y + 1 - o.y) < 2.2 && (!o.can || o.can())) { cur = o; bestD = d; }
   }
   if (cur) tip('interact');
-  if (cur && input.hit(bd.use, 'F14', 'btn:use')) { sfx.click(); cur.use(); emit('interact'); }
-  // eco
+  if (cur && (input.hit(bd.use, 'F14', 'btn:use') || touchUse)) { sfx.click(); if (touchUse) stat.promptTaps++; stat.uses++; cur.use(); emit('interact'); }
+  touchUse = false;
+  // eco (en táctil, un toque apenas temprano contra un rayo del Guardián se guarda unos instantes)
   if (input.hit(bd.eco, 'F15', 'btn:eco')) eco();
+  else if (ecoBuf > 0) {
+    ecoBuf -= dt;
+    const B = level.boss;
+    if (ecoBuf <= 0 || !B || B.nearestOrb(b.pos.x, b.pos.z) < B.reflectR()) { ecoBuf = 0; eco(true); }
+  }
   // pistas contextuales
   if (level.n === 1) {
     for (const id in level.blocks) { const bl = level.blocks[id]; if (Math.hypot(bl.x - b.pos.x, bl.z - b.pos.z) < 3) { tip('push'); break; } }
     for (const id in level.plates) { const pl = level.plates[id]; if (Math.hypot(pl.x - b.pos.x, pl.z - b.pos.z) < 2.5) { tip('plates'); break; } }
   }
 }
-function eco() {
+function eco(fromBuffer = false) {
   if (!S().relics.sello) { sfx.denied(); toast('Todavía no tenés el Sello del Eco', 1200); return; }
   if (P.ecoCd > 0) { sfx.denied(); return; }
+  const b = P.body, B = level && level.boss;
+  if (input.isTouch && !fromBuffer && B && B.active && (B.phase === 1 || B.phase === 3)) {
+    // ayuda táctil: si el rayo todavía está un poco lejos, el Eco se dispara solo cuando entra en el radio (≤ 0,2 s)
+    const d = B.nearestOrb(b.pos.x, b.pos.z), R = B.reflectR();
+    if (d > R && d < R + 13 * 0.2) { ecoBuf = 0.2; return; }
+  }
+  ecoBuf = 0; stat.ecos++;
   P.ecoCd = diff().ecoCd;
-  const b = P.body;
+  const r0 = B ? B.reflects : 0;
   sfx.eco(); fx.ring(b.pos.x, b.pos.y + 0.15, b.pos.z, 0x3fe8d6, 4.6, 0.45); fx.ring(b.pos.x, b.pos.y + 1.0, b.pos.z, 0x7ffff0, 3.2, 0.35);
   level.pulse(b.pos.x, b.pos.z, 4.5);
+  if (B && B.reflects > r0) buzz(25);
   emit('eco');
 }
 function animatePlayer(dt) {
@@ -648,8 +682,9 @@ function openOptions(pause) {
       ${row('jump', 'Saltar')}${row('use', 'Interactuar')}${row('eco', 'Eco')}
       <label>Sensibilidad de cámara <input type="range" min="0.4" max="2" step="0.1" value="${o.sens}" data-sens aria-label="Sensibilidad de cámara"></label>
       <label>Invertir cámara vertical <input type="checkbox" data-invert ${o.invert ? 'checked' : ''}></label>
+      ${input.isTouch ? `<label>Vibración al tocar y recibir daño <input type="checkbox" data-haptics ${o.haptics ? 'checked' : ''}></label>` : ''}
       <label>Movimiento (sacudidas y destellos) <select data-motion><option value="auto"${o.motion === 'auto' ? ' selected' : ''}>Según el sistema</option><option value="reduce"${o.motion === 'reduce' ? ' selected' : ''}>Reducido</option><option value="full"${o.motion === 'full' ? ' selected' : ''}>Completo</option></select></label>
-      <div class="te-small">Mover: WASD/flechas · Cámara: Q/R o arrastrar · Gamepad: A saltar, X interactuar, B eco, LB/RB cámara, Start pausa. Sonido y calidad gráfica: botón ⚙/⏸ de la barra.</div>
+      <div class="te-small">${input.isTouch ? 'Táctil: joystick para moverte, arrastrá el dedo en la escena para girar la cámara, tocá el aviso de interacción o USAR para usar. ' : ''}Mover: WASD/flechas · Cámara: Q/R o arrastrar · Gamepad: A saltar, X interactuar, B eco, LB/RB cámara, Start pausa. Sonido y calidad gráfica: botón ⚙/⏸ de la barra.</div>
     </div>
     <div class="k3-btnrow"><button class="k3-b" data-back>Listo</button><button class="k3-b alt" data-defaults>Valores por defecto</button></div>`);
 }
@@ -660,6 +695,7 @@ optScreen.el.addEventListener('input', e => {
   const t = /** @type {HTMLInputElement} */ (e.target), o = S().opts;
   if (t.matches('[data-sens]')) o.sens = +t.value;
   if (t.matches('[data-invert]')) o.invert = t.checked;
+  if (t.matches('[data-haptics]')) { o.haptics = t.checked; buzz(15); }
   if (t.matches('[data-motion]')) o.motion = /** @type {any} */ (t.value);
   persist();
 });
@@ -693,6 +729,8 @@ const hook = {
   get paused() { return game.paused; },
   get tip() { return tipId; }, get prompt() { return cur ? cur.label() : ''; },
   get camYaw() { return cam.yaw; },
+  get stats() { return { jumps: stat.jumps, peak: +stat.peak.toFixed(3), moved: +moved.toFixed(2), uses: stat.uses, ecos: stat.ecos, promptTaps: stat.promptTaps }; },
+  get touch() { return { isTouch: input.isTouch, fov: camera.fov, ecoBuf, reflectR: level && level.boss ? level.boss.reflectR() : null }; },
   get counts() {
     if (!level) return {};
     return { enemies: level.enemies.length, alive: level.enemies.filter(e => !e.dead && e.state !== 'gone').length, colliders: level.cols.length, interactables: level.inters.length, beams: level.segCount, codices: level.codices.filter(c => !c.taken).length, orbs: level.boss ? level.boss.orbCount : 0 };
@@ -719,7 +757,8 @@ const hook = {
 if (DEBUG) {
   /** @type {any} */ (hook).debug = {
     goto(n, cp) { if (state === 'menu') startRun(false); loadArea(n, cp || ({ 1: 'a1_inicio', 2: 'a2_inicio', 3: 'a3_inicio' })[n]); state = 'play'; P.alive = true; },
-    simulate(sec) { game.simulate(sec); },
+    simulate(sec) { simulating = true; try { game.simulate(sec); } finally { simulating = false; } },
+    freeze(v = true) { frozen = !!v; },
     teleport(x, y, z) { const b = P.body.pos; b.x = x; b.y = y; b.z = z; P.body.vel.x = P.body.vel.y = P.body.vel.z = 0; cam.tx = x; cam.tz = z; },
     setHP(n) { P.hp = n; }, setFlames(n) { run.flames = n; },
     give(kind) { ctx.takeRelic(kind, P.body.pos.x, P.body.pos.z); },
@@ -735,6 +774,7 @@ if (DEBUG) {
     killBoss() { level.boss.defeat(); },
     strike(i) { const o = level.inters.find(x => x.id === 'crystal:' + i); if (o) o.use(); },
     skipCut() { if (cut) cut.t = cut.dur; },
+    showTip(id) { S().tutorial.off = false; delete S().tutorial.seen[id]; tipId = ''; tip(id); tipT = 600; },
     reflectAll() { const B = level.boss; for (const o of B.orbs) if (o.on) o.back = true; },
   };
 }

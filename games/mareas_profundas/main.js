@@ -48,6 +48,7 @@ function sanitize() {
     sens: typeof o.sens === 'number' && o.sens >= 0.3 && o.sens <= 2.5 ? o.sens : 1,
     invert: !!o.invert,
     motion: ['auto', 'reduce', 'full'].includes(o.motion) ? o.motion : 'auto',
+    haptics: o.haptics !== false,
     binds: { ...dO.binds },
   };
   if (o.binds && typeof o.binds === 'object') for (const k in dO.binds) if (typeof o.binds[k] === 'string' && o.binds[k]) s.opts.binds[k] = o.binds[k];
@@ -119,6 +120,16 @@ if (input.isTouch) document.body.classList.add('mp-touch');
 input.showTouch(false);
 const btnEl = id => /** @type {HTMLElement|null} */ (document.querySelector(`.k3-btn[aria-label="${id}"]`));
 const useBtn = btnEl('use'), sonarBtn = btnEl('sonar'), lightBtn = btnEl('light');
+/** Vibración corta (sólo táctil, apagable en Controles). */
+function buzz(ms) { if (!input.isTouch || !S().opts.haptics || !navigator.vibrate) return; try { navigator.vibrate(ms); } catch (e) { /* sin vibración */ } }
+document.querySelectorAll('.k3-btn').forEach(b => b.addEventListener('pointerdown', () => buzz(8)));
+/** Encuadre: en vertical se abre el FOV para conservar ~62° horizontales (si no, el túnel de visión oculta amenazas). */
+const FOV = 62;
+function fitFov() {
+  const a = Math.max(0.2, camera.aspect);
+  const want = a >= 1 ? FOV : clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(FOV) / 2) / a)), FOV, 86);
+  if (Math.abs(camera.fov - want) > 0.05) { camera.fov = want; camera.updateProjectionMatrix(); }
+}
 
 /* ======================= partida ======================= */
 const run = { score: 0, time: 0, deadT: 0, transT: 0, transTo: 1, transSpawn: '', crashes: 0, hurts: 0, photosRun: 0, victT: 0, why: '', lastDepthWarn: 0, inkT: 0, dark: 0, darkWant: 0, whale: 6 };
@@ -126,7 +137,7 @@ const run = { score: 0, time: 0, deadT: 0, transT: 0, transTo: 1, transSpawn: ''
 /** @type {any} */ let boss = null;
 /** @type {any} */ let cur = null;
 /** @type {any} */ let cut = null;
-let tipId = '', tipT = 0, moved = 0, cutSkip = false;
+let tipId = '', tipT = 0, moved = 0, cutSkip = false, rotHint = false;
 const cam = { yaw: 0, pitch: 0.28, lookYaw: 0, lookPitch: 0, idle: 0, menuA: 0, dist: 8, pos: new THREE.Vector3(), tgt: new THREE.Vector3() };
 const emit = (ev, v) => M.emit(ev, v);
 function addScore(n) { run.score += Math.round(n); }
@@ -296,6 +307,7 @@ function startRun(fresh) {
   A.started();
   moved = 0;
   setTimeout(() => tip('move'), 400);
+  if (input.isTouch && innerHeight > innerWidth && !rotHint) { rotHint = true; setTimeout(() => state === 'play' && innerHeight > innerWidth && toast('📱 Tip: con el teléfono horizontal ves más océano', 2600), 2600); }
 }
 function endRun(won) { M.runEnd({ won }); A.ended({ score: run.score }); }
 function onRestart() {
@@ -317,6 +329,7 @@ function hurt(n, fx_, fy, fz, kind, o = {}) {
   const dx = P.pos.x - fx_, dy = P.pos.y - fy, dz = P.pos.z - fz, l = Math.hypot(dx, dy, dz) || 1, k = o.knock ?? 6;
   P.vel.x += dx / l * k; P.vel.y += dy / l * k * 0.6; P.vel.z += dz / l * k;
   if (!reduced()) ui.hurt();
+  buzz(35);
   fx.shake(0.35); sfx.hurt(); emit('hurt', 1); emit('hurt_' + kind);
   if (P.carrying === 'capsule') { emit('capsuleCrash'); toast('💥 ¡La cápsula se golpeó!', 1500); }
   fx.sparks(P.pos.x, P.pos.y, P.pos.z, 14, 0xffd27a, 4, 0.18, 0.4);
@@ -577,7 +590,7 @@ function control(dt) {
     if (h.tag.startsWith('debris:')) { /* los escombros no dañan: se empujan */ }
     else if (h.impact > 3.2) {
       const dmg = (h.impact - 3.2) * 7 * D.crash;
-      P.hull -= dmg; run.crashes++; emit('crash'); sfx.crash(h.impact); fx.shake(Math.min(0.5, h.impact * 0.06)); if (!reduced()) ui.hurt();
+      P.hull -= dmg; run.crashes++; emit('crash'); buzz(25); sfx.crash(h.impact); fx.shake(Math.min(0.5, h.impact * 0.06)); if (!reduced()) ui.hurt();
       fx.cloud(P.pos.x - h.nx * RAD, P.pos.y - h.ny * RAD, P.pos.z - h.nz * RAD, 6, 0x8a7a5a, 1.5, 0.8);
       if (P.carrying === 'capsule') { emit('capsuleCrash'); toast('💥 ¡Chocaste con la cápsula!', 1500); }
       checkDeath('crash');
@@ -642,7 +655,7 @@ function scanStep(dt, held) {
     if (!e.species || !e.scannable || s.scanned.includes(e.species)) continue;
     _dir.subVectors(e.pos, P.pos); const d = _dir.length(); if (d > 18 + (e.size || 1) || d < 0.01) continue;
     const cos = (_dir.x * fwd.x + _dir.z * fwd.z) / Math.max(0.01, Math.hypot(_dir.x, _dir.z));
-    if (cos < 0.86 || Math.abs(_dir.y) > d * 0.7 + (e.size || 1)) continue;
+    if (cos < (input.isTouch ? 0.8 : 0.86) || Math.abs(_dir.y) > d * 0.7 + (e.size || 1)) continue;
     if (d < bd) { bd = d; best = e; }
   }
   if (best && best !== P.scanTarget) P.scanK = 0;
@@ -693,6 +706,7 @@ function animateSub(dt) {
 }
 const _ct = new THREE.Vector3(), _cd = new THREE.Vector3();
 function updateCamera(dt) {
+  fitFov();
   const lk = input.takeLook(), o = S().opts;
   if (Math.abs(lk.dx) + Math.abs(lk.dy) > 0.5) { cam.idle = 0; cam.lookYaw -= lk.dx * 0.006 * o.sens; cam.lookPitch = clamp(cam.lookPitch + lk.dy * 0.004 * o.sens * (o.invert ? -1 : 1), -0.5, 0.9); }
   else { cam.idle += dt; if (cam.idle > 1.6 && (Math.abs(P.thrust) > 0.1 || cam.idle > 4)) { cam.lookYaw *= Math.exp(-2 * dt); cam.lookPitch *= Math.exp(-2 * dt); } }
@@ -717,11 +731,14 @@ function updateCamera(dt) {
   cam.pos.x += (tx - cam.pos.x) * k; cam.pos.y += (ty - cam.pos.y) * k; cam.pos.z += (tz - cam.pos.z) * k;
   const sh = fx.shakeAmt * 0.5;
   camera.position.set(cam.pos.x + (Math.random() - 0.5) * sh, cam.pos.y + (Math.random() - 0.5) * sh, cam.pos.z + (Math.random() - 0.5) * sh);
-  camera.lookAt(_ct.x + Math.sin(yaw) * 3, _ct.y + 0.2, _ct.z + Math.cos(yaw) * 3);
+  // en vertical el punto de mira baja un poco: el submarino sube hacia el centro, lejos de los controles táctiles
+  const lift = camera.aspect < 0.8 ? -1.1 : 0.2;
+  camera.lookAt(_ct.x + Math.sin(yaw) * 3, _ct.y + lift, _ct.z + Math.cos(yaw) * 3);
   sun.position.set(P.pos.x + 10, P.pos.y + 40, P.pos.z + 8); sun.target.position.copy(P.pos);
 }
 const MENU = { 1: [0, -16, 0, 26, -8], 2: [0, -44, 0, 30, -30], 3: [0, -70, 0, 34, -60] };
 function menuCamera(dt) {
+  fitFov();
   cam.menuA += dt * (reduced() ? 0 : 0.05);
   const f = MENU[level ? level.n : 1];
   camera.position.set(f[0] + Math.sin(cam.menuA) * f[3], f[4], f[2] + Math.cos(cam.menuA) * f[3]);
@@ -874,11 +891,11 @@ function openOptions(pause) {
   const row = id => `<div class="mp-bind"><span>${/** @type {any} */ (BIND_NAMES)[id]}</span><button type="button" data-bind="${id}" class="${listening === id ? 'wait' : ''}">${listening === id ? 'Apretá una tecla…' : keyLabel(o.binds[id])}</button></div>`;
   optScreen.show(`<span class="k3-kicker">OPCIONES</span><h1 style="font-size:30px">CONTROLES</h1>
     <div class="mp-opts">
-      ${['up', 'down', 'use', 'sonar', 'photo', 'light'].map(row).join('')}
+      ${input.isTouch ? `<label>Vibración al tocar y recibir golpes <input type="checkbox" data-haptics ${o.haptics ? 'checked' : ''}></label>` : ['up', 'down', 'use', 'sonar', 'photo', 'light'].map(row).join('')}
       <label>Sensibilidad de cámara <input type="range" min="0.4" max="2" step="0.1" value="${o.sens}" data-sens aria-label="Sensibilidad de cámara"></label>
       <label>Invertir cámara vertical <input type="checkbox" data-invert ${o.invert ? 'checked' : ''}></label>
       <label>Movimiento (sacudidas y destellos) <select data-motion><option value="auto"${o.motion === 'auto' ? ' selected' : ''}>Según el sistema</option><option value="reduce"${o.motion === 'reduce' ? ' selected' : ''}>Reducido</option><option value="full"${o.motion === 'full' ? ' selected' : ''}>Completo</option></select></label>
-      <div class="mp-small">Mover: WASD/flechas · Mirar: arrastrar · Mando: A usar, B sonar, X foto, Y luz, RB subir, LB bajar, Start pausa. Sonido y calidad gráfica: botón ⏸ de la barra.</div>
+      <div class="mp-small">${input.isTouch ? 'Joystick: avanzar y girar · SUBIR/BAJAR: profundidad · arrastrá la pantalla para mirar · mantené USAR para escanear.' : 'Mover: WASD/flechas · Mirar: arrastrar · Mando: A usar, B sonar, X foto, Y luz, RB subir, LB bajar, Start pausa.'} Sonido y calidad gráfica: botón ⏸ de la barra.</div>
     </div>
     <div class="k3-btnrow"><button class="k3-b" data-back>Listo</button><button class="k3-b alt" data-defaults>Valores por defecto</button></div>`);
 }
@@ -890,6 +907,7 @@ optScreen.el.addEventListener('input', e => {
   if (t.matches('[data-sens]')) o.sens = +t.value;
   if (t.matches('[data-invert]')) o.invert = t.checked;
   if (t.matches('[data-motion]')) o.motion = /** @type {any} */ (t.value);
+  if (t.matches('[data-haptics]')) { o.haptics = t.checked; if (t.checked) buzz(15); }
   persist();
 });
 optScreen.el.addEventListener('keydown', e => {
@@ -921,7 +939,7 @@ const hook = {
   get energy() { return r3(P.energy); }, get hull() { return r3(P.hull); }, get o2() { return r3(P.o2); }, get hp() { return r3(P.hull); },
   get depth() { return r3(depth()); }, get limit() { return limit(); },
   get score() { return run.score; }, get runTime() { return r3(run.time); }, get simTime() { return game.simTime; },
-  get paused() { return game.paused; }, get tip() { return tipId; }, get prompt() { return cur ? (cur.blockedNow || cur.label()) : ''; }, get promptId() { return cur ? cur.id : ''; },
+  get paused() { return game.paused; }, get fov() { return r3(camera.fov); }, get touch() { return { isTouch: input.isTouch, axis: input.axis(), up: input.button('up'), down: input.button('down'), use: input.button('use'), lookYaw: r3(cam.lookYaw), lookPitch: r3(cam.lookPitch) }; }, get tip() { return tipId; }, get prompt() { return cur ? (cur.blockedNow || cur.label()) : ''; }, get promptId() { return cur ? cur.id : ''; },
   get scan() { return { target: P.scanTarget ? P.scanTarget.species : null, k: r3(P.scanK) }; },
   get counts() {
     if (!level) return {};

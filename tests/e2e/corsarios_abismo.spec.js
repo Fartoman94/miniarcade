@@ -549,3 +549,132 @@ test.describe('Corsarios del Abismo', () => {
     expectNoErrors(errors);
   });
 });
+
+/* ======================= celular: matriz de tamaños, multitáctil y menús táctiles ======================= */
+const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+const HUD_SEL = ['#ca-status', '#ca-mis', '#ca-map', '#ca-prompt', '#ca-tip', '#ca-boss', '.mla-bar', '.k3-joy', '.k3-btn[aria-label="port"]', '.k3-btn[aria-label="star"]', '.k3-btn[aria-label="act"]', '.k3-btn[aria-label="kit"]'];
+/** Cajas visibles del HUD propio + barra del SDK: superposiciones, fuera de pantalla, scroll y tamaño de los botones táctiles. */
+async function layout(page) {
+  return page.evaluate(sel => {
+    const vis = e => { for (let x = e; x; x = x.parentElement) { if (x.hidden) return false; const cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
+    const boxes = sel.map(s => { const e = document.querySelector(s); if (!e || !vis(e)) return null; const b = e.getBoundingClientRect(); return b.width && b.height ? { s, x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height } : null; }).filter(Boolean);
+    const hits = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) { const a = boxes[i], c = boxes[j]; if (a.x < c.r - 1 && a.r > c.x + 1 && a.y < c.b - 1 && a.b > c.y + 1) hits.push(a.s + ' × ' + c.s); }
+    const out = boxes.filter(b => b.x < -1 || b.y < -1 || b.r > innerWidth + 1 || b.b > innerHeight + 1).map(b => b.s);
+    const small = [...document.querySelectorAll('.k3-btn, #ca-tip button')].filter(vis).map(e => { const b = e.getBoundingClientRect(); return { t: e.getAttribute('aria-label') || e.textContent, w: b.width, h: b.height }; })
+      .filter(b => b.w < 44 || b.h < 44 || (/^(port|star)$/.test(b.t) && (b.w < 56 || b.h < 56))).map(b => `${b.t} ${Math.round(b.w)}×${Math.round(b.h)}`);
+    return { hits, out, small, ids: boxes.map(b => b.s), sw: document.documentElement.scrollWidth, sh: document.documentElement.scrollHeight, w: innerWidth, h: innerHeight };
+  }, HUD_SEL);
+}
+function expectClean(r, tag) {
+  expect(r.hits, tag).toEqual([]);
+  expect(r.out, tag).toEqual([]);
+  expect(r.small, tag).toEqual([]);
+  expect(r.sw, tag).toBeLessThanOrEqual(r.w);
+  expect(r.sh, tag).toBeLessThanOrEqual(r.h);
+}
+
+test.describe('Corsarios del Abismo · celular', () => {
+  test.beforeEach(({ isMobile }, testInfo) => { test.skip(!isMobile, 'sólo celular'); testInfo.setTimeout(240_000); });
+
+  test('matriz de tamaños: menú tocable, HUD/consejo/aviso/jefe sin superposiciones al rotar en plena partida', async ({ page }) => {
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    // menú: el botón principal se ve, entra en pantalla, es ≥44 px y no hay scroll horizontal
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h }); await wait(page, 150);
+      const m = await page.evaluate(() => {
+        const b = /** @type {HTMLElement} */ (document.querySelector('#ca-menu [data-go]')).getBoundingClientRect();
+        const bar = /** @type {HTMLElement} */ (document.querySelector('.mla-bar')).getBoundingClientRect();
+        const scr = /** @type {HTMLElement} */ (document.querySelector('#ca-menu'));
+        const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        return { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height, sw: document.documentElement.scrollWidth, scw: scr.scrollWidth, vw: innerWidth, vh: innerHeight,
+          hitsBar: b.left < bar.right && b.right > bar.left && b.top < bar.bottom && b.bottom > bar.top, tappable: !!(top && top.closest('[data-go]')) };
+      });
+      const tag = `menú ${w}×${h}`;
+      expect(m.x, tag).toBeGreaterThanOrEqual(0); expect(m.r, tag).toBeLessThanOrEqual(m.vw);
+      expect(m.y, tag).toBeGreaterThanOrEqual(0); expect(m.b, tag).toBeLessThanOrEqual(m.vh);
+      expect(m.h, tag).toBeGreaterThanOrEqual(44); expect(m.w, tag).toBeGreaterThanOrEqual(56);
+      expect(m.hitsBar, tag).toBe(false); expect(m.tappable, tag).toBe(true);
+      expect(m.sw, tag).toBeLessThanOrEqual(m.vw); expect(m.scw, tag).toBeLessThanOrEqual(m.vw);
+    }
+    // arranque sólo táctil desde el tamaño más chico
+    await page.setViewportSize({ width: 360, height: 640 });
+    await startDet(page, true);
+    await D(page, 'freeze(true)');
+    await D(page, 'teleport(4,-36,3.14)'); // con aviso de ACCIÓN visible
+    await sim(page, 3); // el título de la región se apaga y aparece el consejo del timón
+    await expect.poll(async () => { await sim(page, 0.05); return T(page, 'return T.tip'); }, POLL).toBe('sail');
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h }); await sim(page, 0.1); await wait(page, 150);
+      const r = await layout(page);
+      expect(r.ids).toEqual(expect.arrayContaining(['#ca-status', '#ca-map', '#ca-prompt', '#ca-tip', '.mla-bar', '.k3-joy', '.k3-btn[aria-label="port"]', '.k3-btn[aria-label="star"]']));
+      expectClean(r, `juego ${w}×${h}`);
+      expect(await T(page, 'return T.state')).toBe('sail'); // rotar no rompe el estado
+    }
+    // ACCIÓN táctil después de rotar varias veces: atraca
+    await page.locator('#ca-tip [data-t="ok"]').tap();
+    await page.locator('.k3-btn[aria-label="act"]').tap(); await sim(page, 0.1);
+    expect(await T(page, 'return T.state')).toBe('docked');
+    await sim(page, 1.5);
+    await expect(page.locator('#ca-market')).toBeVisible();
+    await expect(page.locator('.k3-touch')).toBeHidden(); // los controles no tapan la tienda
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h }); await wait(page, 120);
+      const z = await page.evaluate(() => { const b = /** @type {HTMLElement} */ (document.querySelector('#ca-market [data-leave]')); b.scrollIntoView({ block: 'nearest' }); const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { h: r.height, ok: !!(top && top.closest('[data-leave]')), inView: r.top >= 0 && r.bottom <= innerHeight, sw: document.documentElement.scrollWidth, vw: innerWidth }; });
+      expect(z.h, `mercado ${w}×${h}`).toBeGreaterThanOrEqual(44); expect(z.ok, `mercado ${w}×${h}`).toBe(true); expect(z.inView).toBe(true); expect(z.sw).toBeLessThanOrEqual(z.vw);
+    }
+    await page.locator('#ca-market [data-leave]').tap();
+    await expect(page.locator('.k3-touch')).toBeVisible();
+    // pelea con el jefe: barra del jefe + consejo de fase 1 sin pisarse en ningún tamaño
+    await D(page, 'bossPhase(1)'); await sim(page, 3);
+    await expect.poll(async () => { await sim(page, 0.05); return T(page, 'return T.tip'); }, POLL).toBe('boss');
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h }); await sim(page, 0.1); await wait(page, 150);
+      const r = await layout(page);
+      expect(r.ids).toEqual(expect.arrayContaining(['#ca-boss', '#ca-tip']));
+      expectClean(r, `jefe ${w}×${h}`);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('multitáctil: timón y andanada a la vez; cañones abajo a la derecha en la zona del pulgar; vibración opcional', async ({ page }) => {
+    await page.addInitScript(() => { /** @type {any} */ (window).__buzz = []; navigator.vibrate = p => { /** @type {any} */ (window).__buzz.push(p); return true; }; });
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await startDet(page, true);
+    await D(page, 'freeze(true)'); await D(page, 'teleport(0,0,0)'); await D(page, 'aim(false)');
+    const g = await page.evaluate(() => { const q = s => /** @type {HTMLElement} */ (document.querySelector(s)).getBoundingClientRect(); return { port: q('.k3-btn[aria-label="port"]'), star: q('.k3-btn[aria-label="star"]'), act: q('.k3-btn[aria-label="act"]'), kit: q('.k3-btn[aria-label="kit"]'), joy: q('.k3-joy'), w: innerWidth, h: innerHeight }; });
+    // fila de cañones debajo de ACCIÓN/KIT, babor a la izquierda de estribor, en la mitad derecha; timón a la izquierda
+    expect(g.port.top).toBeGreaterThan(g.act.bottom - 1);
+    expect(g.port.left).toBeLessThan(g.star.left);
+    expect(g.port.left).toBeGreaterThan(g.w / 2 - 10);
+    expect(g.joy.right).toBeLessThan(g.port.left);
+    expect(g.port.width).toBeGreaterThanOrEqual(56); expect(g.star.width).toBeGreaterThanOrEqual(56);
+    const j = await center(page, '.k3-joy'), p = await center(page, '.k3-btn[aria-label="port"]');
+    // dedo 1: timón arriba (velas); dedo 2: babor — al mismo tiempo
+    await touch(page, 'touchStart', [[j[0], j[1]]]);
+    await touch(page, 'touchMove', [[j[0], j[1] - 60]]);
+    await touch(page, 'touchStart', [[j[0], j[1] - 60], p]);
+    await sim(page, 0.6);
+    const s = await T(page, 'return T.player');
+    await touch(page, 'touchEnd', []);
+    expect(s.sail).toBeGreaterThan(0.3);
+    expect(s.reload.L).toBeGreaterThan(0); // disparó por babor mientras el timón seguía apretado
+    expect(s.reload.R).toBe(0);
+    await expect(page.locator('.k3-btn[aria-label="port"]')).not.toHaveClass(/\bon\b/);
+    expect((await page.evaluate(() => /** @type {any} */ (window).__buzz)).length).toBeGreaterThan(0);
+    // apagar la vibración en Opciones (táctil: sin filas de teclas)
+    await page.keyboard.press('Escape');
+    await page.locator('.mla-pause [data-a="custom"]', { hasText: 'Controles' }).click();
+    await expect(page.locator('#ca-opts')).toBeVisible();
+    await expect(page.locator('#ca-opts [data-bind]')).toHaveCount(0);
+    await page.locator('#ca-opts [data-haptics]').uncheck();
+    expect(await T(page, 'return T.save.opts.haptics')).toBe(false);
+    const lbl = await page.locator('#ca-opts label').first().boundingBox();
+    expect(/** @type {any} */ (lbl).height).toBeGreaterThanOrEqual(44);
+    expectNoErrors(errors);
+  });
+});
+

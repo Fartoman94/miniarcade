@@ -28,7 +28,7 @@ const DEFAULT_BINDS = { wave: 'Space', speed: 'KeyT', upgrade: 'KeyU', sell: 'Ke
 const DEFAULTS = {
   unlocked: 1, mapSel: 0, wavesTotal: 0, defended: false, titan: false, wins: 0, runs: 0, kills: 0, best: /** @type {any[]} */ ([null, null, null]),
   checkpoint: /** @type {any} */ (null),
-  settings: { pan: 1, zoom: 1, invert: false, motion: 'auto', ranges: false, binds: { ...DEFAULT_BINDS } },
+  settings: { pan: 1, zoom: 1, invert: false, motion: 'auto', ranges: false, haptics: true, binds: { ...DEFAULT_BINDS } },
   tutorial: { done: false },
 };
 const save = createSave(SAVE_KEY, SAVE_VERSION, DEFAULTS);
@@ -46,7 +46,7 @@ function sanitize() {
   const bi = s.binds && typeof s.binds === 'object' ? s.binds : {};
   const okKey = v => typeof v === 'string' && /^(Key[A-Z]|Digit[0-9]|Space|Enter|Tab|ShiftLeft|Backspace)$/.test(v) && !['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyP', 'KeyR', 'KeyZ', 'KeyC', 'Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(v);
   d.settings = {
-    pan: num(s.pan, 1, 0.5, 2), zoom: num(s.zoom, 1, 0.5, 2), invert: s.invert === true, motion: ['auto', 'on', 'off'].includes(s.motion) ? s.motion : 'auto', ranges: s.ranges === true,
+    pan: num(s.pan, 1, 0.5, 2), zoom: num(s.zoom, 1, 0.5, 2), invert: s.invert === true, motion: ['auto', 'on', 'off'].includes(s.motion) ? s.motion : 'auto', ranges: s.ranges === true, haptics: s.haptics !== false,
     binds: { wave: okKey(bi.wave) ? bi.wave : DEFAULT_BINDS.wave, speed: okKey(bi.speed) ? bi.speed : DEFAULT_BINDS.speed, upgrade: okKey(bi.upgrade) ? bi.upgrade : DEFAULT_BINDS.upgrade, sell: okKey(bi.sell) ? bi.sell : DEFAULT_BINDS.sell },
   };
   d.tutorial = { done: !!(d.tutorial && d.tutorial.done === true) };
@@ -70,7 +70,7 @@ const G = {
   overlay: '', shake: 0, endT: 0, endWon: false, rerouteT: 0, thunderT: 8, flashT: 0,
   tut: { on: false, step: 0, waitT: 0 },
   /** @type {{t:number, fn:()=>void}[]} */ later: [],
-  lastInput: 'mouse', record: false, enterUsed: false,
+  lastInput: 'mouse', record: false, enterUsed: false, lastPick: '', lastOrient: innerHeight > innerWidth * 1.05,
 };
 
 /* ======================= motor ======================= */
@@ -99,6 +99,12 @@ const input = createInput(game.root, { buttons: [
   { id: 'rotl', label: '⟲', key: 'KeyQ' }, { id: 'rotr', label: '⟳', key: 'KeyE' }] });
 input.showTouch(false);
 const sfx = createSfx(game.audio);
+/** Vibración corta sólo para toques (celular), apagable en Controles y desactivada con movimiento reducido. */
+function buzz(/** @type {number|number[]} */ ms) {
+  if (G.lastInput !== 'touch' || !S.settings.haptics || reduced() || !navigator.vibrate) return;
+  try { navigator.vibrate(ms); } catch (_) { /* nada */ }
+}
+{ const den = sfx.denied; sfx.denied = () => { den(); buzz([18, 40, 18]); }; }
 const mats = createMaterials();
 
 // luces y cielo
@@ -165,7 +171,9 @@ function applyCamera() {
 }
 function clampCam() {
   const W = ctx.W; if (!W) return;
-  cam.tx = clamp(cam.tx, W.bounds.x0 + 2, W.bounds.x1 - 2); cam.tz = clamp(cam.tz, W.bounds.z0 + 2, W.bounds.z1 - 2);
+  // con algo seleccionado se deja correr la cámara un poco más allá del borde, para que el objeto no quede bajo el panel
+  const m = G.sel ? -4 : 2;
+  cam.tx = clamp(cam.tx, W.bounds.x0 + m, W.bounds.x1 - m); cam.tz = clamp(cam.tz, W.bounds.z0 + m, W.bounds.z1 - m);
   cam.tdist = clamp(cam.tdist, DMIN, DMAX);
 }
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitP = new THREE.Vector3();
@@ -261,6 +269,7 @@ function moveGesture() {
 }
 
 /* ======================= selección ======================= */
+const TOUCH_R = 30, AMBIG_PX = 7;
 /** Candidatos bajo un punto de pantalla: se prueba el rayo a varias alturas (torres altas, cristales). */
 function pickAt(cx, cy) {
   const W = ctx.W; if (!W) return;
@@ -274,10 +283,37 @@ function pickAt(cx, cy) {
     }
   };
   const tol = touch ? 1.6 : 1.25;
+  if (touch) {
+    // táctil: se mide en píxeles de pantalla, con un radio mínimo de dedo (≥ 30 px) aunque el mapa se vea chico
+    /** @type {{kind:string, ref:any, d:number}[]} */ const cands = [];
+    const near = (kind, ref, x, z, hs, wtol) => {
+      let d = 1e9;
+      for (const h of hs) { const s = toScreen(x, h, z); if (s.vis) d = Math.min(d, Math.hypot(s.x - cx, s.y - cy)); }
+      const a = toScreen(x, 0.3, z), b = toScreen(x + wtol, 0.3, z);
+      if (d <= Math.max(TOUCH_R, Math.hypot(b.x - a.x, b.y - a.y))) cands.push({ kind, ref, d });
+    };
+    for (const p of W.pads) near(p.tower ? 'tower' : 'pad', p.tower || p, p.x, p.z, p.tower ? [0.3, 1.2, 2.2, 3.0] : [0.3], tol);
+    for (const l of W.levers) near('lever', l, l.x, l.z, [0.3, 1.0], tol);
+    for (const a of W.aux) near('aux', a, a.x, a.z, [0.3, 1.2, 2.0], tol);
+    near('crystal', W.crystal, W.crystal.x, W.crystal.z, [0.3, 1.5, 3.0], tol + 0.6);
+    cands.sort((a, b) => a.d - b.d);
+    // lupa: dos objetos casi a la misma distancia del dedo y el mapa lejos → se acerca la cámara en vez de adivinar
+    if (cands.length > 1 && cands[1].d - cands[0].d < AMBIG_PX && cands[0].ref !== cands[1].ref && cam.tdist > DMIN + 6) {
+      const g = groundAt(cx, cy);
+      if (g) { cam.tx = g.x; cam.tz = g.z; }
+      cam.tdist = Math.max(DMIN, cam.tdist * 0.62); clampCam();
+      G.lastPick = 'zoom';
+      toast('Acercando: tocá de nuevo lo que querías elegir');
+      return;
+    }
+    best = cands[0] || null;
+  } else {
   for (const p of W.pads) consider(p.tower ? 'tower' : 'pad', p.tower || p, p.x, p.z, p.tower ? [0.3, 1.2, 2.2, 3.0] : [0.3], tol);
   for (const l of W.levers) consider('lever', l, l.x, l.z, [0.3, 1.0], tol);
   for (const a of W.aux) consider('aux', a, a.x, a.z, [0.3, 1.2, 2.0], tol);
   consider('crystal', W.crystal, W.crystal.x, W.crystal.z, [0.3, 1.5, 3.0], tol + 0.6);
+  }
+  G.lastPick = best ? /** @type {any} */ (best).kind : 'none';
   if (G.moveTower) {
     if (best && best.kind === 'pad') { doRelocate(G.moveTower, best.ref); return; }
     if (best && best.kind === 'tower' && best.ref === G.moveTower) { cancelMove(); return; }
@@ -293,10 +329,39 @@ function activate(kind, ref) {
 }
 function select(s) {
   G.sel = s; previewType = '';
-  if (!s) { ui.hidePanel(); return; }
-  sfx.select();
+  if (!s) { ui.hidePanel(); clampCam(); return; }
+  sfx.select(); buzz(8);
   refreshPanel(true);
+  revealSel();
   if (s.kind === 'tower') tutEvent('selectTower');
+}
+/** Si el panel (o el HUD) tapa lo que se acaba de elegir, desliza la cámara para dejarlo a la vista sobre el panel. */
+function revealSel() {
+  const s = G.sel; if (!s || !ctx.W) return;
+  const o = s.kind === 'tower' ? s.ref.pad : s.ref;
+  // se calcula con la cámara ya en su destino (puede estar deslizándose, p. ej. tras girar el teléfono)
+  const cur = { x: cam.x, z: cam.z, dist: cam.dist, yaw: cam.yaw };
+  cam.x = cam.tx; cam.z = cam.tz; cam.dist = cam.tdist; cam.yaw = cam.tyaw;
+  applyCamera();
+  try { revealAt(o); } finally { Object.assign(cam, cur); applyCamera(); }
+}
+function revealAt(o) {
+  const p = toScreen(o.x, 0.3, o.z);
+  const pr = /** @type {HTMLElement} */ (document.getElementById('be-panel')).getBoundingClientRect();
+  const lo = (pr.height && pr.left < p.x + 30 && pr.right > p.x - 30 ? pr.top : innerHeight) - 34;
+  let hi = 24;
+  for (const q of ['#be-status', '.be-top', '.mla-bar']) {
+    const e = document.querySelector(q); if (!e) continue;
+    const r = e.getBoundingClientRect();
+    if (r.height && r.left < p.x + 30 && r.right > p.x - 30) hi = Math.max(hi, r.bottom + 30);
+  }
+  const el = document.elementFromPoint(clamp(p.x, 0, innerWidth - 1), clamp(p.y, 0, innerHeight - 1));
+  const covered = !p.vis || p.y > lo || p.y < hi || p.x < 24 || p.x > innerWidth - 24 || !el || el.tagName !== 'CANVAS';
+  if (!covered) return;
+  const ty = lo > hi ? (lo + hi) / 2 : innerHeight * 0.3, tx = clamp(p.x, innerWidth * 0.2, innerWidth * 0.8);
+  const a = groundAt(p.x, p.y), b = groundAt(tx, ty);
+  if (!a || !b) return;
+  cam.tx += a.x - b.x; cam.tz += a.z - b.z; clampCam();
 }
 let panelRefreshT = 0;
 function refreshPanel(force = false) {
@@ -329,7 +394,7 @@ function buildTower(pad, type) {
   if (G.gold < T.lv[0].cost) { toast(`Te falta esencia: ${T.name} cuesta ${T.lv[0].cost}`); sfx.denied(); return false; }
   G.gold -= T.lv[0].cost;
   const t = towers.build(pad, type);
-  sfx.build(); fx.burst(pad.x, 0.8, pad.z, T.color, 18, 3.5); fx.ring(pad.x, pad.z, T.color, 0.4, 2.2, 0.5);
+  sfx.build(); buzz(20); fx.burst(pad.x, 0.8, pad.z, T.color, 18, 3.5); fx.ring(pad.x, pad.z, T.color, 0.4, 2.2, 0.5);
   if (type === 'fuego') { G.fireBuilt = true; MM.emit('fireBuilt'); }
   MM.emit('build');
   tutEvent('build');
@@ -340,14 +405,14 @@ function upgradeTower(t) {
   const c = towers.upgradeCost(t);
   if (t.lv >= 2) { toast('Esta torre ya está al máximo'); sfx.denied(); return false; }
   if (G.gold < c) { toast(`Te falta esencia: la mejora cuesta ${c}`); sfx.denied(); return false; }
-  G.gold -= c; towers.upgrade(t); sfx.upgrade();
+  G.gold -= c; towers.upgrade(t); sfx.upgrade(); buzz(20);
   if (t.lv === 2) { G.maxed++; MM.emit('maxed'); popup(t.pad, t.top + 2, '¡NIVEL MÁXIMO!', '#ffd23a'); }
   tutEvent('upgrade');
   refreshPanel(true);
   return true;
 }
 function sellTower(t) {
-  const v = towers.sell(t); G.gold += v; sfx.sell();
+  const v = towers.sell(t); G.gold += v; sfx.sell(); buzz(12);
   popup(t.pad, 2, `+${v}`, '#ffd23a');
   select(null);
 }
@@ -370,7 +435,7 @@ function harvest(a) {
   a.charge = 0;
   const v = harvestValue();
   G.gold += v; G.harvests++;
-  sfx.harvest(); fx.burst(a.x, 1.4, a.z, 0x7dffd0, 18, 3.5); fx.ring(a.x, a.z, 0x7dffd0, 0.4, 2.4, 0.5);
+  sfx.harvest(); buzz(12); fx.burst(a.x, 1.4, a.z, 0x7dffd0, 18, 3.5); fx.ring(a.x, a.z, 0x7dffd0, 0.4, 2.4, 0.5);
   popup(a, 2.6, `+${v} ESENCIA`, '#7dffd0');
   MM.emit('harvest');
   tutEvent('harvest');
@@ -410,7 +475,7 @@ function toggleLever(l) {
   const st = 1 - b.state;
   if (!W.canSet(l.bridge, st)) { toast('Así los enemigos quedarían sin camino'); sfx.denied(); return false; }
   W.setBridge(l.bridge, st);
-  l.cool = 10; sfx.lever(); ctx.shake(0.15);
+  l.cool = 10; sfx.lever(); buzz(25); ctx.shake(0.15);
   fx.burst(l.x, 1.2, l.z, 0xffd23a, 10, 2.5);
   popup(l, 2.2, 'RUTA CAMBIADA', '#ffe08a');
   MM.emit('lever');
@@ -527,7 +592,7 @@ function onLeak(e) {
   if (G.state !== 'play') { if (!e.isBoss) enemyGone(e); return; }
   const dmg = e.isBoss ? 999 : e.def.leak * (e.elite ? 2 : 1);
   G.crystal -= dmg; G.leaks++;
-  sfx.leak(); ui.hurtFlash(); ctx.shake(0.5);
+  sfx.leak(); buzz(45); ui.hurtFlash(); ctx.shake(0.5);
   const cr = ctx.W.crystal;
   fx.burst(cr.x, 2.4, cr.z, 0xff5a8a, 16, 4);
   popup(cr, 4, `-${Math.min(dmg, G.crystalMax)} 💎`, '#ff8aa0');
@@ -747,6 +812,7 @@ function endTutorial(skipped) {
 /* ======================= superposiciones (ayuda/controles) ======================= */
 function openOverlay(which) {
   G.overlay = which;
+  if (G.state === 'menu') ui.menu.hide(); // si no, el menú se transparenta debajo de la ayuda en pantallas chicas
   if (which === 'help') ui.showHelp({ binds: S.settings.binds });
   else ui.showOpts({ settings: S.settings });
 }
@@ -1007,7 +1073,17 @@ loadMap(G.map);
 frameMap(true); cam.tdist *= 1.08;
 showMenu();
 game.start();
-addEventListener('resize', () => { if (G.state === 'menu') { frameMap(); cam.tdist *= 1.08; } });
+addEventListener('resize', () => {
+  const portrait = innerHeight > innerWidth * 1.05, flipped = portrait !== G.lastOrient;
+  G.lastOrient = portrait;
+  if (G.state === 'menu') { frameMap(); cam.tdist *= 1.08; return; }
+  // giro del teléfono en plena partida: se reencuadra el mapa (sin tocar el estado) y se vuelve a mostrar lo elegido
+  if (flipped && (G.state === 'play' || G.state === 'cine') && !cam.focus) {
+    camera.aspect = innerWidth / Math.max(1, innerHeight); camera.updateProjectionMatrix(); // el ResizeObserver del motor llega después
+    frameMap();
+    if (G.sel) setTimeout(() => { if (G.sel) { refreshPanel(true); revealSel(); } }, 120);
+  }
+});
 
 /* ======================= gancho de pruebas ======================= */
 function routeFrom(si) { if (!ctx.W || !ctx.W.spawns[si]) return []; const W = ctx.W, out = []; let c = W.spawns[si].c, r = W.spawns[si].r; for (let i = 0; i < 80; i++) { out.push([c, r]); const n = W.next(c, r); if (!n) break; c = n.c; r = n.r; } return out; }
@@ -1035,6 +1111,9 @@ const hook = {
   get selected() { const s = G.sel; return s ? { kind: s.kind, pad: s.kind === 'pad' ? s.ref.i : s.kind === 'tower' ? s.ref.pad.i : -1, index: s.ref.i ?? -1 } : null; },
   get panel() { return ui.panelOpen ? ui.panelKind : ''; },
   get moving() { return !!G.moveTower; },
+  /** true mientras la cámara se desliza hacia su destino (p. ej. tras elegir algo tapado por el panel). */
+  get camMoving() { return Math.abs(cam.tx - cam.x) + Math.abs(cam.tz - cam.z) + Math.abs(cam.tdist - cam.dist) > 0.05; },
+  get lastPick() { return G.lastPick; },
   get towers() { return towers.list.map(t => ({ pad: t.pad.i, type: t.type, lv: t.lv + 1, prio: t.prio, frozen: t.frozenT > 0, stunned: t.stunT > 0, kills: t.kills, shots: t.shots, x: t.pad.x, z: t.pad.z })); },
   get enemies() {
     const by = {}; for (const e of enemies.list) if (e.alive) by[e.type] = (by[e.type] || 0) + 1;

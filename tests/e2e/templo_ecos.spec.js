@@ -21,9 +21,17 @@ async function start(page, isMobile) {
   else { await page.locator('#te-menu [data-go]').focus(); await page.keyboard.press('Enter'); }
   await expect.poll(() => T(page, 'return T.state'), POLL).toBe('play');
 }
+/** Igual que start() y además congela el bucle real (?debug): sólo simulate() avanza el juego, así la entrada real
+ * (teclas/toques) se consume siempre en el próximo paso simulado y los resultados no dependen de la carga de la CPU. */
+async function sim(page, sec) { await D(page, `simulate(${sec})`); }
+async function startFrozen(page, isMobile) {
+  await start(page, isMobile); await D(page, 'freeze(true)');
+  // calidad baja (DPR 1, sin sombras): el rasterizado por software de cada cuadro real no ahoga a la CPU cuando corren varios workers
+  await page.evaluate(() => /** @type {any} */ (window).MLArcade.settings.set('quality', 'low'));
+  await sim(page, 0.15); // primer HUD
+}
 /** Mantiene una tecla mientras corre un tramo de simulación determinista. */
 async function hold(page, key, sec) { await page.keyboard.down(key); await D(page, `simulate(${sec})`); await page.keyboard.up(key); }
-async function sim(page, sec) { await D(page, `simulate(${sec})`); }
 const cdps = new WeakMap();
 async function touch(page, type, x, y) {
   let cdp = cdps.get(page);
@@ -38,6 +46,47 @@ async function solvePlates(page) {
   await pushFrom(page, -6.4, 10, 'KeyD'); await pushFrom(page, -2, 12.4, 'KeyW', 2);
   await pushFrom(page, 6.4, 10, 'KeyA'); await pushFrom(page, 2, 12.4, 'KeyW', 2);
   await D(page, 'teleport(0,0,1)'); await sim(page, 0.5);
+}
+
+/** Toques múltiples reales por CDP (cada punto con su id). */
+async function touches(page, type, points) {
+  let cdp = cdps.get(page);
+  if (!cdp) { cdp = await page.context().newCDPSession(page); cdps.set(page, cdp); }
+  await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(p => ({ x: p.x, y: p.y, id: p.id })) });
+}
+const center = async (page, sel) => { const b = /** @type {any} */ (await page.locator(sel).boundingBox()); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+const frames = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(0)))));
+const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+/** Revisa la UI propia del juego: dentro de la pantalla, sin superponerse con la barra del SDK, misiones, controles ni entre sí. */
+async function auditLayout(page) {
+  return page.evaluate(() => {
+    const vis = e => { if (!e || e.closest('[hidden]')) return null; const b = e.getBoundingClientRect(); return b.width && b.height ? b : null; };
+    const SEL = ['#te-status', '#te-side', '#te-prompt', '#te-rot', '.mlm-hud', '.mla-bar', '.k3-joy', '.k3-btn[aria-label="jump"]', '.k3-btn[aria-label="use"]', '.k3-btn[aria-label="eco"]'];
+    const boxes = SEL.map(s => { const b = vis(document.querySelector(s)); return b ? { s, x: b.left, y: b.top, r: b.right, b: b.bottom } : null; }).filter(Boolean);
+    const hits = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], c = boxes[j];
+      if (a.x < c.r - 1 && a.r > c.x + 1 && a.y < c.b - 1 && a.b > c.y + 1) hits.push(a.s + ' × ' + c.s);
+    }
+    const out = boxes.filter(b => b.x < -1 || b.y < -1 || b.r > innerWidth + 1 || b.b > innerHeight + 1).map(b => b.s);
+    // el contenido de la columna derecha no se recorta (salvo el objetivo, que cede lugar a propósito)
+    const side = document.querySelector('#te-side');
+    const clipped = [...side.querySelectorAll('#te-tip button, #te-boss .te-bar')].filter(e => { const b = vis(e); const sb = side.getBoundingClientRect(); return b && (b.bottom > sb.bottom + 1); }).map(e => e.textContent || 'barra');
+    const targets = [...document.querySelectorAll('.k3-btn, .mla-bar button, #te-tip button, #te-prompt, #te-rot')].map(e => ({ e, b: vis(e) })).filter(x => x.b)
+      .filter(x => x.b.width < 44 || x.b.height < 44).map(x => (x.e.getAttribute('aria-label') || x.e.textContent || '').trim().slice(0, 20) + ' ' + Math.round(x.b.width) + '×' + Math.round(x.b.height));
+    const fonts = [...document.querySelectorAll('#te-status .te-chip, #te-obj, #te-boss small, #te-tip, #te-prompt, .mlm-m')].filter(e => vis(e))
+      .map(e => ({ t: (e.textContent || '').trim().slice(0, 16), f: parseFloat(getComputedStyle(e).fontSize), min: e.classList.contains('mlm-m') ? 11 : 12 })).filter(x => x.f < x.min).map(x => x.t + ' ' + x.f);
+    return { hits, out, clipped, targets, fonts, sw: document.documentElement.scrollWidth, sh: document.documentElement.scrollHeight, w: innerWidth, h: innerHeight };
+  });
+}
+function expectClean(r, label) {
+  expect(r.hits, label).toEqual([]);
+  expect(r.out, label).toEqual([]);
+  expect(r.clipped, label).toEqual([]);
+  expect(r.targets, label).toEqual([]);
+  expect(r.fonts, label).toEqual([]);
+  expect(r.sw, label).toBeLessThanOrEqual(r.w);
+  expect(r.sh, label).toBeLessThanOrEqual(r.h);
 }
 
 test.describe('Templo de los Ecos', () => {
@@ -57,9 +106,11 @@ test.describe('Templo de los Ecos', () => {
   });
 
   test('arranque con entrada real, movimiento y salto', async ({ page, isMobile }) => {
-    const { errors } = await openGame(page, FILE);
+    // Determinista: la entrada real (tecla o toque) queda apretada mientras corre simulate(); el salto se verifica con
+    // contadores monótonos (saltos y altura máxima) en vez de muestrear la altura en el instante justo (era la causa del flaky en CI).
+    const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, isMobile);
+    await startFrozen(page, isMobile);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('ml:telemetry') || '[]').map(e => e.type))).toContain('start');
     await expect(page.locator('#te-status')).toBeVisible();
     const z0 = (await T(page, 'return T.player')).z;
@@ -67,18 +118,22 @@ test.describe('Templo de los Ecos', () => {
       const box = /** @type {any} */ (await page.locator('.k3-joy').boundingBox());
       const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
       await touch(page, 'touchStart', cx, cy); await touch(page, 'touchMove', cx, cy - 50);
-      await expect.poll(() => T(page, 'return T.player.z'), POLL).toBeLessThan(z0 - 0.8);
+      await sim(page, 0.6);
       await touch(page, 'touchEnd', 0, 0);
-      // botón táctil de salto
-      await page.locator('.k3-btn[aria-label="jump"]').tap();
-      await expect.poll(() => T(page, 'return T.player.y'), POLL).toBeGreaterThan(0.2);
     } else {
-      await page.keyboard.down('KeyW');
-      await expect.poll(() => T(page, 'return T.player.z'), POLL).toBeLessThan(z0 - 0.8);
-      await page.keyboard.up('KeyW');
-      await page.keyboard.press('Space');
-      await expect.poll(() => T(page, 'return T.player.y'), POLL).toBeGreaterThan(0.2);
+      await page.keyboard.down('KeyW'); await sim(page, 0.6); await page.keyboard.up('KeyW');
     }
+    expect((await T(page, 'return T.player')).z).toBeLessThan(z0 - 0.8);
+    expect((await T(page, 'return T.stats')).moved).toBeGreaterThan(0.8);
+    await sim(page, 0.3);
+    expect(await T(page, 'return T.player.grounded')).toBe(true);
+    // salto: botón táctil real / Espacio real; el flanco queda guardado hasta el próximo paso, así que simulate lo consume siempre
+    if (isMobile) await page.locator('.k3-btn[aria-label="jump"]').tap(); else await page.keyboard.press('Space');
+    await sim(page, 1.0);
+    const st = await T(page, 'return T.stats');
+    expect(st.jumps).toBe(1);
+    expect(st.peak).toBeGreaterThan(0.2);
+    expect(await T(page, 'return T.player.grounded')).toBe(true);
     expectNoErrors(errors);
   });
 
@@ -108,7 +163,7 @@ test.describe('Templo de los Ecos', () => {
     test.skip(isMobile, 'empuje por teclado: en celular se cubre con el joystick en otra prueba');
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, false);
+    await startFrozen(page, false);
     // empujar el bloque b1 una baldosa al este caminando contra él
     await pushFrom(page, -6.4, 10, 'KeyD');
     expect((await T(page, 'return T.puzzle.blocks')).b1).toEqual([-2, 10]);
@@ -141,23 +196,26 @@ test.describe('Templo de los Ecos', () => {
   test('Sello del Eco: reliquia, arañas, pared secreta y códice (misión principal + secundaria persistentes)', async ({ page, isMobile }) => {
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, isMobile);
+    await startFrozen(page, isMobile);
     await D(page, 'openDoor("a1_santuario")');
     await D(page, 'teleport(0,0,-8)'); await sim(page, 0.3);
     expect(await T(page, 'return T.prompt')).toBe('Tomar el Sello del Eco');
     if (isMobile) await page.locator('.k3-btn[aria-label="use"]').tap(); else await page.keyboard.press('KeyE');
-    await expect.poll(() => T(page, 'return T.save.relics.sello'), POLL).toBe(true);
+    await sim(page, 0.1);
+    expect(await T(page, 'return T.save.relics.sello')).toBe(true);
     const m = await T(page, 'return T.missions.current.find(x => x.id === "sello")');
     expect(m.status).toBe('done');
     // las arañas despiertan; el Eco las destruye
     await sim(page, 1.0);
     expect((await T(page, 'return T.enemies')).filter(e => e.kind === 'spider' && e.state !== 'sleep').length).toBe(2);
     if (isMobile) await page.locator('.k3-btn[aria-label="eco"]').tap(); else await page.keyboard.press('KeyF');
-    await expect.poll(() => T(page, 'return T.enemies.filter(e => e.kind === "spider" && e.dead).length'), POLL).toBe(2);
+    await sim(page, 0.1);
+    expect(await T(page, 'return T.enemies.filter(e => e.kind === "spider" && e.dead).length')).toBe(2);
     // pared agrietada: el Eco la derrumba y la sala secreta cuenta
     await D(page, 'teleport(7.6,0,8)'); await sim(page, 1.2);
     if (isMobile) await page.locator('.k3-btn[aria-label="eco"]').tap(); else await page.keyboard.press('KeyF');
-    await expect.poll(() => T(page, 'return T.puzzle.walls.s1'), POLL).toBe(true);
+    await sim(page, 0.2);
+    expect(await T(page, 'return T.puzzle.walls.s1')).toBe(true);
     await D(page, 'teleport(13.5,0,8)'); await sim(page, 0.4);
     const s = await T(page, 'return T.save');
     expect(s.secrets).toContain('s1');
@@ -179,7 +237,7 @@ test.describe('Templo de los Ecos', () => {
   test('espejos giratorios: la luz se redirige con E, enciende el receptor y el estado persiste', async ({ page, isMobile }) => {
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, isMobile);
+    await startFrozen(page, isMobile);
     await D(page, 'goto(2)');
     const beams0 = await T(page, 'return T.counts.beams');
     const pressUse = async () => { if (isMobile) await page.locator('.k3-btn[aria-label="use"]').tap(); else await page.keyboard.press('KeyE'); await sim(page, 0.5); };
@@ -209,7 +267,7 @@ test.describe('Templo de los Ecos', () => {
   test('Sala del Eco: melodía de cristales, nota equivocada despierta arañas, acertijo sin pistas', async ({ page, isMobile }) => {
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, isMobile);
+    await startFrozen(page, isMobile);
     await D(page, 'goto(2)');
     await D(page, 'teleport(0,0,-19.8)'); await sim(page, 0.3);
     expect(await T(page, 'return T.prompt')).toBe('Escuchar la melodía');
@@ -232,7 +290,7 @@ test.describe('Templo de los Ecos', () => {
   test('plataformas temporizadas, caída al abismo y checkpoint de brasero', async ({ page, isMobile }) => {
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, isMobile);
+    await startFrozen(page, isMobile);
     await D(page, 'teleport(0,0,-16)'); await sim(page, 0.5);
     expect(await T(page, 'return T.save.cp')).toBe('a1_abismo');
     // las plataformas alternan (sólida → parpadeo → hueca)
@@ -253,7 +311,7 @@ test.describe('Templo de los Ecos', () => {
     test.skip(isMobile, 'mismo recorrido que escritorio; en celular se cubre el uso táctil en otras pruebas');
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, false);
+    await startFrozen(page, false);
     await D(page, 'give("sello")');
     await D(page, 'teleport(0,0,-33.6)'); await sim(page, 0.3);
     expect(await T(page, 'return T.prompt')).toBe('Abrir con el Sello del Eco');
@@ -281,7 +339,7 @@ test.describe('Templo de los Ecos', () => {
     test.skip(isMobile, 'lógica de IA: igual en ambos proyectos');
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, false);
+    await startFrozen(page, false);
     // centinela: te ve dentro del cono → alerta → embiste
     await D(page, 'teleport(0,0,1.0)');
     const states = new Set();
@@ -306,7 +364,7 @@ test.describe('Templo de los Ecos', () => {
   test('Guardián Eco: intro, 3 fases (rayos devueltos con Eco, resonadores, corazón) y victoria', async ({ page, isMobile }) => {
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, isMobile);
+    await startFrozen(page, isMobile);
     await D(page, 'give("sello")');
     await D(page, 'goto(3)');
     // entrar a la arena dispara la intro (cinemática)
@@ -370,7 +428,7 @@ test.describe('Templo de los Ecos', () => {
   test('drenaje de la reliquia: perderla reinicia la fase; derrota sin llamas y reintento', async ({ page, isMobile }) => {
     const { errors } = await openGame(page, DBG);
     await ready(page);
-    await start(page, isMobile);
+    await startFrozen(page, isMobile);
     await D(page, 'spawnBoss()'); await sim(page, 0.3); await D(page, 'skipCut()'); await sim(page, 0.1);
     await D(page, 'bossPhase(2)');
     await D(page, 'teleport(0,0,9)');
@@ -499,6 +557,157 @@ test.describe('Templo de los Ecos', () => {
     await page.locator('.k3-btn[aria-label="jump"]').tap();
     await expect.poll(() => T(page, 'return T.player.y'), POLL).toBeGreaterThan(0.2);
     await page.setViewportSize({ width: 412, height: 915 });
+    expectNoErrors(errors);
+  });
+  test('celular: matriz de pantallas (vertical y apaisado) en menú, exploración, espejo y jefe; girar en plena partida', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    // menú: el botón principal se ve, está en pantalla y mide ≥ 56 px; todo botón ≥ 44 px; sin scroll horizontal
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h }); await frames(page);
+      const m = await page.evaluate(() => {
+        const go = document.querySelector('#te-menu [data-go]').getBoundingClientRect();
+        const small = [...document.querySelectorAll('#te-menu button')].map(b => b.getBoundingClientRect()).filter(b => b.height < 44 || b.width < 44).length;
+        const el = document.elementFromPoint(go.left + go.width / 2, go.top + go.height / 2);
+        return { go: { t: go.top, b: go.bottom, h: go.height, l: go.left, r: go.right }, small, hitGo: !!(el && el.closest('[data-go]')), sw: document.documentElement.scrollWidth, w: innerWidth, h: innerHeight };
+      });
+      const label = `menú ${w}×${h}`;
+      expect(m.go.t, label).toBeGreaterThanOrEqual(0); expect(m.go.b, label).toBeLessThanOrEqual(m.h);
+      expect(m.go.l, label).toBeGreaterThanOrEqual(0); expect(m.go.r, label).toBeLessThanOrEqual(m.w);
+      expect(m.go.h, label).toBeGreaterThanOrEqual(56);
+      expect(m.small, label).toBe(0);
+      expect(m.hitGo, label).toBe(true);
+      expect(m.sw, label).toBeLessThanOrEqual(m.w);
+    }
+    await page.setViewportSize({ width: 360, height: 640 }); await frames(page);
+    await start(page, true);
+    const scenes = {
+      exploración: async () => { await D(page, 'showTip("move")'); },
+      espejo: async () => { await D(page, 'give("sello")'); await D(page, 'goto(2)'); await D(page, 'teleport(-12.6,0,2.6)'); await sim(page, 0.4); await D(page, 'showTip("mirror")'); },
+      jefe: async () => { await D(page, 'spawnBoss()'); await sim(page, 0.3); await D(page, 'skipCut()'); await sim(page, 0.1); await D(page, 'bossPhase(1)'); await D(page, 'teleport(0,0,9)'); await D(page, 'setHP(4)'); await sim(page, 0.5); await D(page, 'showTip("boss")'); },
+    };
+    for (const [name, setup] of Object.entries(scenes)) {
+      await setup();
+      for (const [w, h] of SIZES) {
+        // rotar/cambiar de tamaño en plena partida: el estado sigue y la distribución se recalcula
+        await page.setViewportSize({ width: w, height: h }); await frames(page);
+        await D(page, 'setHP(4)'); await sim(page, 0.05);
+        await page.evaluate(() => { const t = document.querySelector('.k3-toast'); if (t) t.classList.remove('on'); });
+        await frames(page);
+        expect(await T(page, 'return T.state'), `${name} ${w}×${h}`).toBe('play');
+        await expect(page.locator('#te-tip'), `${name} ${w}×${h}`).toBeVisible();
+        if (name === 'espejo') await expect(page.locator('#te-prompt'), `${name} ${w}×${h}`).toBeVisible();
+        if (name === 'jefe') await expect(page.locator('#te-boss'), `${name} ${w}×${h}`).toBeVisible();
+        expectClean(await auditLayout(page), `${name} ${w}×${h}`);
+        // encuadre: en vertical la cámara abre el ángulo
+        expect(await T(page, 'return T.touch.fov'), `${name} ${w}×${h}`).toBe(w < h * 0.8 ? 62 : 50);
+      }
+    }
+    expectNoErrors(errors);
+  });
+
+  test('celular: recorrido sólo táctil — multitáctil, espejo y melodía tocando el aviso, Eco del jefe con margen táctil', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await startFrozen(page, true);
+    // multitáctil: joystick (dedo 1) + SALTO (dedo 2) a la vez
+    const joy = await center(page, '.k3-joy'), jump = await center(page, '.k3-btn[aria-label="jump"]');
+    const z0 = (await T(page, 'return T.player.z'));
+    await touches(page, 'touchStart', [{ ...joy, id: 1 }]);
+    await touches(page, 'touchMove', [{ x: joy.x, y: joy.y - 50, id: 1 }]);
+    await touches(page, 'touchStart', [{ x: joy.x, y: joy.y - 50, id: 1 }, { ...jump, id: 2 }]);
+    await sim(page, 0.5);
+    await touches(page, 'touchEnd', [{ x: joy.x, y: joy.y - 50, id: 1 }]);
+    await touches(page, 'touchEnd', []);
+    await sim(page, 0.8);
+    let st = await T(page, 'return T.stats');
+    expect(st.jumps).toBe(1);
+    expect(st.peak).toBeGreaterThan(1);
+    expect((await T(page, 'return T.player.z'))).toBeLessThan(z0 - 1.5);
+    // tutorial: «Entendido» se toca
+    await D(page, 'showTip("interact")');
+    await page.locator('#te-tip [data-t="ok"]').tap();
+    await expect(page.locator('#te-tip')).toBeHidden();
+    // espejo: tocar el aviso «Girar espejo» lo gira (y USAR también)
+    await D(page, 'give("sello")'); await D(page, 'goto(2)');
+    await D(page, 'teleport(-12.6,0,2.6)'); await sim(page, 0.3);
+    await expect(page.locator('#te-prompt')).toContainText('Girar espejo');
+    await page.locator('#te-prompt').tap(); await sim(page, 0.3);
+    expect((await T(page, 'return T.puzzle.mirrors')).m1).toBe(1);
+    await page.locator('.k3-btn[aria-label="use"]').tap(); await sim(page, 0.3);
+    expect((await T(page, 'return T.puzzle.mirrors')).m1).toBe(2);
+    expect((await T(page, 'return T.stats')).promptTaps).toBe(1);
+    // melodía: escuchar y tocar cada cristal desde el aviso, sin teclado
+    await D(page, 'teleport(0,0,-19.8)'); await sim(page, 0.3);
+    await expect(page.locator('#te-prompt')).toContainText('Escuchar la melodía');
+    await page.locator('#te-prompt').tap(); await sim(page, 5);
+    const melody = (await T(page, 'return T.puzzle.echo')).melody;
+    const SPOT = [[-4.5, -15.3], [-1.5, -17.6], [1.5, -17.6], [4.5, -15.3]];
+    const NAMES = ['rojo', 'ámbar', 'turquesa', 'violeta'];
+    for (const k of melody) {
+      await D(page, `teleport(${SPOT[k][0]},0,${SPOT[k][1]})`); await sim(page, 0.3);
+      await expect(page.locator('#te-prompt')).toContainText(NAMES[k]);
+      await page.locator('#te-prompt').tap(); await sim(page, 0.2);
+    }
+    expect((await T(page, 'return T.puzzle.echo')).state).toBe('done');
+    expect((await T(page, 'return T.save.rooms')).eco).toBe(true);
+    // Guardián: el Eco táctil tiene margen (radio mayor) y un toque apenas temprano se guarda hasta que el rayo entra
+    await D(page, 'spawnBoss()'); await sim(page, 0.3); await D(page, 'skipCut()'); await sim(page, 0.1);
+    await D(page, 'bossPhase(1)'); await D(page, 'teleport(0,0,9)');
+    const tr = await T(page, 'return T.touch');
+    expect(tr.reflectR).toBeGreaterThan(await T(page, 'const d = T.difficulty; return d.parry * 13 + 0.6'));
+    let early = 0;
+    for (let i = 0; i < 400 && early < 2; i++) {
+      await D(page, 'setHP(4)'); await sim(page, 0.05);
+      const r = await T(page, `const b = T.boss, p = T.player; let d = Infinity; for (const o of b.orbs) if (!o.back && o.y < 4) d = Math.min(d, Math.hypot(o.x - p.x, o.z - p.z)); return { ph: b.phase, d, R: T.touch.reflectR, cd: T.touch.ecoBuf }`);
+      if (r.ph !== 1) break;
+      // toque «temprano»: el rayo todavía está fuera del radio, dentro de la ventana de guardado
+      if (r.d > r.R + 0.4 && r.d < r.R + 2.4) {
+        const before = await T(page, 'return T.boss.reflects');
+        await page.locator('.k3-btn[aria-label="eco"]').tap();
+        await sim(page, 0.4);
+        if ((await T(page, 'return T.boss.reflects')) > before) early++;
+        await sim(page, 1.0);
+      }
+    }
+    expect(early).toBeGreaterThanOrEqual(2);
+    expectNoErrors(errors);
+  });
+
+  test('celular: vibración opcional, pausa al pasar a segundo plano y gestos bloqueados en la superficie de juego', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    await page.addInitScript(() => { /** @type {any} */ (window).__vib = 0; navigator.vibrate = () => { /** @type {any} */ (window).__vib++; return true; }; });
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    // con «movimiento: completo» (headless puede informar reduced-motion) la vibración está activa por defecto
+    await page.locator('#te-menu [data-opts]').tap();
+    await expect(page.locator('#te-opts [data-haptics]')).toBeChecked();
+    await page.locator('#te-opts [data-motion]').selectOption('full');
+    await page.locator('#te-opts [data-back]').tap();
+    await startFrozen(page, true);
+    await page.locator('.k3-btn[aria-label="jump"]').tap();
+    expect(await page.evaluate(() => /** @type {any} */ (window).__vib)).toBeGreaterThan(0);
+    // apagarla desde las opciones (vía pausa)
+    await page.locator('.mla-bar button[aria-label="Pausa"]').tap();
+    await page.locator('.mla-pause [data-a="custom"]', { hasText: 'Controles' }).tap();
+    await page.locator('#te-opts [data-haptics]').uncheck();
+    expect(await T(page, 'return T.save.opts.haptics')).toBe(false);
+    await page.locator('#te-opts [data-back]').tap();
+    await page.locator('.mla-pause [data-a="resume"]').tap();
+    await expect.poll(() => T(page, 'return T.paused'), POLL).toBe(false);
+    const v0 = await page.evaluate(() => /** @type {any} */ (window).__vib);
+    await page.locator('.k3-btn[aria-label="jump"]').tap();
+    expect(await page.evaluate(() => /** @type {any} */ (window).__vib)).toBe(v0);
+    // superficie de juego sin gestos del navegador (zoom/scroll): touch-action none en el lienzo y en el HUD
+    const ta = await page.evaluate(() => ({ root: getComputedStyle(document.querySelector('canvas').parentElement).touchAction, hud: getComputedStyle(document.querySelector('#te-status')).touchAction, vp: document.querySelector('meta[name=viewport]').getAttribute('content') }));
+    expect(ta.root).toBe('none'); expect(ta.hud).toBe('none');
+    expect(ta.vp).not.toMatch(/user-scalable|maximum-scale/);
+    // la app pasa a segundo plano → pausa
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect.poll(() => T(page, 'return T.paused'), POLL).toBe(true);
+    await expect(page.locator('.mla-pause')).toBeVisible();
     expectNoErrors(errors);
   });
 });

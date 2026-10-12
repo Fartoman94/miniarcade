@@ -94,7 +94,7 @@ export const SAVE_DEFAULTS = {
   bestScore: 0,
   stats: { stunts: 0, towers: 0, wrecks: 0, rounds: 0 },
   tutorial: { off: false, seen: /** @type {Record<string, boolean>} */ ({}) },
-  opts: { sens: 1, autoGas: false, motion: 'auto', cam: 'lejos', binds: { nitro: 'ShiftLeft', power: 'KeyE', drift: 'Space' } },
+  opts: { sens: 1, autoGas: false, haptics: true, motion: 'auto', cam: 'lejos', binds: { nitro: 'ShiftLeft', power: 'KeyE', drift: 'Space' } },
 };
 
 /** Etiqueta legible de un código de tecla. @param {string} code */

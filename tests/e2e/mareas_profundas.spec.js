@@ -585,4 +585,222 @@ test.describe('Mareas Profundas', () => {
     await page.setViewportSize({ width: 412, height: 915 });
     expectNoErrors(errors);
   });
+  /* ======================= móvil (proyecto 'mobile', Pixel 7) ======================= */
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+  /** Cajas visibles, pares superpuestos y elementos fuera del viewport. */
+  const layout = (page, sels) => page.evaluate(sels => {
+    const vis = e => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return b.width > 0 && b.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' && !e.closest('[hidden]'); };
+    const boxes = [];
+    for (const s of sels) document.querySelectorAll(s).forEach((e, i) => { if (vis(e)) { const b = e.getBoundingClientRect(); boxes.push({ s: s + (i ? '#' + i : ''), x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }); } });
+    const hits = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], c = boxes[j];
+      if (a.x < c.r - 1 && a.r > c.x + 1 && a.y < c.b - 1 && a.b > c.y + 1) hits.push(a.s + ' × ' + c.s);
+    }
+    const out = boxes.filter(b => b.x < -1 || b.y < -1 || b.r > innerWidth + 1 || b.b > innerHeight + 1).map(b => b.s);
+    return { boxes, hits, out, sw: document.documentElement.scrollWidth, w: innerWidth };
+  }, sels);
+  /** Elementos con texto propio más chico que `min` px dentro de `root`. */
+  const tinyText = (page, root, min) => page.evaluate(([root, min]) => {
+    const bad = [];
+    document.querySelectorAll(root).forEach(r => r.querySelectorAll('*').forEach(e => {
+      const own = [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+      if (!own || !e.getClientRects().length || getComputedStyle(e).display === 'none' || e.closest('[hidden]')) return;
+      const fs = parseFloat(getComputedStyle(e).fontSize);
+      if (fs < min) bad.push(e.textContent.trim().slice(0, 20) + ' ' + fs + 'px');
+    }));
+    return bad;
+  }, [root, min]);
+  const center = async (page, sel) => { const b = /** @type {any} */ (await page.locator(sel).boundingBox()); return [b.x + b.width / 2, b.y + b.height / 2]; };
+  /** Toques reales multitáctiles por CDP: cada punto es [x, y]; touchEnd suelta todos. */
+  async function touchN(page, type, pts) {
+    let cdp = cdps.get(page);
+    if (!cdp) { cdp = await page.context().newCDPSession(page); cdps.set(page, cdp); }
+    await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })) });
+  }
+  const HUD = ['#mp-left', '#mp-radar', '#mp-boss', '#mp-tip', '#mp-prompt', '#mp-warn', '.mla-bar', '.k3-joy', ...['up', 'down', 'sonar', 'use', 'photo', 'light'].map(b => `.k3-btn[aria-label="${b}"]`)];
+
+  test('celular: matriz de viewports (menú entra, objetivos ≥ 44 px, HUD sin choques en juego/aviso/peligro/jefe y partida sólo táctil)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    test.setTimeout(600_000);
+    const { errors } = await openGame(page, DBG);
+    for (const [w, h] of SIZES) {
+      const tag = `${w}×${h}`;
+      await page.setViewportSize({ width: w, height: h });
+      await page.evaluate(() => localStorage.clear()); // tutorial y progreso desde cero en cada tamaño
+      await page.goto('/' + DBG);
+      await ready(page);
+      // --- menú: entra sin scroll, nada pisa la barra del SDK, botón principal grande en pantalla ---
+      const m = await layout(page, ['#mp-menu .k3-panel > *', '.mla-bar > *']);
+      expect(m.out, tag).toEqual([]);
+      expect(m.hits.filter(x => x.includes('.mla-bar')), tag).toEqual([]);
+      expect(m.sw, tag).toBeLessThanOrEqual(m.w);
+      expect(await page.evaluate(() => { const e = /** @type {HTMLElement} */ (document.querySelector('#mp-menu')); return e.scrollHeight - e.clientHeight; }), tag + ' menú sin scroll').toBeLessThanOrEqual(1);
+      const go = /** @type {any} */ (await page.locator('#mp-menu [data-go]').boundingBox());
+      expect(go.height, tag).toBeGreaterThanOrEqual(56);
+      expect(go.y + go.height, tag).toBeLessThanOrEqual(h);
+      const small = await page.evaluate(() => [...document.querySelectorAll('#mp-menu button, .mla-bar button, .mla-bar a')].filter(b => b.getClientRects().length).map(b => b.getBoundingClientRect()).filter(r => r.width < 44 || r.height < 44).length);
+      expect(small, tag + ' botones < 44 px').toBe(0);
+      expect(await tinyText(page, '#mp-menu', 11), tag).toEqual([]);
+      // --- partida con un toque real ---
+      await startFrozen(page, true);
+      await sim(page, 0.3);
+      await expect(page.locator('#mp-tip'), tag).toBeVisible();
+      const check = async (what) => {
+        const r = await layout(page, HUD);
+        expect(r.hits, tag + ' ' + what).toEqual([]);
+        expect(r.out, tag + ' ' + what).toEqual([]);
+        expect(r.sw, tag).toBeLessThanOrEqual(r.w);
+        return r;
+      };
+      const r = await check('juego + consejo');
+      for (const b of r.boxes.filter(b => b.s.startsWith('.k3-btn'))) { expect(b.w, tag + b.s).toBeGreaterThanOrEqual(56); expect(b.h, tag + b.s).toBeGreaterThanOrEqual(56); }
+      const joy = /** @type {any} */ (r.boxes.find(b => b.s === '.k3-joy'));
+      expect(joy.w, tag).toBeGreaterThanOrEqual(120);
+      expect(joy.x, tag).toBeLessThan(w * 0.25); expect(joy.b, tag).toBeGreaterThan(h * 0.75); // pulgar izquierdo
+      const up = /** @type {any} */ (r.boxes.find(b => b.s.includes('"up"')));
+      expect(up.r, tag).toBeGreaterThan(w * 0.8); expect(up.b, tag).toBeGreaterThan(h * 0.6); // pulgar derecho
+      for (const b of await page.locator('#mp-tip button').all()) expect((/** @type {any} */ (await b.boundingBox())).height, tag).toBeGreaterThanOrEqual(44);
+      expect(await tinyText(page, '#mp-gauges, #mp-obj, #mp-prompt, #mp-warn, #mp-tip > div:nth-child(2), #mp-tip .row', 12), tag).toEqual([]);
+      expect(await tinyText(page, '#mp-missions, #mp-boss, #mp-tip, .k3-touch', 11), tag).toEqual([]);
+      // aviso de interacción + peligro + consejo a la vez
+      await D(page, 'at("module:reef",0,0,1)'); await sim(page, 0.2);
+      await expect(page.locator('#mp-prompt'), tag).toBeVisible();
+      await check('aviso USAR');
+      await D(page, 'teleport(0,-12,30,Math.PI)'); await D(page, 'setRes({o2:0})'); await sim(page, 0.2);
+      await expect(page.locator('#mp-warn'), tag).not.toBeEmpty();
+      await check('peligro');
+      // --- acción principal sólo con toques: joystick adelante + SONAR ---
+      await D(page, 'setRes({o2:100,energy:100})');
+      const p0 = await T(page, 'return T.player');
+      const [jx, jy] = await center(page, '.k3-joy');
+      await touchN(page, 'touchStart', [[jx, jy]]); await touchN(page, 'touchMove', [[jx, jy - 60]]);
+      await expect.poll(() => T(page, 'return T.touch.axis.y'), { message: tag }).toBeLessThan(-0.5);
+      await sim(page, 1);
+      await touchN(page, 'touchEnd', []);
+      const p1 = await T(page, 'return T.player');
+      expect(Math.hypot(p1.x - p0.x, p1.z - p0.z), tag).toBeGreaterThan(1.5);
+      const e0 = await T(page, 'return T.energy');
+      await page.locator('.k3-btn[aria-label="sonar"]').tap(); await sim(page, 0.1);
+      expect(await T(page, 'return T.energy'), tag).toBeLessThan(e0 - 1);
+      // --- jefe: barra del Leviatán sin pisar el HUD ---
+      await D(page, 'spawnBoss()'); await D(page, 'skipCut()'); await sim(page, 0.2); await D(page, 'bossPhase(1)'); await sim(page, 0.3);
+      await expect(page.locator('#mp-boss'), tag).toBeVisible();
+      await check('jefe');
+    }
+    expectNoErrors(errors);
+  });
+
+  test('celular: multitáctil (joystick + SUBIR a la vez), arrastre de cámara y retícula de escaneo con USAR mantenido', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await startFrozen(page, true);
+    await D(page, 'teleport(0,-12,30,Math.PI)');
+    const p0 = await T(page, 'return T.player');
+    const joy = await center(page, '.k3-joy'), up = await center(page, '.k3-btn[aria-label="up"]');
+    await touchN(page, 'touchStart', [joy, up]);
+    await touchN(page, 'touchMove', [[joy[0], joy[1] - 60], up]);
+    await expect.poll(() => T(page, 'return T.touch.up')).toBe(true);
+    await expect(page.locator('.k3-btn[aria-label="up"]')).toHaveClass(/on/);
+    await sim(page, 1);
+    const t = await T(page, 'return T.touch');
+    await touchN(page, 'touchEnd', []);
+    const p1 = await T(page, 'return T.player');
+    expect(t.axis.y).toBeLessThan(-0.5);
+    expect(p1.y).toBeGreaterThan(p0.y + 0.8);
+    expect(Math.hypot(p1.x - p0.x, p1.z - p0.z)).toBeGreaterThan(1.5);
+    // arrastrar en una zona libre de la pantalla gira la cámara (con el bucle real: el congelado descarta el arrastre)
+    const vw = /** @type {any} */ (page.viewportSize());
+    await page.locator('#mp-tip [data-t="ok"]').tap().catch(() => {});
+    await D(page, 'freeze(false)');
+    const y0 = (await T(page, 'return T.touch')).lookYaw;
+    await touchN(page, 'touchStart', [[vw.width * 0.5, vw.height * 0.55]]);
+    for (let i = 1; i <= 6; i++) await touchN(page, 'touchMove', [[vw.width * 0.5 + i * 20, vw.height * 0.55]]);
+    await expect.poll(async () => Math.abs((await T(page, 'return T.touch')).lookYaw - y0)).toBeGreaterThan(0.2);
+    await touchN(page, 'touchEnd', []);
+    await D(page, 'freeze(true)');
+    // escaneo: mantener USAR con una especie en la mira llena la retícula
+    const sp = /** @type {any} */ (await T(page, `return T.creatures.find(c => c.species && c.kind === 'jelly') || T.creatures.find(c => c.species)`));
+    await D(page, `teleport(${sp.x}, ${sp.y}, ${sp.z - 7}, 0)`); await D(page, `face(${sp.x}, ${sp.y}, ${sp.z})`); await sim(page, 0.1);
+    await expect.poll(() => T(page, 'return T.scan.target')).not.toBeNull();
+    const use = await center(page, '.k3-btn[aria-label="use"]');
+    await touchN(page, 'touchStart', [use]);
+    await expect.poll(() => T(page, 'return T.touch.use')).toBe(true);
+    await sim(page, 0.5);
+    const k = (await T(page, 'return T.scan')).k;
+    await touchN(page, 'touchEnd', []);
+    expect(k).toBeGreaterThan(0.2);
+    await expect(page.locator('#mp-reticle small')).toContainText(/ESCANEANDO|MANTENÉ USAR/);
+    expectNoErrors(errors);
+  });
+
+  test('celular: rotar en plena inmersión reacomoda HUD, controles y cámara sin perder el estado; calidad y pausa en segundo plano', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await ready(page);
+    await startFrozen(page, true);
+    await D(page, 'teleport(0,-12,30,Math.PI)'); await D(page, 'setRes({energy:77,hull:66})'); await sim(page, 0.2);
+    const before = await T(page, 'return { x: T.player.x, z: T.player.z, hull: T.hull, fov: T.fov, zone: T.zone }');
+    expect(before.fov).toBeGreaterThan(80); // vertical: FOV abierto (~62° horizontales)
+    await page.setViewportSize({ width: 844, height: 390 });
+    await wait(page, 400); await sim(page, 0.2);
+    const after = await T(page, 'return { state: T.state, x: T.player.x, z: T.player.z, hull: T.hull, fov: T.fov, zone: T.zone }');
+    expect(after.state).toBe('play');
+    expect(after.zone).toBe(before.zone);
+    expect(after.hull).toBeCloseTo(before.hull, 0);
+    expect(Math.abs(after.x - before.x) + Math.abs(after.z - before.z)).toBeLessThan(0.5);
+    expect(after.fov).toBeCloseTo(62, 0);
+    const r = await layout(page, HUD);
+    expect(r.hits).toEqual([]); expect(r.out).toEqual([]);
+    // los botones siguen funcionando en la nueva posición
+    expect((await center(page, '.k3-btn[aria-label="use"]'))[0]).toBeGreaterThan(600);
+    const e0 = await T(page, 'return T.energy');
+    await page.locator('.k3-btn[aria-label="sonar"]').tap(); await sim(page, 0.1);
+    expect(await T(page, 'return T.energy')).toBeLessThan(e0);
+    // calidad automática razonable en pantalla táctil: media, sin sombras, DPR acotado
+    expect(await T(page, 'return T.quality')).toMatchObject({ q: 'medium', shadows: false });
+    expect((await T(page, 'return T.quality')).pixelRatio).toBeLessThanOrEqual(1.5);
+    // segundo plano: la partida se pausa sola
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect.poll(() => T(page, 'return T.paused')).toBe(true);
+    expectNoErrors(errors);
+  });
+
+  test('celular: opciones táctiles (vibración, sin teclas) y ayuda con botonera siempre alcanzable', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    await page.addInitScript(() => { /** @type {any} */ (window).__vib = []; Object.defineProperty(navigator, 'vibrate', { configurable: true, value: ms => { /** @type {any} */ (window).__vib.push(ms); return true; } }); });
+    const { errors } = await openGame(page, DBG);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await ready(page);
+    await page.locator('#mp-menu [data-opts]').tap();
+    await expect(page.locator('#mp-opts')).toBeVisible();
+    await expect(page.locator('#mp-opts [data-bind]')).toHaveCount(0);
+    await expect(page.locator('#mp-opts [data-haptics]')).toBeChecked();
+    const back = /** @type {any} */ (await page.locator('#mp-opts [data-back]').boundingBox());
+    expect(back.y + back.height).toBeLessThanOrEqual(390);
+    expect(back.height).toBeGreaterThanOrEqual(44);
+    await page.locator('#mp-opts [data-back]').tap();
+    await page.locator('#mp-menu [data-help]').tap();
+    await expect(page.locator('#mp-help')).toBeVisible();
+    expect(await page.evaluate(() => { const e = /** @type {HTMLElement} */ (document.querySelector('#mp-help')); return e.scrollHeight > e.clientHeight; })).toBe(true); // la ayuda scrollea…
+    const hb = /** @type {any} */ (await page.locator('#mp-help [data-back]').boundingBox());
+    expect(hb.y + hb.height).toBeLessThanOrEqual(390); // …pero la botonera queda pegada abajo
+    await page.locator('#mp-help [data-back]').tap();
+    await start(page, true);
+    await page.locator('.k3-btn[aria-label="light"]').tap();
+    expect((await page.evaluate(() => /** @type {any} */ (window).__vib)).length).toBeGreaterThan(0);
+    // apagar la vibración desde la pausa → Controles
+    await page.locator('.mla-bar button[aria-label="Pausa"]').tap();
+    await page.locator('.mla-pause [data-a="custom"]', { hasText: 'Controles' }).tap();
+    await page.locator('#mp-opts [data-haptics]').tap();
+    expect(await T(page, 'return T.save.opts.haptics')).toBe(false);
+    await page.locator('#mp-opts [data-back]').tap();
+    await page.locator('.mla-pause [data-a="resume"]').tap().catch(() => {});
+    await page.evaluate(() => { /** @type {any} */ (window).__vib.length = 0; });
+    await page.locator('.k3-btn[aria-label="light"]').tap();
+    expect((await page.evaluate(() => /** @type {any} */ (window).__vib)).length).toBe(0);
+    expectNoErrors(errors);
+  });
 });

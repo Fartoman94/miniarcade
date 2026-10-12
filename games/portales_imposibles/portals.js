@@ -92,7 +92,7 @@ export function createPortals(ctx) {
   }
 
   /** Dispara un portal desde `o` en dirección `d`. Devuelve {ok, err?, x,y,z}. */
-  function shoot(which, o, d, lists) {
+  function shoot(which, o, d, lists, dry = false) {
     // el disparo atraviesa rejillas, campos y disparadores; se detiene en todo lo demás
     const h = raycast(o.x, o.y, o.z, d.x, d.y, d.z, 80, lists, c => c.mat === 'grate' || c.mat === 'trigger' || c.mat === 'field' || c.mat === 'barrier' || c.mat === 'player' || c.mat === 'sphere' || c.mat === 'turret');
     if (!h || !h.box) return { ok: false, err: 'none', x: o.x + d.x * 30, y: o.y + d.y * 30, z: o.z + d.z * 30 };
@@ -100,6 +100,7 @@ export function createPortals(ctx) {
     if (box.mat !== 'white') return { ok: false, err: box.mat === 'glass' ? 'glass' : 'surface', x, y, z, nx, ny, nz };
     const f = fit(which, box, x, y, z, nx, ny, nz, d, lists);
     if (!f.F) return { ok: false, err: f.err, x, y, z, nx, ny, nz };
+    if (dry) return { ok: true, x, y, z, nx, ny, nz };
     place(which, box, f.F);
     shots++;
     return { ok: true, x, y, z, nx, ny, nz };

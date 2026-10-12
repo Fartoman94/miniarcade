@@ -10,7 +10,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0a0705;overscroll-beh
 .am-hud[hidden]{display:none}
 .am-panel{background:linear-gradient(180deg,rgba(14,18,10,.82),rgba(10,12,8,.6));border:1px solid rgba(166,255,46,.28);border-radius:12px;
   box-shadow:0 8px 24px rgba(0,0,0,.35)}
-.am-status{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));width:214px;padding:8px 10px 9px;display:grid;gap:6px}
+.am-status{box-sizing:border-box;position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));width:236px;padding:8px 10px 9px;display:grid;gap:6px}
 .am-row{display:flex;align-items:center;gap:7px}
 .am-lbl{font-size:9px;font-weight:800;letter-spacing:.18em;color:#a9b89a}
 .am-hp{position:relative;flex:1;height:14px;border-radius:7px;background:rgba(255,255,255,.1);overflow:hidden}
@@ -60,7 +60,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0a0705;overscroll-beh
 .am-mk[hidden]{display:none}.am-mk.edge .ic{border-style:dashed}
 .am-dmg{position:absolute;left:50%;top:50%;width:220px;height:220px;margin:-110px 0 0 -110px;border-radius:50%;opacity:0;
   background:conic-gradient(from -20deg,rgba(255,40,40,.75) 0 40deg,transparent 40deg);-webkit-mask:radial-gradient(closest-side,transparent 78%,#000 80%,#000 96%,transparent 98%);mask:radial-gradient(closest-side,transparent 78%,#000 80%,#000 96%,transparent 98%)}
-.am-hint{position:absolute;left:50%;bottom:calc(max(22px,env(safe-area-inset-bottom)) + 52px);transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));padding:8px 14px;border-radius:12px;
+.am-hint{position:absolute;left:50%;bottom:calc(max(22px,env(safe-area-inset-bottom)) + 52px);transform:translateX(-50%);width:max-content;box-sizing:border-box;max-width:min(560px,calc(100vw - 32px));padding:8px 14px;border-radius:12px;
   background:rgba(10,12,8,.85);border:1px solid rgba(166,255,46,.4);font-size:13px;font-weight:700;text-align:center;opacity:0;transition:opacity .25s}
 .am-hint.on{opacity:1}
 .am-banner{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity .35s;width:min(720px,calc(100vw - 32px))}
@@ -86,10 +86,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0a0705;overscroll-beh
   background:rgba(255,255,255,.07);border:2px solid rgba(166,255,46,.35);touch-action:none;pointer-events:auto}
 .am-rstick[hidden]{display:none}
 .am-rstick i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:rgba(166,255,46,.32)}
-.am-rstick span{position:absolute;left:0;right:0;top:-18px;text-align:center;font:800 9px system-ui;letter-spacing:.2em;color:rgba(255,255,255,.55)}
+.am-rstick span{position:absolute;left:0;right:0;top:-18px;text-align:center;font:800 10px system-ui;letter-spacing:.2em;color:rgba(255,255,255,.55)}
 /* botones táctiles: a la izquierda del stick derecho */
 body .k3-touch .k3-btns{right:calc(max(20px,env(safe-area-inset-right)) + 144px);bottom:max(20px,env(safe-area-inset-bottom));max-width:216px;gap:8px}
-body .k3-touch .k3-btn{width:62px;height:62px;font-size:10px;letter-spacing:.03em}
+body .k3-touch .k3-btn{width:62px;height:62px;font-size:11px;letter-spacing:.03em;-webkit-touch-callout:none}
+body .k3-touch .k3-btn[aria-label="fire"]{width:70px;height:70px;font-size:12px}
+body .k3-touch .k3-btn.on{box-shadow:0 0 0 3px rgba(255,255,255,.55) inset}
 body .k3-touch .k3-btn[aria-label="fire"]{background:rgba(255,120,40,.45);border-color:rgba(255,170,90,.85)}
 body .k3-touch .k3-btn[aria-label="roll"]{background:rgba(80,180,255,.35)}
 body .k3-touch .k3-btn[aria-label="use"]{background:rgba(166,255,46,.32)}
@@ -104,7 +106,7 @@ body .k3-touch .k3-btn[aria-label="use"]{background:rgba(166,255,46,.32)}
   .am-menu .k3-panel{width:min(920px,100%);flex-direction:row;align-items:center;gap:22px;text-align:left}
   .am-mleft{align-items:flex-start;flex:0 0 36%}.am-mright{flex:1;gap:7px}
   .am-menu h1{font-size:clamp(28px,5.4vw,46px)!important}
-  .am-mright .k3-b{padding:10px 15px;font-size:13px}
+  .am-mright .k3-b{padding:10px 15px;font-size:13px;min-height:44px}.am-mright .k3-b[data-go]{min-height:50px;padding:10px 20px;font-size:14px}
   .am-camp{padding:6px 10px;font-size:11px}
 }
 .am-menu h1 span{color:var(--am)}
@@ -120,7 +122,7 @@ body .k3-touch .k3-btn[aria-label="use"]{background:rgba(166,255,46,.32)}
 .am-dfx{font-size:11px;color:#a9b89a;min-height:1.3em;text-align:center}
 .am-credit{display:flex;align-items:center;gap:6px;font:400 11px 'Bungee',system-ui,sans-serif;letter-spacing:.16em;color:#dfe9d2}
 .am-credit img{width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(166,255,46,.6)}
-.am-credit small{font:800 9px system-ui;letter-spacing:.24em;color:#97a68a}
+.am-credit small{font:800 11px system-ui;letter-spacing:.24em;color:#97a68a}
 .am-opt{width:100%;display:grid;gap:7px;text-align:left;font-size:13px}
 .am-opt label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(255,255,255,.05);border-radius:10px;padding:7px 10px}
 .am-opt input[type=range]{width:140px;accent-color:var(--am)}
@@ -142,16 +144,16 @@ body .k3-touch .k3-btn[aria-label="use"]{background:rgba(166,255,46,.32)}
 .am-craft-grid button:focus-visible{outline:2px solid #fff}
 .am-lv{display:flex;gap:3px}.am-lv i{width:14px;height:5px;border-radius:2px;background:rgba(255,255,255,.18)}.am-lv i.on{background:var(--am)}
 @media (pointer:coarse){.am-keys,.am-wm{display:none}.am-hint{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 160px)}.am-tut{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 160px)}}
-@media (orientation:portrait) and (pointer:coarse){.am-hint{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 300px)}.am-tut{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 300px)}.am-prompt{top:56%}}
+@media (orientation:portrait) and (pointer:coarse){.am-hint{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 300px);font-size:12px;padding:6px 11px}.am-tut{bottom:calc(max(22px,env(safe-area-inset-bottom)) + 300px)}.am-prompt{top:56%}}
 @media (max-width:760px){
-  .am-status{width:178px;padding:6px 8px;gap:4px}.am-ammo{font-size:16px}.am-mods{display:none}
+  .am-status{width:196px;padding:6px 8px;gap:4px}.am-ammo{font-size:16px}.am-mods{display:none}
   .am-obj{top:calc(max(8px,env(safe-area-inset-top)) + 112px);left:8px;right:8px;transform:none;width:auto;min-width:0;padding:5px 10px}
   .am-obj .am-goal{font-size:12px}
   .am-sm span:not(.primary){display:none}
   .am-banner{top:44%}
 }
 @media (max-height:500px){
-  .am-status{width:178px;padding:5px 8px;gap:3px}.am-ammo{font-size:15px}.am-mods,.am-score{display:none}
+  .am-status{width:196px;padding:5px 8px;gap:3px}.am-ammo{font-size:15px}.am-mods,.am-score{display:none}
   .am-obj{top:max(6px,env(safe-area-inset-top));left:50%;right:auto;transform:translateX(-50%);width:min(340px,calc(100vw - 440px));min-width:220px;padding:4px 10px}
   .am-obj .am-goal{font-size:11px}.am-sm span{font-size:9px;padding:1px 6px}.am-sm{margin-top:3px}.am-sm span:not(.primary){display:none}
   .am-banner{top:36%}
@@ -159,6 +161,37 @@ body .k3-touch .k3-btn[aria-label="use"]{background:rgba(166,255,46,.32)}
 }
 @media (pointer:coarse) and (max-height:500px){.am-hint{bottom:auto;top:calc(max(6px,env(safe-area-inset-top)) + 118px);max-width:min(460px,calc(100vw - 440px));font-size:12px;padding:6px 10px}.am-tut{bottom:max(10px,env(safe-area-inset-bottom));width:calc(100vw - 560px);min-width:260px}.am-prompt{top:64%}}
 @media (prefers-reduced-motion:reduce){.am-hint,.am-banner,.am-hitm{transition:none}}
+/* ---- móvil ---- */
+.k3-screen.am-scr{touch-action:pan-y;overscroll-behavior:contain}
+@media (orientation:portrait){.k3-screen.am-scr{padding-top:calc(max(16px,env(safe-area-inset-top)) + 54px);padding-bottom:max(16px,env(safe-area-inset-bottom))}}
+@media (orientation:landscape) and (max-height:560px){.k3-screen.am-scr{padding-right:calc(max(16px,env(safe-area-inset-right)) + 4px);padding-top:calc(max(10px,env(safe-area-inset-top)) + 46px);padding-bottom:max(10px,env(safe-area-inset-bottom))}}
+#am-menu [data-diff] button{min-height:44px}
+#am-menu .mlm-diff-t{font-size:11px}
+#am-menu .mlm-diff-row button{padding-left:12px;padding-right:12px}
+.am-btnbar{position:sticky;bottom:0;padding:10px 0 max(6px,env(safe-area-inset-bottom));width:100%;display:flex;justify-content:center;background:linear-gradient(transparent,rgba(2,4,8,.92) 40%)}
+@media (pointer:coarse){
+  .am-opt label{min-height:44px;box-sizing:border-box}
+  .am-opt input[type=range]{height:44px;width:min(150px,38vw)}
+  .am-opt input[type=checkbox]{width:26px;height:26px}
+  .am-opt select{min-height:44px;font-size:14px}
+  .am-map .pc,.am-map .gp{display:none}
+  .am-tut button{min-height:44px;min-width:64px;font-size:12px}
+  .am-tut p small{font-size:10px}
+  .am-arenas button{min-height:48px}
+  .am-craft-grid button{min-height:56px}
+}
+/* menú en celulares bajitos (vertical): compacto */
+@media (orientation:portrait) and (max-height:740px){
+  .am-menu .k3-panel{gap:8px}.am-mcol{gap:8px}
+  .am-menu h1{font-size:clamp(28px,9vw,40px)!important}
+  .am-menu .am-sub{font-size:13px;line-height:1.35}
+  .am-menu .k3-b{padding:12px 18px;font-size:14px}
+  .am-camp{font-size:12px;padding:6px 10px}
+}
+/* HUD apretado (vertical angosto): vida/rodar/munición, sin puntaje */
+.am-status.tight{padding:5px 7px;gap:3px}.am-status.tight .am-score,.am-status.tight .am-mods{display:none}
+.am-status.tight .am-lbl{letter-spacing:.06em}.am-status.tight .am-pulse{width:34px}.am-status.tight .am-ammo{font-size:15px}
+
 `;
 
 /** @param {{onSkipTutorial:()=>void, isTouch:boolean}} h */
@@ -244,10 +277,72 @@ export function createUI(h) {
   const end = screen('', { accent: ACCENT, id: 'am-end' }); end.hide();
   const clear = screen('', { accent: ACCENT, id: 'am-clear' }); clear.hide();
   const craft = screen('', { accent: ACCENT, id: 'am-craft' }); craft.hide();
+  for (const sc of [menu, opts, end, clear, craft]) sc.el.classList.add('am-scr');
+
+  /* ---- distribución del HUD según pantalla (barra del arcade, vertical/apaisado, tutorial) ---- */
+  const stEl = /** @type {HTMLElement} */ (hud.querySelector('.am-status'));
+  const obEl = /** @type {HTMLElement} */ (hud.querySelector('.am-obj'));
+  let topSafe = 70, layoutRaf = 0;
+  const overlaps = (/** @type {DOMRect} */ a, /** @type {DOMRect} */ b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  function layout() {
+    layoutRaf = 0;
+    stEl.style.top = stEl.style.width = ''; stEl.classList.remove('tight'); obEl.style.top = '';
+    tut.style.top = ''; tut.style.bottom = ''; tut.style.left = ''; tut.style.width = ''; tut.style.transform = ''; tut.style.minWidth = '';
+    hint.style.top = ''; hint.style.bottom = '';
+    if (hud.hidden) return;
+    const bar = document.querySelector('.mla-bar');
+    const W = innerWidth, H = innerHeight, portrait = H > W;
+    let sr = stEl.getBoundingClientRect();
+    const br = bar ? bar.getBoundingClientRect() : null;
+    if (br && br.width > 0 && overlaps(sr, br)) {
+      // 1) achicar el panel de estado para que entre a la izquierda de la barra; 2) si no entra, bajarlo
+      const room = br.left - 6 - sr.left;
+      if (room >= 132) { stEl.classList.add('tight'); stEl.style.width = room + 'px'; }
+      else stEl.style.top = (br.bottom + 6) + 'px';
+      sr = stEl.getBoundingClientRect();
+    }
+    let bottom = Math.max(sr.bottom, br ? br.bottom : 0);
+    if (W <= 760) {
+      // objetivo a lo ancho, debajo del estado y de la barra
+      obEl.style.top = (bottom + 6) + 'px';
+      bottom = obEl.getBoundingClientRect().bottom;
+    } else bottom = Math.max(bottom, obEl.getBoundingClientRect().bottom);
+    topSafe = bottom;
+    if (h.isTouch && portrait) {
+      // tutorial y avisos arriba (debajo del objetivo): abajo están los pulgares y los botones
+      let y = bottom + 6;
+      if (!tut.hidden) { tut.style.top = y + 'px'; tut.style.bottom = 'auto'; y = tut.getBoundingClientRect().bottom + 6; }
+      hint.style.top = y + 'px'; hint.style.bottom = 'auto';
+    } else if (h.isTouch) {
+      // apaisado: el tutorial va en el hueco entre el stick izquierdo y los botones
+      hint.style.top = (bottom + 6) + 'px'; hint.style.bottom = 'auto';
+      const joy = document.querySelector('.k3-joy'), btns = document.querySelector('.k3-btns');
+      if (!tut.hidden && joy && btns) {
+        const jr = joy.getBoundingClientRect(), bb = btns.getBoundingClientRect();
+        if (jr.width && bb.width) {
+          const left = jr.right + 8, wdt = bb.left - 8 - left;
+          if (wdt >= 200) { tut.style.left = left + 'px'; tut.style.width = wdt + 'px'; tut.style.minWidth = '0'; tut.style.transform = 'none'; }
+        }
+      }
+    }
+  }
+  const relayout = () => { if (!layoutRaf) layoutRaf = requestAnimationFrame(layout); };
+  addEventListener('resize', relayout);
+  addEventListener('orientationchange', relayout);
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(relayout); ro.observe(obEl); ro.observe(stEl); ro.observe(tut);
+    const bar = document.querySelector('.mla-bar'); if (bar) ro.observe(bar);
+  }
+  // red de seguridad barata: la barra del arcade puede cambiar de botones sin cambiar de tamaño de ventana
+  setInterval(() => { if (!hud.hidden) relayout(); }, 1000);
+
 
   return {
     hud, menu, opts, end, clear, craft, tut, rstick, rs,
-    showHud(v) { hud.hidden = !v; },
+    showHud(v) { hud.hidden = !v; relayout(); },
+    layout, relayout,
+    /** Borde inferior de los paneles de arriba (para que los marcadores no queden tapados). */
+    get topSafe() { return topSafe; },
     showRStick(v) { rstick.hidden = !(v && h.isTouch); if (rstick.hidden) { rs.x = rs.y = 0; rs.active = false; } },
     /** @param {any} s */
     status(s) {
@@ -305,6 +400,7 @@ export function createUI(h) {
     vignette(k) { vig.style.opacity = String(Math.max(0, Math.min(1, k)).toFixed(2)); },
     toxic(k) { tox.style.opacity = String(Math.max(0, Math.min(1, k)).toFixed(2)); },
     tutorial(show, n = 0, total = 0, text = '') {
+      if (tut.hidden === show) relayout();
       tut.hidden = !show; if (!show) return;
       /** @type {HTMLElement} */ (tut.querySelector('[data-k="n"]')).textContent = `${n}/${total}`;
       /** @type {HTMLElement} */ (tut.querySelector('[data-k="t"]')).textContent = text;
@@ -349,18 +445,18 @@ function optionsHTML(st, touch) {
     <label>Disparo automático al apuntar (táctil) <input type="checkbox" data-o="autoFire" ${st.autoFire ? 'checked' : ''}></label>
     <label>Reducir movimiento (sin sacudidas ni destellos) <input type="checkbox" data-o="calm" ${st.calm ? 'checked' : ''}></label>
   </div>
-  <table class="am-map"><tr><th>ACCIÓN</th><th>PC</th><th>TÁCTIL</th><th>GAMEPAD</th></tr>
-    <tr><td>Mover</td><td>WASD</td><td>Stick izq.</td><td>Stick izq.</td></tr>
-    <tr><td>Apuntar / cámara</td><td>Mouse (clic captura) · flechas</td><td>Stick der.</td><td>Stick der.</td></tr>
-    <tr><td>Disparar</td><td>Clic izq. / J</td><td>FUEGO o automático</td><td>RT</td></tr>
-    <tr><td>Mira al hombro</td><td>Clic der. / K</td><td>—</td><td>LT</td></tr>
-    <tr><td>Rodar (evasión)</td><td>Espacio</td><td>RODAR</td><td>A</td></tr>
-    <tr><td>Usar / mantener</td><td>E</td><td>USAR</td><td>X</td></tr>
-    <tr><td>Pulso</td><td>Q</td><td>PULSO</td><td>LB</td></tr>
-    <tr><td>Barricada</td><td>F</td><td>BARR.</td><td>Y</td></tr>
-    <tr><td>Recargar</td><td>R</td><td>automático</td><td>B</td></tr>
-    <tr><td>Pausa</td><td>Esc / P</td><td>⏸</td><td>Start</td></tr></table>
-  <div class="k3-btnrow"><button class="k3-b" type="button" data-back>✓ LISTO</button></div>`;
+  <table class="am-map"><tr><th>ACCIÓN</th><th class="pc">PC</th><th>TÁCTIL</th><th class="gp">GAMEPAD</th></tr>
+    <tr><td>Mover</td><td class="pc">WASD</td><td>Stick izq.</td><td class="gp">Stick izq.</td></tr>
+    <tr><td>Apuntar / cámara</td><td class="pc">Mouse (clic captura) · flechas</td><td>Stick APUNTAR o arrastrar la pantalla</td><td class="gp">Stick der.</td></tr>
+    <tr><td>Disparar</td><td class="pc">Clic izq. / J</td><td>FUEGO o automático</td><td class="gp">RT</td></tr>
+    <tr><td>Mira al hombro</td><td class="pc">Clic der. / K</td><td>—</td><td class="gp">LT</td></tr>
+    <tr><td>Rodar (evasión)</td><td class="pc">Espacio</td><td>RODAR</td><td class="gp">A</td></tr>
+    <tr><td>Usar / mantener</td><td class="pc">E</td><td>USAR</td><td class="gp">X</td></tr>
+    <tr><td>Pulso</td><td class="pc">Q</td><td>PULSO</td><td class="gp">LB</td></tr>
+    <tr><td>Barricada</td><td class="pc">F</td><td>BARR.</td><td class="gp">Y</td></tr>
+    <tr><td>Recargar</td><td class="pc">R</td><td>automático</td><td class="gp">B</td></tr>
+    <tr><td>Pausa</td><td class="pc">Esc / P</td><td>⏸</td><td class="gp">Start</td></tr></table>
+  <div class="am-btnbar"><button class="k3-b" type="button" data-back>✓ LISTO</button></div>`;
 }
 function endHTML(o) {
   return `<span class="k3-kicker">${o.kicker}</span><h1 style="font-size:clamp(28px,7vw,52px)">${o.title}</h1><p>${o.text}</p>
@@ -375,8 +471,8 @@ function clearHTML(o) {
   <div class="am-stats"><div>PUNTOS<b>${o.score}</b></div><div>BONO<b>+${o.bonus}</b></div><div>BAJAS<b>${o.kills}</b></div></div>
   <div class="k3-btnrow"><button class="k3-b" type="button" data-next>▶ SEGUIR A ${o.next}</button><button class="k3-b alt" type="button" data-menu>MENÚ</button></div>`;
 }
-/** @param {Record<string,number>} lv @param {number} scrap */
-function craftHTML(lv, scrap) {
+/** @param {Record<string,number>} lv @param {number} scrap @param {boolean} [touch] */
+function craftHTML(lv, scrap, touch = false) {
   const items = UPGRADES.map((u, i) => {
     const l = lv[u.id] || 0, maxed = l >= 3, cost = maxed ? 0 : u.cost[l];
     return `<button type="button" data-up="${u.id}" ${maxed || scrap < cost ? 'disabled' : ''}><b>${u.icon} ${i + 1}. ${u.name}</b><span>${u.desc}</span>
@@ -384,6 +480,6 @@ function craftHTML(lv, scrap) {
   }).join('');
   return `<span class="k3-kicker">BANCO DE TRABAJO · 🔩 ${scrap} CHATARRA</span><h1 style="font-size:clamp(24px,5vw,38px)">MÓDULOS DE ARMA</h1>
   <div class="am-craft-grid">${items}</div>
-  <p style="font-size:12px">Teclas 1-4 para comprar · E para volver. Las mejoras duran toda la partida.</p>
-  <div class="k3-btnrow"><button class="k3-b" type="button" data-close>✓ LISTO</button></div>`;
+  <p style="font-size:12px">${touch ? 'Tocá un módulo para comprarlo.' : 'Teclas 1-4 para comprar · E para volver.'} Las mejoras duran toda la partida.</p>
+  <div class="am-btnbar"><button class="k3-b" type="button" data-close>✓ LISTO</button></div>`;
 }

@@ -739,3 +739,216 @@ test.describe('El Valle Encantado — MiniArcade 3.0', () => {
     expectNoErrors(errors);
   });
 });
+
+// ---------- Pasada móvil: matriz de tamaños, controles táctiles, gestos y orientación ----------
+const SIZES = [
+  { width: 360, height: 640 }, { width: 390, height: 844 }, { width: 412, height: 915 },
+  { width: 915, height: 412 }, { width: 844, height: 390 },
+];
+const ovl = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+/** Rectángulos de elementos visibles (display/visibility/opacity) por selector. */
+const boxesOf = (page, sels) => page.evaluate(sels => sels.map(s => {
+  const el = document.querySelector(s);
+  if (!el) return null;
+  const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+  if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0 || !r.width) return null;
+  return { s, left: r.left, top: r.top, right: r.right, bottom: r.bottom, w: r.width, h: r.height };
+}), sels);
+/** Puntero táctil sintético (los pointer events de Playwright no simulan dos dedos a la vez). */
+const touch = (page, type, id, x, y, onCanvas) => page.evaluate(([type, id, x, y, onCanvas]) => {
+  const ev = new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true, isPrimary: id === 1 });
+  (onCanvas ? document.getElementById('c') : window).dispatchEvent(ev);
+}, [type, id, x, y, onCanvas]);
+
+test.describe('El Valle Encantado — móvil', () => {
+  test('matriz de tamaños: menú a la vista, HUD sin solapes, objetivos táctiles ≥ 44 px', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo móvil');
+    test.setTimeout(240_000);
+    const { errors } = await openGame(page, FILE);
+    for (const vp of SIZES) {
+      const tag = `${vp.width}×${vp.height}`;
+      await page.setViewportSize(vp);
+      await page.reload();
+      await ready(page);
+      // menú: sin scroll horizontal, el modo principal visible sin desplazar y fuera de la barra del arcade
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tag).toBe(true);
+      await expect(page.locator('#modeExplore'), tag).toBeInViewport({ ratio: 0.9 });
+      const mb = await boxesOf(page, ['#modeExplore', '.title', '.m-right h2', '.mla-bar']);
+      for (const b of mb.slice(0, 3)) expect(ovl(b, mb[3]), `${tag} menú ${b.s} / barra`).toBe(false);
+      expect(mb[0].h, tag).toBeGreaterThanOrEqual(56);
+      // partida sólo con toques
+      await page.locator('#modeExplore').tap();
+      await until(page, () => window.__valle.snap().state === 'play');
+      await wait(page, 400);
+      const ids = ['.hearts', '#journalBtn', '#fragWrap', '#exploreHint', '#atkBtn', '.mla-bar', '.mlm-hud', '.wm'];
+      const bx = (await boxesOf(page, ids)).filter(Boolean);
+      expect(bx.length, tag).toBe(ids.length);
+      for (const b of bx) {
+        expect(b.left >= 0 && b.top >= 0 && b.right <= vp.width + 0.5 && b.bottom <= vp.height + 0.5, `${tag} ${b.s} dentro de la pantalla`).toBe(true);
+      }
+      for (let i = 0; i < bx.length; i++) for (let j = i + 1; j < bx.length; j++) {
+        expect(ovl(bx[i], bx[j]), `${tag}: ${bx[i].s} / ${bx[j].s}`).toBe(false);
+      }
+      const byS = Object.fromEntries(bx.map(b => [b.s, b]));
+      expect(Math.min(byS['#journalBtn'].w, byS['#journalBtn'].h), tag).toBeGreaterThanOrEqual(44);
+      expect(Math.min(byS['#atkBtn'].w, byS['#atkBtn'].h), tag).toBeGreaterThanOrEqual(56);
+      // la acción principal funciona con un toque
+      const n = (await snap(page)).attacks;
+      await page.locator('#atkBtn').tap();
+      await until(page, k => window.__valle.snap().attacks > k, n);
+      // cerca de un habitante: el botón 💬 es grande y no pisa misiones ni ⚔️; el diálogo entra en pantalla
+      const [nx, nz] = await page.evaluate(() => window.__valle.npcPos(1));
+      await page.evaluate(([x, z]) => window.__valle.goto(x + 1.6, z), [nx, nz]);
+      await expect(page.locator('#promptBtn')).toBeVisible();
+      const pb = (await boxesOf(page, ['#promptBtn', '.mlm-hud', '#atkBtn', '#exploreHint']));
+      expect(pb[0].h, tag).toBeGreaterThanOrEqual(44);
+      expect(pb[0].left >= 0 && pb[0].right <= vp.width, tag).toBe(true);
+      for (const b of pb.slice(1).filter(Boolean)) expect(ovl(pb[0], b), `${tag} 💬 / ${b.s}`).toBe(false);
+      await page.locator('#promptBtn').tap({ force: true });
+      await expect(page.locator('#dialog')).toBeVisible();
+      // animación de entrada (arranca con opacidad 0 y 16 px más abajo); con WebGL por CPU tarda
+      await until(page, () => getComputedStyle(document.getElementById('dialog')).opacity === '1', undefined, 15_000);
+      const db = await boxesOf(page, ['#dialog', '.mla-bar', '#atkBtn']);
+      expect(db[0].top >= 0 && db[0].bottom <= vp.height && db[0].left >= 0 && db[0].right <= vp.width, `${tag} diálogo`).toBe(true);
+      expect(ovl(db[0], db[1]), tag).toBe(false);
+      expect(db[2], `${tag} ⚔️ se oculta durante el diálogo`).toBeNull();
+      await page.evaluate(() => window.__valle.finishDlg());
+      // diario: entra en pantalla, ✕ de 44 px y se cierra con un toque
+      await page.locator('#journalBtn').tap();
+      await expect(page.locator('#journal')).toBeVisible();
+      const jb = await boxesOf(page, ['.j-plate', '#jClose', '.mla-bar']);
+      expect(jb[0].top >= 0 && jb[0].bottom <= vp.height && jb[0].right <= vp.width, `${tag} diario`).toBe(true);
+      expect(Math.min(jb[1].w, jb[1].h), tag).toBeGreaterThanOrEqual(44);
+      expect(ovl(jb[1], jb[2]), `${tag} ✕ / barra`).toBe(false);
+      await page.locator('#jClose').tap();
+      await expect(page.locator('#journal')).toBeHidden();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tag).toBe(true);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('Proteger en vertical y apaisado: placas del HUD sin pisarse con la barra ni las misiones', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo móvil');
+    test.setTimeout(120_000);
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await page.locator('#modeMission').scrollIntoViewIfNeeded();
+    await page.locator('#modeMission').tap();
+    await until(page, () => window.__valle.snap().state === 'play');
+    for (const vp of [SIZES[0], SIZES[2], SIZES[4]]) {
+      await page.setViewportSize(vp);
+      await wait(page, 300);
+      const ids = ['.hearts', '#heartWrap', '#waveWrap', '#atkBtn', '.mla-bar', '.mlm-hud'];
+      const bx = (await boxesOf(page, ids)).filter(Boolean);
+      expect(bx.length).toBe(ids.length);
+      for (let i = 0; i < bx.length; i++) for (let j = i + 1; j < bx.length; j++) {
+        expect(ovl(bx[i], bx[j]), `${vp.width}: ${bx[i].s} / ${bx[j].s}`).toBe(false);
+      }
+      // textos de juego legibles
+      const fs = await page.evaluate(() => ['#foeInfo', '#heartWrap .lb'].map(s => parseFloat(getComputedStyle(document.querySelector(s)).fontSize)));
+      expect(fs[0]).toBeGreaterThanOrEqual(12);
+      expect(fs[1]).toBeGreaterThanOrEqual(11);
+    }
+    expectNoErrors(errors);
+  });
+
+  test('joystick y cámara a la vez: el segundo pulgar gira la cámara sin frenar al personaje; dos dedos de cámara = zoom', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo móvil');
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await page.tap('#modeExplore');
+    await until(page, () => window.__valle.snap().state === 'play');
+    await page.evaluate(() => window.__valle.god(true));
+    const vw = page.viewportSize().width, vh = page.viewportSize().height;
+    // pulgar izquierdo: joystick hacia arriba
+    await touch(page, 'pointerdown', 1, 90, vh - 220, true);
+    await touch(page, 'pointermove', 1, 90, vh - 280);
+    await until(page, () => window.__valle.snap().joy);
+    // pulgar derecho: arrastra la cámara (antes esto era "pellizco" y soltaba el joystick)
+    const a = await snap(page);
+    await touch(page, 'pointerdown', 2, vw - 120, vh / 2, true);
+    for (let i = 1; i <= 5; i++) await touch(page, 'pointermove', 2, vw - 120 - i * 20, vh / 2);
+    const b = await snap(page);
+    expect(b.joy).toBe(true);
+    expect(b.camYaw).not.toBe(a.camYaw);
+    expect(b.camDist).toBe(a.camDist);
+    await expect(page.locator('#joy')).toBeVisible();
+    await until(page, ([x, z]) => { const s = window.__valle.snap(); return Math.hypot(s.px - x, s.pz - z) > 0.4; }, [b.px, b.pz]);
+    // tercer dedo, también del lado de la cámara: pellizco que aleja la vista; el joystick sigue
+    await touch(page, 'pointerdown', 3, vw - 100, vh / 2 + 40, true);
+    await touch(page, 'pointermove', 3, vw - 100, vh / 2 + 140);
+    const c = await snap(page);
+    expect(c.camDist).toBeLessThan(b.camDist);
+    expect(c.joy).toBe(true);
+    for (const id of [3, 2, 1]) await touch(page, 'pointerup', id, 0, 0);
+    await expect(page.locator('#joy')).toBeHidden();
+    expect((await snap(page)).joy).toBe(false);
+    expectNoErrors(errors);
+  });
+
+  test('⚔️ táctil apunta a la criatura más cercana (el teclado no cambia)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo móvil');
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    await page.locator('#modeMission').scrollIntoViewIfNeeded();
+    await page.tap('#modeMission');
+    await until(page, () => window.__valle.snap().state === 'play');
+    await page.evaluate(() => { window.__valle.god(true); window.__valle.skipWait(); });
+    await until(page, () => window.__valle.enemyPos().length > 0);
+    await page.evaluate(() => window.__valle.freezeFoes());
+    // el guardián mira hacia -z (inicio); la criatura queda detrás (+z): sin ayuda no se le pega
+    const place = () => page.evaluate(() => { const [x, z] = window.__valle.enemyPos()[0]; window.__valle.goto(x, z - 2.2); return window.__valle.enemyPos()[0][2]; });
+    const hp0 = await place();
+    await wait(page, 300);
+    const k0 = (await snap(page)).attacks;
+    await page.keyboard.press('Space');
+    await until(page, k => window.__valle.snap().attacks > k, k0);
+    await wait(page, 200);
+    expect((await page.evaluate(() => window.__valle.enemyPos()[0]))[2]).toBe(hp0);
+    // enfriamiento del golpe (tiempo de juego: en SwiftShader va más lento que el real)
+    const k1 = (await snap(page)).attacks;
+    for (let i = 0; i < 20 && (await snap(page)).attacks === k1; i++) { await place(); await page.locator('#atkBtn').tap(); await wait(page, 150); }
+    await until(page, h => { const e = window.__valle.enemyPos()[0]; return !e || e[2] < h; }, hp0);
+    expectNoErrors(errors);
+  });
+
+  test('gestos y orientación: sin bloqueo de zoom en el viewport, canvas sin gestos, rotar a mitad de partida', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo móvil');
+    const { errors } = await openGame(page, FILE);
+    await ready(page);
+    const meta = await page.getAttribute('meta[name="viewport"]', 'content');
+    expect(meta).not.toMatch(/user-scalable|maximum-scale/);
+    expect(await page.evaluate(() => getComputedStyle(document.getElementById('c')).touchAction)).toBe('none');
+    expect(await page.evaluate(() => getComputedStyle(document.getElementById('menu')).touchAction)).toBe('pan-y');
+    // el menú se desplaza con el dedo en una pantalla baja (gesto real por CDP)
+    await page.setViewportSize({ width: 360, height: 640 });
+    await wait(page, 200);
+    const cdp = await page.context().newCDPSession(page);
+    const drag = async (x, y0, y1) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] });
+      for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + (y1 - y0) * i / 8 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    await drag(180, 560, 200);
+    await until(page, () => document.getElementById('menu').scrollTop > 50, undefined, 5000);
+    expect(await page.evaluate(() => visualViewport.scale)).toBe(1);
+    // vertical: FOV más abierto; al girar a apaisado vuelve a 60° sin perder la partida
+    await page.locator('#modeExplore').tap();
+    await until(page, () => window.__valle.snap().state === 'play');
+    const v = await snap(page);
+    expect(v.fov).toBeGreaterThan(70);
+    const [fx, fz] = await page.evaluate(() => window.__valle.fragPos()[0]);
+    await page.evaluate(([x, z]) => window.__valle.goto(x + 0.5, z + 0.5), [fx, fz]);
+    await until(page, () => window.__valle.snap().fragsFound === 1);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await wait(page, 300);
+    const h = await snap(page);
+    expect([h.state, h.fragsFound, h.fov]).toEqual(['play', 1, 60]);
+    expect(await page.evaluate(() => [document.getElementById('c').clientWidth, document.getElementById('c').clientHeight])).toEqual([844, 390]);
+    await expect(page.locator('#atkBtn')).toBeInViewport();
+    // segundo plano: el juego se pausa
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { value: true, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await until(page, () => window.__valle.snap().paused);
+    expectNoErrors(errors);
+  });
+});

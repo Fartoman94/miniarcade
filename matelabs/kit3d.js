@@ -136,7 +136,7 @@ export function createInput(root, opts = {}) {
     .k3-joy.left{left:max(20px,env(safe-area-inset-left))}.k3-joy.right{right:max(20px,env(safe-area-inset-right))}
     .k3-joy i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:rgba(255,255,255,.35)}
     .k3-btns{position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(28px,env(safe-area-inset-bottom));display:flex;flex-wrap:wrap-reverse;gap:12px;
-      justify-content:flex-end;max-width:220px;pointer-events:none}
+      justify-content:flex-end;max-width:220px;width:max-content;pointer-events:none}
     .k3-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.35);
       background:rgba(10,14,22,.55);color:#fff;font:800 13px system-ui,sans-serif;display:grid;place-items:center;user-select:none;-webkit-user-select:none}
     .k3-btn.on{background:rgba(46,230,230,.4);transform:scale(.92)}

@@ -107,9 +107,13 @@ export function createBoss(L, refs) {
       ctx.onBossDefeated();
     },
     /** Reflejo con el Eco: devuelve los rayos cercanos y corta el drenaje. */
+    /** Radio de reflejo: ventana de la dificultad + margen táctil (la latencia del toque se compensa en espacio). */
+    reflectR() { return ctx.diff().parry * 13 + 0.6 + (ctx.touchAssist ? 1.0 : 0); },
+    /** Distancia (plano) al rayo más cercano que todavía viene hacia vos, o Infinity. @param {number} px @param {number} pz */
+    nearestOrb(px, pz) { let m = Infinity; for (const o of orbs) if (o.on && !o.back && o.y < 4) m = Math.min(m, Math.hypot(o.x - px, o.z - pz)); return m; },
     onPulse(px, pz) {
       if (!B.active) return;
-      const R = ctx.diff().parry * 13 + 0.6;
+      const R = B.reflectR();
       for (const o of orbs) {
         if (!o.on || o.back) continue;
         if (Math.hypot(o.x - px, o.z - pz) < R && o.y < 4) {

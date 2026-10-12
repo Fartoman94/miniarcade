@@ -194,7 +194,8 @@ export function createEnemies(ctx) {
       // comportamientos
       if (e.type === 'golem' && !held) {
         e.abilityT -= dt;
-        if (e.abilityT <= 0) { e.abilityT = 7; ctx.towers.golemStomp(e); }
+        // sin torre a tiro no gasta el pisotón: vuelve a intentar en 1.5 s
+        if (e.abilityT <= 0) e.abilityT = ctx.towers.golemStomp(e) ? 7 : 1.5;
       }
       if (e.type === 'imp' && !held) {
         if (e.state === 'attack') {

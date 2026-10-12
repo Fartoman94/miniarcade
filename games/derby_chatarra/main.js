@@ -11,6 +11,7 @@ import { createBoss, makeDecal } from './boss.js';
 import { createFx } from './fx.js';
 import { createSfx } from './sfx.js';
 import { createUI } from './ui.js';
+import { createWheel } from './touch.js';
 
 const W = /** @type {any} */ (window);
 const A = W.MLArcade, M = W.MLMissions;
@@ -44,6 +45,7 @@ function sanitize() {
   s.opts = {
     sens: typeof o.sens === 'number' && o.sens >= 0.5 && o.sens <= 1.6 ? o.sens : 1,
     autoGas: o.autoGas === true,
+    haptics: o.haptics !== false,
     motion: ['auto', 'reduce', 'full'].includes(o.motion) ? o.motion : 'auto',
     cam: ['lejos', 'cerca'].includes(o.cam) ? o.cam : 'lejos',
     binds: { ...dO.binds, ...(o.binds && typeof o.binds === 'object' ? o.binds : {}) },
@@ -96,10 +98,11 @@ const cars = createCars(scene);
 const rand = rng(DEBUG ? 12345 : Date.now() & 0xffff);
 
 let input = createInput(game.root, {
-  joystick: 'left',
+  joystick: false, // en celulares se usa el volante propio (touch.js), más cómodo que el joystick genérico
   buttons: [{ id: 'brake', label: 'FRENO' }, { id: 'gas', label: 'ACEL' }, { id: 'nitro', label: 'NITRO' }, { id: 'power', label: 'PODER' }],
 });
 if (input.isTouch) document.body.classList.add('dc-touch');
+const wheel = createWheel(/** @type {HTMLElement} */ (document.querySelector('.k3-touch')), { haptics: () => S().opts.haptics !== false && !reduced() });
 input.showTouch(false);
 const powerBtn = /** @type {HTMLElement|null} */ (document.querySelector('.k3-btn[aria-label="power"]'));
 const nitroBtn = /** @type {HTMLElement|null} */ (document.querySelector('.k3-btn[aria-label="nitro"]'));
@@ -122,7 +125,7 @@ const cam = { x: 0, y: 8, z: 20, yaw: 0, fov: 62, orbit: 0, lx: 0, ly: 0, lz: 0 
 /* ======================= tutorial contextual ======================= */
 const K = id => input.isTouch ? ({ nitro: 'NITRO', power: 'PODER', drift: 'FRENO + girar' })[id] : keyLabel(binds()[id]);
 const TIPS = {
-  drive: () => input.isTouch ? 'Girá con el <b>VOLANTE</b> de la izquierda. <b>ACEL</b> y <b>FRENO</b> a la derecha (podés activar la aceleración automática en Opciones).' : '<b>W/↑</b> acelerar, <b>S/↓</b> frenar y reversa, <b>A/D</b> girar. <b>' + K('drift') + '</b> derrape, <b>' + K('nitro') + '</b> nitro.',
+  drive: () => input.isTouch ? '<b>VOLANTE</b>: arrastrá el pulgar de lado a lado en la mitad izquierda. <b>ACEL</b> y <b>FRENO</b> a la derecha (aceleración automática en Opciones).' : '<b>W/↑</b> acelerar, <b>S/↓</b> frenar y reversa, <b>A/D</b> girar. <b>' + K('drift') + '</b> derrape, <b>' + K('nitro') + '</b> nitro.',
   ram: () => 'Embestí con el <b>FRENTE</b>: hacés más daño y recibís menos. Los <b>costados y la cola</b> son tu punto débil: mirá el diagrama de daño.',
   power: () => `Tenés un potenciador en la ranura. Usalo con <b>${K('power')}</b>: 🔥 nitro, 🧲 imán (atrae rivales), 🛡 escudo, ✴ trampa.`,
   ramp: () => 'Subí la <b>rampa</b> a toda velocidad: más de 0,7 s en el aire es un <b>salto acrobático</b>. Girá en el aire para un trompo.',
@@ -198,7 +201,7 @@ function startRound(n) {
   run.bossTriggered = false; run.endT = 0; run.deadT = 0; run.result = null; run.moved = 0;
   state = 'countdown'; overlay = false; closeTip();
   menu.hide(); endScreen.hide(); helpScreen.hide(); optScreen.hide();
-  ui.show(true); input.showTouch(true); input.clear();
+  ui.show(true); input.showTouch(true); input.clear(); wheel.reset();
   cam.yaw = P.yaw; cam.x = P.x - Math.sin(P.yaw) * 10; cam.z = P.z - Math.cos(P.yaw) * 10; cam.y = 5;
   M.runStart();
   if (s.tour.wrecks) emit('wreck', s.tour.wrecks);
@@ -263,6 +266,7 @@ function damageCar(c, dmg, zone, attacker, kind) {
   if (c.isPlayer) {
     if (!reduced() && dmg > 4) ui.flash();
     sfx.hurt(); fx.shake(Math.min(0.6, dmg * 0.025));
+    if (dmg > 6 && input.isTouch) wheel.buzz(Math.min(40, Math.round(dmg * 2)));
     if (c.zone[zone] > 0.6 && !c['lost' + zone]) { c['lost' + zone] = true; fx.debris(c.x, c.y + 0.8, c.z, 5, c.color, 6); toast(zone === 'f' ? '¡Se te soltó el paragolpes!' : zone === 'b' ? '¡Perdiste el baúl!' : '¡Se te voló una puerta!', 1300); }
   }
   if (c.hp <= 0 && !c.isBoss) wreck(c, attacker, kind);
@@ -610,8 +614,9 @@ function playerControl(dt) {
   if (brk) thr = -1;
   if (o.autoGas && !brk) thr = 1;
   c.throttle = thr;
-  c.steer = clamp(a.x * o.sens, -1.3, 1.3);
-  c.handbrake = input.down(bd.drift) || input.down('F15') || (input.isTouch && brk && Math.abs(a.x) > 0.5 && P.speed > 8);
+  const sx = wheel.active ? wheel.x : a.x;
+  c.steer = clamp(sx * o.sens, -1.3, 1.3);
+  c.handbrake = input.down(bd.drift) || input.down('F15') || (input.isTouch && brk && Math.abs(sx) > 0.5 && P.speed > 8);
   c.nitro = input.down(bd.nitro) || input.down('F13') || input.button('nitro');
   if (input.hit(bd.power, 'F14', 'btn:power')) usePower(P);
   if (c.nitro && P.nitro > 1) sfx.nitro();
@@ -724,7 +729,7 @@ function updateCamera(dt) {
   if (P.speed < -3) want = P.yaw; // en reversa la cámara sigue detrás
   cam.yaw += wrap(want - cam.yaw) * Math.min(1, dt * (P.grounded ? 4.5 : 1.5));
   const bossOn = boss && run.bossTriggered;
-  const dist = (o.cam === 'cerca' ? 7.2 : 9.6) + sp * 0.07 + (portrait ? 2.5 : 0) + (bossOn ? 3 : 0) + (P.isPlayer && S().car === 'omega' ? 0.5 : 0);
+  const dist = (o.cam === 'cerca' ? 7.2 : 9.6) + sp * 0.07 + (portrait ? 1.2 : 0) + (bossOn ? 3 : 0) + (P.isPlayer && S().car === 'omega' ? 0.5 : 0);
   let hgt = 4.3 + (portrait ? 1.6 : 0) + (bossOn ? 1.5 : 0);
   // la cámara no atraviesa los muros: se acerca y sube si quedaría afuera de la arena
   let dd = dist;
@@ -740,10 +745,17 @@ function updateCamera(dt) {
   cam.lz += (P.z + Math.cos(P.yaw) * look - cam.lz) * Math.min(1, dt * 8);
   cam.ly = P.y + (portrait ? -0.6 : 1.3);
   camera.lookAt(cam.lx, cam.ly, cam.lz);
-  const fov = 60 + Math.min(14, sp * 0.4) + (P.nitroOn ? 7 : 0) + (portrait ? 8 : 0);
+  const fov = baseFov() + Math.min(portrait ? 8 : 14, sp * 0.4) + (P.nitroOn ? (portrait ? 4 : 7) : 0);
   cam.fov += (fov - cam.fov) * Math.min(1, dt * 3);
   if (Math.abs(camera.fov - cam.fov) > 0.05) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }
   followSun(P.x, P.z);
+}
+/** FOV vertical base: en vertical se abre hasta que el campo HORIZONTAL sea ≥ 50° (rivales a los costados visibles). */
+function baseFov() {
+  const asp = camera.aspect;
+  if (asp >= 0.85) return 60;
+  const v = 2 * Math.atan(Math.tan(25 * Math.PI / 180) / asp) * 180 / Math.PI;
+  return clamp(v, 64, 80);
 }
 function orbitCamera(dt) {
   cam.orbit += dt * (reduced() ? 0 : 0.06);
@@ -803,7 +815,7 @@ function garageHTML() {
     const locked = id === 'omega' && !s.unlocked.omega;
     return `<button type="button" class="dc-car" role="radio" data-car="${id}" aria-checked="${s.car === id}" ${locked ? 'disabled' : ''}>
       <b>${locked ? '🔒 ' : ''}${c.name}</b><span>Vel.</span>${bar(c.maxSpeed, 30)}<span>Peso</span>${bar(c.mass, 2)}<span>Vida</span>${bar(c.hp, 150)}</button>`;
-  }).join('')}</div><div class="dc-cardesc" data-cardesc>${CARS[s.car].perk}: ${CARS[s.car].desc}</div>`;
+  }).join('')}</div><div class="dc-cardesc" data-cardesc><b>${CARS[s.car].name}</b> · ${CARS[s.car].perk}: ${CARS[s.car].desc}</div>`;
 }
 function showMenu() {
   state = 'menu'; ui.show(false); input.showTouch(false); closeTip(); cut = null; overlay = false;
@@ -816,10 +828,11 @@ function showMenu() {
     <p>Embestí, derrapá, saltá y sobreviví en tres arenas. Sumá puntos de torneo ronda a ronda y enfrentá al Triturador Omega en la Gran Final.</p>
     ${cont ? `<div class="dc-menu-prog">Torneo en curso: Ronda ${s.round} · ${R.name} (${R.place}) · Tus puntos de torneo: <b>${tp.player}</b> · Destruidos: ${s.tour.wrecks}${s.wins ? ' · 🏆 ' + s.wins : ''}</div>`
       : s.wins ? `<div class="dc-menu-prog">🏆 Torneos ganados: ${s.wins} · Récord: ${s.bestScore}</div>` : ''}
-    <div class="k3-btnrow"><button class="k3-b" data-go>${cont ? `▶ Continuar: ${R.name}` : '▶ Empezar torneo'}</button>${cont ? '<button class="k3-b alt" data-new>Nuevo torneo</button>' : ''}</div>
     ${garageHTML()}
     <div data-diff></div><div class="dc-dtab" data-dtab>${diffText()}</div>
-    <div class="k3-btnrow"><button class="k3-b alt" data-opts>⚙ Controles y opciones</button><button class="k3-b alt" data-help>📖 Cómo jugar</button></div>
+    <div class="k3-btnrow dc-gorow"><button class="k3-b" data-go>${cont ? `▶ Continuar: ${R.name}` : '▶ Empezar torneo'}</button>${cont ? '<button class="k3-b alt" data-new>Nuevo torneo</button>' : ''}</div>
+    <div class="k3-btnrow dc-subrow"><button class="k3-b alt" data-opts>⚙ Controles<span class="dc-long"> y opciones</span></button><button class="k3-b alt" data-help>📖 Cómo jugar</button></div>
+    ${input.isTouch ? '<div class="dc-rot">📱↻ Se juega más cómodo con el teléfono horizontal (también funciona en vertical).</div>' : ''}
     <div class="dc-credit">CREADO POR <img src="matelabs/mascota-128.webp" alt="">MATELABS</div>`);
   const holder = /** @type {HTMLElement} */ (menu.el.querySelector('[data-diff]'));
   M.difficultyPicker(holder, { onChange: () => { const t = menu.el.querySelector('[data-dtab]'); if (t) t.textContent = diffText(); } });
@@ -828,6 +841,9 @@ function showMenu() {
   A.refresh();
 }
 menu.on('[data-go]', () => { sfx.click(); startRound(S().started ? S().round : 1); });
+// botones del menú principal (antes no tenían manejador: no abrían nada)
+menu.on('[data-opts]', () => { sfx.click(); openOptions(false); });
+menu.on('[data-help]', () => { sfx.click(); openHelp(false); });
 menu.on('[data-new]', () => {
   const b = /** @type {HTMLElement} */ (menu.el.querySelector('[data-new]'));
   if (!newArmed) { newArmed = true; b.textContent = '¿Abandonar el torneo? Tocá de nuevo'; return; }
@@ -839,7 +855,7 @@ menu.el.addEventListener('click', e => {
   const id = /** @type {string} */ (b.dataset.car);
   S().car = /** @type {any} */ (id); persist(); sfx.click();
   menu.el.querySelectorAll('[data-car]').forEach(x => x.setAttribute('aria-checked', String(x === b)));
-  const d = menu.el.querySelector('[data-cardesc]'); if (d) d.textContent = `${CARS[id].perk}: ${CARS[id].desc}`;
+  const d = menu.el.querySelector('[data-cardesc]'); if (d) d.innerHTML = `<b>${CARS[id].name}</b> · ${CARS[id].perk}: ${CARS[id].desc}`;
   if (arena && P) { const sp = arena.spawns[0]; cars.remove(P); makePlayer(); place(P, sp); run.setupFor = run.round + ':' + id + ':' + diffName(); }
 });
 function newTournament() {
@@ -857,7 +873,7 @@ function openHelp(pause) {
   if (!pause) menu.hide();
   helpScreen.show(`<span class="k3-kicker">CÓMO JUGAR</span><h1 style="font-size:32px">EL DERBY</h1>
     <ul class="k3-list">
-      <li>🕹 <b>Manejar:</b> ${input.isTouch ? 'volante a la izquierda, ACEL y FRENO a la derecha' : 'W/↑ acelerar · S/↓ frenar/reversa · A/D o ←/→ girar'} · <b>Derrape:</b> ${K('drift')} · <b>Nitro:</b> ${K('nitro')} · <b>Potenciador:</b> ${K('power')}</li>
+      <li>🕹 <b>Manejar:</b> ${input.isTouch ? 'arrastrá el pulgar en horizontal sobre la mitad izquierda (volante); ACEL, FRENO, NITRO y PODER a la derecha' : 'W/↑ acelerar · S/↓ frenar/reversa · A/D o ←/→ girar'} · <b>Derrape:</b> ${K('drift')} · <b>Nitro:</b> ${K('nitro')} · <b>Potenciador:</b> ${K('power')}</li>
       <li>🎮 <b>Gamepad:</b> stick girar · RT/↑ acelerar · LT/↓ frenar · A/RB nitro · X potenciador · B derrape · Start pausa</li>
       <li>💥 <b>Daño:</b> pegá con el frente (×1,25) y cuidá costados (×1,15) y cola (×1,35). El diagrama muestra cada zona; el auto se abolla, humea y se prende fuego.</li>
       <li>🏆 <b>Torneo:</b> 3 rondas. Puntos de ronda = daño causado ×10, +500 por rival destruido, saltos, torres y +300 según tu vida al final. Terminá entre los ${ADVANCE_PLACE} primeros para pasar; ganás si sos 1º en puntos de torneo al final.</li>
@@ -884,11 +900,13 @@ function openOptions(pause) {
   const row = (id, name) => `<div class="dc-bind"><span>${name}</span><button type="button" data-bind="${id}">${listening === id ? 'Apretá una tecla…' : keyLabel(o.binds[id])}</button></div>`;
   optScreen.show(`<span class="k3-kicker">OPCIONES</span><h1 style="font-size:30px">CONTROLES</h1>
     <div class="dc-opts">
-      ${row('nitro', 'Nitro')}${row('power', 'Usar potenciador')}${row('drift', 'Derrape (freno de mano)')}
+      ${input.isTouch ? '' : row('nitro', 'Nitro') + row('power', 'Usar potenciador') + row('drift', 'Derrape (freno de mano)')}
       <label>Sensibilidad de dirección <input type="range" min="0.5" max="1.6" step="0.1" value="${o.sens}" data-sens aria-label="Sensibilidad de dirección"></label>
       <label>Aceleración automática <input type="checkbox" data-autogas ${o.autoGas ? 'checked' : ''}></label>
+      ${input.isTouch ? `<label>Vibración en botones y choques <input type="checkbox" data-haptics ${o.haptics !== false ? 'checked' : ''}></label>` : ''}
       <label>Cámara <select data-cam><option value="lejos"${o.cam === 'lejos' ? ' selected' : ''}>Lejos</option><option value="cerca"${o.cam === 'cerca' ? ' selected' : ''}>Cerca</option></select></label>
       <label>Movimiento (sacudidas y destellos) <select data-motion><option value="auto"${o.motion === 'auto' ? ' selected' : ''}>Según el sistema</option><option value="reduce"${o.motion === 'reduce' ? ' selected' : ''}>Reducido</option><option value="full"${o.motion === 'full' ? ' selected' : ''}>Completo</option></select></label>
+      ${input.isTouch ? '<div class="dc-small">Celular: arrastrá el pulgar en horizontal sobre la mitad izquierda (el volante aparece donde tocás). Derecha: ACEL (grande), FRENO, NITRO y PODER. FRENO + girar a velocidad = derrape.</div>' : ''}
       <div class="dc-small">Manejo: W/A/S/D o flechas (fijo). Gamepad: stick girar, RT acelerar, LT frenar, A nitro, X potenciador, B derrape, Start pausa. Sonido y calidad gráfica: botón ⚙/⏸ de la barra.</div>
     </div>
     <div class="k3-btnrow"><button class="k3-b" data-back>Listo</button><button class="k3-b alt" data-defaults>Valores por defecto</button></div>`);
@@ -900,6 +918,7 @@ optScreen.el.addEventListener('input', e => {
   const t = /** @type {HTMLInputElement} */ (e.target), o = S().opts;
   if (t.matches('[data-sens]')) o.sens = +t.value;
   if (t.matches('[data-autogas]')) o.autoGas = t.checked;
+  if (t.matches('[data-haptics]')) { /** @type {any} */ (o).haptics = t.checked; if (t.checked) wheel.buzz(15); }
   if (t.matches('[data-cam]')) o.cam = /** @type {any} */ (t.value);
   if (t.matches('[data-motion]')) o.motion = /** @type {any} */ (t.value);
   persist();
@@ -938,6 +957,7 @@ const hook = {
   get timeLeft() { return run.left; }, get runTime() { return run.time; }, get simTime() { return game.simTime; }, get countdown() { return run.countdown; },
   get paused() { return game.paused; }, get overlay() { return overlay; },
   get tip() { return tipId; }, get big() { return ui.bigText; },
+  get touch() { return { isTouch: input.isTouch, wheel: +wheel.x.toFixed(3), wheelActive: wheel.active, steer: P ? +P.ctl.steer.toFixed(3) : 0, fov: +camera.fov.toFixed(1) }; },
   get rivals() { return rivals.map(pub); },
   get stats() { return { stunts: run.stunts, towers: run.towers, wrecks: run.wrecks, repairs: run.repairs, powerTypes: [...run.powerTypes] }; },
   get standings() { return P ? standings().map(c => ({ id: c.isPlayer ? 'player' : c.id, points: c.points })) : []; },

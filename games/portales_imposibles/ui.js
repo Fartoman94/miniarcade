@@ -21,7 +21,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#fff;-webki
 #pi-room{pointer-events:auto;padding:6px 8px 6px 10px;border-radius:12px;background:rgba(8,12,22,.78);border:1px solid rgba(155,123,255,.35);display:flex;align-items:center;gap:6px;font:700 12px/1.25 system-ui}
 #pi-room .t{flex:1;min-width:0}
 #pi-room .t b{display:block;font:400 12px 'Bungee',system-ui,sans-serif;letter-spacing:.03em;color:#e2d8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#pi-room .t small{display:block;color:#b9c6dd;font-variant-numeric:tabular-nums;white-space:nowrap}
+#pi-room .t small{display:block;font-size:12px;color:#b9c6dd;font-variant-numeric:tabular-nums;white-space:nowrap}
 #pi-room .t small.late{color:#ffb38a}
 #pi-room button{appearance:none;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#fff;border-radius:9px;min-width:36px;height:34px;font:800 14px system-ui;cursor:pointer;padding:0 6px}
 #pi-room button:active{transform:scale(.94)}
@@ -30,7 +30,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#fff;-webki
 #pi-boss small{display:block;font:700 11px/1.3 system-ui;color:#f6c9ec;margin:2px 0 5px}
 .pi-bar{height:8px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden}.pi-bar i{display:block;height:100%;background:linear-gradient(90deg,#9b7bff,#ff7ae0);transition:width .2s}
 .pi-card{pointer-events:auto;padding:9px 11px;border-radius:12px;background:rgba(10,10,30,.9);border:1px solid rgba(155,123,255,.6);font:600 13px/1.4 system-ui,sans-serif;color:#e8e2ff}
-.pi-card .k{font:800 10px system-ui;letter-spacing:.22em;color:#b9a4ff;margin-bottom:3px}
+.pi-card .k{font:800 11px system-ui;letter-spacing:.22em;color:#b9a4ff;margin-bottom:3px}
 .pi-card .row{display:flex;gap:6px;margin-top:7px;justify-content:flex-end}
 .pi-card button{appearance:none;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:9px;padding:6px 10px;font:700 12px system-ui;cursor:pointer;min-height:32px}
 .pi-card button.pri{background:#9b7bff;color:#120a2a;border-color:#9b7bff}
@@ -50,7 +50,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#fff;-webki
 #pi-fade.on{opacity:1}
 body.pi-touch .k3-btn[aria-label="a"]{background:rgba(53,182,255,.38);border-color:#35b6ff}
 body.pi-touch .k3-btn[aria-label="b"]{background:rgba(255,138,36,.38);border-color:#ff8a24}
-body.pi-touch .k3-btn{width:66px;height:66px;font-size:11px}
+body.pi-touch .k3-btn{width:66px;height:66px;font-size:12px}
 body.pi-touch #pi-prompt{top:auto;bottom:calc(178px + env(safe-area-inset-bottom))}
 @media (orientation:landscape){body.pi-touch #pi-prompt{bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100vw - 440px)}}
 @media (max-height:480px){#pi-side{width:min(270px,36vw);gap:4px}.pi-card{font-size:12px;padding:6px 9px}#pi-obj{display:none}
@@ -71,6 +71,42 @@ body.pi-touch #pi-prompt{top:auto;bottom:calc(178px + env(safe-area-inset-bottom
 .pi-tt button small{font:700 11px system-ui;opacity:.8}
 .k3-panel h1{font-size:clamp(28px,7vw,56px)!important}
 @media (max-height:480px){.k3-panel h1{font-size:30px!important}.k3-panel{gap:7px!important}.k3-panel p{font-size:13px}.k3-b{padding:10px 16px!important}.pi-dtab{display:none}}
+/* ---------- celular (táctil) ---------- */
+body.pi-touch #pi-side{top:calc(60px + env(safe-area-inset-top))}
+body.pi-touch #pi-room button{min-width:44px;height:44px;font-size:17px}
+@media (orientation:portrait){body.pi-touch #pi-room{flex-wrap:wrap;row-gap:5px}body.pi-touch #pi-room .t{flex:1 1 100%}body.pi-touch #pi-room button{flex:1 1 0}}
+body.pi-touch .pi-card button{min-height:44px;padding:8px 14px;font-size:13px}
+/* tarjetas en celular: texto a la izquierda (con scroll propio si no entra), botones a la derecha siempre visibles */
+body.pi-touch #pi-tip,body.pi-touch #pi-hint{position:fixed;box-sizing:border-box;z-index:31;transform:none;margin:0;padding:7px 8px 7px 10px;line-height:1.3;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);column-gap:10px;align-items:center}
+body.pi-touch #pi-tip[hidden],body.pi-touch #pi-hint[hidden]{display:none}
+body.pi-touch .pi-card > div:nth-child(2){grid-column:1;overflow-y:auto;overscroll-behavior:contain;max-height:100%;align-self:start}
+body.pi-touch .pi-card .row{grid-column:2;grid-row:1 / span 2;flex-direction:column;margin:0;align-items:stretch}
+body.pi-touch #pi-room .t small{overflow:hidden;text-overflow:ellipsis}
+body.pi-touch #pi-hint:not([hidden]) ~ #pi-tip{display:none}
+body.pi-touch .k3-btn{transition:transform .06s,background-color .06s}
+body.pi-touch .k3-btn.on{filter:brightness(1.35)}
+body.pi-touch .k3-screen{padding:calc(60px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+body.pi-touch .k3-b{min-height:48px}
+body.pi-touch .k3-b[data-go],body.pi-touch .k3-b[data-retry],body.pi-touch #pi-end .k3-b[data-menu]:not(.alt){min-height:56px;min-width:min(260px,100%)}
+body.pi-touch .pi-opts input[type=range]{width:min(150px,38vw);height:32px}
+body.pi-touch .pi-opts input[type=checkbox]{width:26px;height:26px;flex:none}
+body.pi-touch .pi-opts label{min-height:44px;box-sizing:border-box}
+body.pi-touch .pi-opts select{min-height:44px}
+body.pi-touch .pi-tt button{min-height:52px}
+/* las pantallas largas (opciones, ayuda, contrarreloj) dejan la acción principal fija abajo: se ve siempre y queda al alcance del pulgar */
+body.pi-touch #pi-opts .k3-panel > .k3-btnrow:last-child,body.pi-touch #pi-help .k3-panel > .k3-btnrow:last-child,body.pi-touch #pi-tt .k3-panel > .k3-btnrow:last-child{
+  position:sticky;bottom:0;padding:10px 0 2px;width:100%;background:linear-gradient(180deg,rgba(4,6,12,0),rgba(4,6,12,.94) 35%)}
+@media (orientation:portrait) and (max-height:760px){
+  body.pi-touch .k3-panel{gap:8px!important}
+  body.pi-touch #pi-menu h1{font-size:30px!important}
+  body.pi-touch #pi-menu .k3-panel p{font-size:14px;line-height:1.4}
+  body.pi-touch .pi-dtab{font-size:12px;line-height:1.35}
+  body.pi-touch #pi-menu .k3-b.alt{font-size:13px;padding:11px 14px}}
+@media (orientation:landscape) and (max-height:480px){
+  body.pi-touch #pi-menu h1{font-size:26px!important}
+  body.pi-touch #pi-menu .k3-panel{gap:6px!important}
+  body.pi-touch #pi-menu .k3-b.alt{font-size:13px;padding:10px 14px!important}}
 `;
 
 export function createUI() {
@@ -102,8 +138,40 @@ export function createUI() {
   let tipCb = /** @type {any} */ (null), titleT = 0;
   tipEl.addEventListener('click', e => { const b = /** @type {HTMLElement} */ (e.target).closest('[data-t]'); if (b && tipCb) tipCb(/** @type {HTMLElement} */ (b).dataset.t); });
   hintEl.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).closest('[data-h]')) hintEl.hidden = true; });
+  /* Celular: el tutorial y la pista flotan en el hueco libre entre los controles táctiles (pulgares) y el resto del HUD,
+   * sin tapar la mira, el joystick, los botones, las misiones ni la barra del SDK. Escritorio: quedan en la columna. */
+  const box = (/** @type {Element|null} */ e) => { if (!e || /** @type {HTMLElement} */ (e).hidden || e.closest('[hidden]')) return null; const r = e.getBoundingClientRect(); return r.width && r.height ? r : null; };
+  function layout() {
+    const touch = document.body.classList.contains('pi-touch');
+    const card = !hintEl.hidden ? hintEl : !tipEl.hidden ? tipEl : null;
+    for (const c of [tipEl, hintEl]) { c.style.maxHeight = ''; if (c !== card || !touch) c.style.left = c.style.top = c.style.width = ''; }
+    if (!touch || !card || els.side.hidden) return;
+    const W = innerWidth, H = innerHeight;
+    const joy = box(document.querySelector('.k3-joy')), btns = box(document.querySelector('.k3-btns')), pr = box(els.prompt);
+    const ctlTop = Math.min(joy ? joy.top : H, btns ? btns.top : H);
+    let left = 8, width = W - 16;
+    if (W > H) { // horizontal: entre el joystick y los botones, abajo
+      const l = (joy ? joy.right : 0) + 10, r = (btns ? btns.left : W) - 10;
+      width = Math.min(460, r - l); left = l + (r - l - width) / 2;
+    }
+    card.style.width = Math.round(width) + 'px'; card.style.left = Math.round(left) + 'px';
+    const ch = card.offsetHeight;
+    let bottom = W > H ? H - Math.max(8, H - (joy ? joy.bottom : H)) : ctlTop - 8;
+    if (pr && pr.right > left && pr.left < left + width) bottom = Math.min(bottom, pr.top - 6);
+    let top = bottom - ch;
+    const crossLo = H / 2 + 22, crossHi = H / 2 - 22; // la mira (y un margen) nunca queda tapada
+    if (W <= H && top < crossLo) {
+      // vertical sin lugar abajo: debajo del HUD superior (misiones y columna derecha), si entra sin tapar la mira;
+      // si tampoco entra, la tarjeta queda abajo con altura limitada y desplazamiento interno
+      let tb = 0; for (const e of [document.querySelector('.mlm-hud'), st, document.getElementById('pi-room'), boss, obj, document.querySelector('.mla-bar')]) { const b = box(e); if (b) tb = Math.max(tb, b.bottom); }
+      if (tb + 6 + ch <= crossHi) top = tb + 6;
+      else { const mh = Math.max(96, bottom - crossLo); card.style.maxHeight = Math.round(mh) + 'px'; top = bottom - Math.min(ch, mh); }
+    }
+    card.style.top = Math.round(Math.max(8, top)) + 'px';
+  }
+  addEventListener('resize', () => requestAnimationFrame(layout));
   return {
-    els,
+    els, layout,
     on(name, fn) { handlers[name] = fn; },
     show(v) { els.cross.hidden = !v; els.side.hidden = !v; if (!v) { els.prompt.hidden = true; } },
     status(o) {
@@ -135,14 +203,14 @@ export function createUI() {
     objective(t) { if (t !== last.obj) { obj.textContent = t; last.obj = t; } },
     tip(html, cb) {
       tipCb = cb || null;
-      if (!html) { tipEl.hidden = true; return; }
+      if (!html) { tipEl.hidden = true; layout(); return; }
       tipEl.innerHTML = `<div class="k">TUTORIAL</div><div>${html}</div><div class="row"><button type="button" data-t="skip">Saltar tutorial</button><button type="button" class="pri" data-t="ok">Entendido</button></div>`;
-      tipEl.hidden = false;
+      tipEl.hidden = false; layout();
     },
     hint(text, stage) {
-      if (!text) { hintEl.hidden = true; return; }
+      if (!text) { hintEl.hidden = true; layout(); return; }
       hintEl.innerHTML = `<div class="k">PISTA ${stage}/3</div><div>${text}</div><div class="row"><button type="button" data-h="x">Cerrar</button></div>`;
-      hintEl.hidden = false;
+      hintEl.hidden = false; layout();
     },
     title(big, small, ms = 2200) {
       els.title.innerHTML = `<small>${small || ''}</small><b>${big}</b>`; els.title.classList.add('on');

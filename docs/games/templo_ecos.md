@@ -18,7 +18,7 @@ columnas); todo el audio se sintetiza con `createAudio().tone`. No se usan GLB d
 | Moverse | WASD / flechas | joystick izquierdo | stick / cruceta |
 | Cámara | arrastrar mouse, Q / R | arrastrar el dedo fuera de los controles | LB / RB |
 | Saltar (doble con Plumas) | Espacio* | botón SALTO | A |
-| Interactuar | E* | botón USAR (se ilumina si hay algo cerca) | X |
+| Interactuar | E* | botón USAR (se ilumina si hay algo cerca) o tocar el aviso «Girar espejo / Tocar cristal…» | X |
 | Eco | F* | botón ECO (se atenúa en recarga) | B |
 | Pausa | Esc / P | ⏸ de la barra | Start |
 
@@ -113,24 +113,78 @@ Logros de misiones y dificultad: claves compartidas `ml:missions` / `ml:difficul
 
 ## Gancho de pruebas
 `window.__templo_ecos` (sólo lectura): `state, scene, area, missions, player, hp, maxHp, flames, score, runTime, simTime,
-paused, tip, prompt, counts, enemies, perf, quality, difficulty, boss, puzzle, save`. Con `?debug` agrega `debug`:
-`goto, simulate, teleport, setHP, setFlames, give, solveRoom, openDoor, use, rotateMirror, pulse, hurt, spawnBoss,
+paused, tip, prompt, camYaw, stats, touch, counts, enemies, perf, quality, difficulty, boss, puzzle, save` (`stats`: contadores
+monótonos de saltos/altura máxima/distancia/usos/ecos/toques del aviso; `touch`: táctil, FOV, búfer del Eco, radio de reflejo).
+Con `?debug` agrega `debug`: `freeze` (el bucle real deja de avanzar la simulación; sólo `simulate`), `showTip`, `goto, simulate, teleport, setHP, setFlames, give, solveRoom, openDoor, use, rotateMirror, pulse, hurt, spawnBoss,
 bossPhase, bossHit, killBoss, strike, skipCut, reflectAll`.
 
-## Pruebas (`tests/e2e/templo_ecos.spec.js`, `ML_WORKERS=1`)
-17 pruebas: carga sin errores; arranque con entrada real + movimiento + salto (teclado / joystick y botón táctil por CDP);
-tutorial (aparece, se salta, se reactiva desde la pausa); placas + bloques + puerta sellada con teclas reales; Sello +
-arañas + pared secreta + códice y persistencia tras recargar (misión principal y secundaria); espejos con E/USAR, receptor
-y persistencia; Sala del Eco (nota equivocada despierta arañas, acertijo sin pistas); plataformas temporizadas, caída y
-brasero; transición entre los 3 escenarios con entrada real (ida y vuelta); rivales (centinela alerta/embiste, espectro
-repelido por el Eco y disuelto por la luz); Guardián completo (intro, F1 con Eco real, F2 placa + espejo con E, F3, victoria
-y récord); drenaje de reliquia (reinicio de fase) + derrota + reintento; pausa congela 1 s / reanuda / reiniciar;
-guardado corrupto y con forma inválida; dificultad; calidad; celular 412×915 y 915×412 sin superposición ni scroll.
+## Pruebas (`tests/e2e/templo_ecos.spec.js`)
+20 pruebas por proyecto. Las de juego con `?debug` arrancan con `startFrozen`: tras arrancar con entrada real se congela el
+bucle real (`debug.freeze`) y se baja la calidad, así sólo `simulate()` avanza el juego y la tecla/toque real se consume
+siempre en el próximo paso simulado (resultado independiente de la carga de CPU). Cobertura: carga sin errores; arranque
+con entrada real + movimiento + salto (verificado con contadores monótonos `stats`); tutorial; placas + bloques + puerta;
+Sello + arañas + pared secreta + códice + persistencia; espejos; Sala del Eco; plataformas temporizadas y brasero; 3
+escenarios; rivales; Guardián completo; drenaje + derrota + reintento; pausa; guardado corrupto; dificultad; calidad;
+celular HUD 412×915/915×412; **celular: matriz de pantallas**; **celular: recorrido sólo táctil**; **celular: vibración,
+pausa en segundo plano y gestos** (ver «Móvil»).
 
-**Resultados reales (2026-10-10, `ML_WORKERS=1`, corrida completa de ambos proyectos, 8.1 min):**
-- desktop: 16 passed, 1 skipped (la de celular).
-- mobile (Pixel 7): 14 passed, 3 skipped (empuje por teclado, recorrido de escenarios y IA de rivales: idénticos a escritorio y cubiertos ahí).
-- Total: 30 passed, 4 skipped, 0 failed. Sin errores de consola en ninguna prueba.
+**Resultados reales (2026-10-11, máquina compartida con otros agentes, carga media ~50–60):**
+- `ML_WORKERS=1`: desktop 16 passed / 4 skipped (las de celular); mobile (Pixel 7) 17 passed / 3 skipped. Total 33 passed, 7 skipped, 0 failed (13.3 min).
+- `ML_WORKERS=4`: mismo resultado, 33 passed, 7 skipped, 0 failed (5.0 min).
+- Además, «arranque…», «Sello del Eco…», «Guardián Eco…» y «recorrido sólo táctil» con `--repeat-each 2` y 4 workers: 14/14 passed.
+
+## Móvil
+Capturas reales (Chromium headless, `isMobile` + `hasTouch`, DPR 2–3; script de auditoría con `?debug`, que además muestra
+el contador de FPS del SDK arriba): antes `.perf/mobile-templo_ecos/before/<tamaño>-{menu,play,mirror,boss}.png`, después
+`.perf/mobile-templo_ecos/after/…` (con `report.json` de cajas, superposiciones y textos chicos). Tamaños: 360×640,
+390×844, 412×915, 915×412 y 844×390.
+
+**Problemas encontrados → arreglados**
+- La columna derecha (tutorial/objetivo/jefe) empezaba en y=48 y quedaba **debajo de la barra del SDK** (58 px en táctil) en
+  los 5 tamaños; los chips de estado también la pisaban en 360/390/412 vertical. Ahora `layout()` (ui.js) mide la barra,
+  los chips, las misiones y los controles reales y ubica todo con variables `--te-*`; se recalcula al girar, al cambiar la
+  barra del navegador (`visualViewport`) y cuando cambia el HUD (`ResizeObserver`).
+- Chips de estado con `height:32px;overflow:hidden`: en 360 px **se cortaban** (puntos/Eco invisibles). Ahora hacen salto de
+  línea y las misiones bajan debajo.
+- Apaisado (915×412, 844×390): en el jefe, el tutorial **tapaba el botón ECO**. Los tres botones van en fila
+  (ECO · SALTO · USAR) y la columna derecha tiene alto máximo hasta los controles; si no entra, el objetivo cede lugar.
+- Aviso de interacción en apaisado podía caer sobre los botones: su ancho se calcula entre joystick y botones.
+- Botones del tutorial 32 px, cerrar inscripción 34 px, selects/botones de opciones 34 px → **≥ 44 px**; botones del menú en
+  apaisado 40–42 px → 48 px, principal **56 px**; en pantallas bajas el menú oculta la descripción para que entre sin scroll.
+- Textos: `TUTORIAL` 10→11 px, subtítulo del jefe 11→12 px, misiones 11→12 px en táctil.
+- Avisos (toast) en vertical: tope al 18 % encima del tutorial y del aviso de misión, angostos (≤ 50 % del ancho). Ahora
+  usan todo el ancho bajo la barra y el aviso de misión va debajo; en apaisado van abajo al centro. Siguen pudiendo tapar
+  por 1,5–3 s el tutorial/misiones en vertical (transitorio, aceptado).
+- Encuadre vertical: FOV 50 → **62** cuando el aspecto es < 0,8 (además de la distancia mayor que ya había).
+- Aviso suave «Apaisado se ve más del templo» al arrancar en vertical (5 s, se cierra con un toque, no bloquea).
+
+**Asistencias táctiles (escritorio sin cambios)**
+- Tocar el aviso («Girar espejo», «Tocar cristal turquesa», «Escuchar la melodía»…) equivale a USAR: espejos y melodía se
+  resuelven sólo con toques y el blanco es grande.
+- Jefe: radio de reflejo del Eco +1,0 (≈ 75 ms de latencia de toque a velocidad 13) y búfer: un ECO tocado hasta 0,2 s antes
+  de que el rayo entre al radio se guarda y se dispara solo cuando entra.
+- Vibración corta opcional (botones 10 ms, aviso 12 ms, daño 35 ms, reflejo 25 ms); opción «Vibración» en Controles (sólo
+  táctil) y se apaga con movimiento reducido.
+
+**Ya estaba bien (verificado):** `touch-action:none` en la superficie (kit) y ahora también en el HUD; viewport sin
+`user-scalable`/`maximum-scale`; multitáctil joystick + botón + cámara; pausa al pasar a segundo plano (SDK); calidad
+automática en táctil = media (DPR ≤ 1,5, sin sombras).
+
+**Pruebas móviles nuevas (proyecto mobile, Pixel 7):** matriz de 5 tamaños (menú: principal visible, en pantalla, ≥ 56 px y
+tocable; todos los botones ≥ 44 px; partida en exploración/espejo/jefe girando el tamaño en plena partida: sin salirse,
+sin superponerse con barra/misiones/controles, sin recortes en la columna, blancos ≥ 44 px, textos ≥ 12 px (misiones ≥ 11),
+FOV según orientación); recorrido sólo táctil (joystick + SALTO a la vez, «Entendido», espejo con el aviso y con USAR,
+melodía completa tocando el aviso, dos reflejos con ECO tocado temprano); vibración on/off, `touch-action`, viewport y
+pausa por `visibilitychange`.
+
+**Flaky de CI arreglado («arranque con entrada real, movimiento y salto»):** muestreaba `player.y > 0.2` con `expect.poll`
+después de un salto corto (≈ 0,45 s en el aire): con los intervalos del poll y la CPU de CI el pico se perdía. Ahora corre
+congelado: el toque/tecla real queda apretado mientras corre `simulate()` y el salto se verifica con contadores monótonos
+(`stats.jumps`, `stats.peak`). Con la misma técnica se estabilizaron «Sello del Eco» (en móvil fallaba: el Eco salía cuando
+una araña ya había salido del radio) y «Guardián Eco» (timeout con 4 workers).
+
+**NO PROBADO:** teléfonos reales (no hay disponibles), Safari/iOS (notch real, `navigator.vibrate` no existe en iOS: la
+opción simplemente no hace nada), FPS reales en gama baja.
 
 ## Rendimiento (Chromium headless + SwiftShader, 1280×800; sirve para comparar, no son FPS reales)
 `node tests/perf/measure.mjs` (menú): Media → 16.5 fps, peor cuadro 183 ms, heap 7.1 MB, 1043 KB, 23 requests, 0 errores;

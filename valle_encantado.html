@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10241a">
 <title>El Valle Encantado — creado por MateLabs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%9A%3C/text%3E%3C/svg%3E">
@@ -106,7 +106,7 @@
   .credit{display:flex;flex-direction:column;gap:2px;padding:9px 20px;transform:rotate(-1.4deg);
        border:2px solid rgba(255,217,61,.55);border-radius:10px;background:rgba(12,22,15,.75);
        box-shadow:0 5px 0 rgba(4,8,6,.5)}
-  .credit-k{font-size:9px;letter-spacing:.34em;font-weight:800;color:rgba(255,255,255,.7)}
+  .credit-k{font-size:11px;letter-spacing:.28em;font-weight:800;color:rgba(255,255,255,.7)}
   .credit-n{font-family:'MedievalSharp';font-size:19px;color:#ffd93d}
   .m-ctrl{display:flex;gap:8px;flex-wrap:wrap}
   .m-right{display:flex;flex-direction:column;gap:16px;width:min(430px,92vw)}
@@ -121,7 +121,7 @@
   .mode.mission{border-left:8px solid #e0564f}
   .mode:hover{transform:translateX(8px);border-color:#ffd97a;box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 24px rgba(255,200,110,.15)}
   .mode:active{transform:translateX(8px) scale(.98)}
-  .m-foot{font-size:10px;letter-spacing:.28em;font-weight:800;color:rgba(255,240,210,.5)}
+  .m-foot{font-size:11px;letter-spacing:.22em;font-weight:800;color:rgba(255,240,210,.5)}
   @media (max-width:820px){#menu{justify-content:center;overflow-y:auto;align-content:center}
     .m-left{align-items:center;text-align:center}.m-ctrl{justify-content:center}}
 
@@ -232,6 +232,87 @@
     body.m-mission #bossBar{top:128px}
   }
   @media (max-height:480px){#bossBar{top:8px;width:min(46vw,360px)}body.m-mission #bossBar{top:58px}}
+
+  /* ===== Pasada móvil (celular vertical y apaisado) =====
+     Gestos: sin user-scalable=no; el zoom/scroll del navegador se corta con touch-action. El canvas no
+     acepta ningún gesto del navegador; el menú y el diario sólo se desplazan en vertical (sin zoom). */
+  #c,#dialog,#atkBtn,#promptBtn,#journalBtn{touch-action:none}
+  #menu{touch-action:pan-y;overscroll-behavior:contain}
+  .wm{font-size:11px;letter-spacing:.24em;white-space:nowrap}
+  /* controles táctiles: zonas del pulgar respetando el notch / la barra de inicio */
+  #atkBtn{right:calc(22px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom))}
+  #atkBtn.on{background:rgba(150,56,34,.8);border-color:#ffe9b0}
+  body.dlg-open #atkBtn,body.journal-open #atkBtn{visibility:hidden}
+  #promptBtn{min-height:48px;bottom:calc(140px + env(safe-area-inset-bottom));max-width:calc(100vw - 24px);
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #promptBtn:active{background:rgba(201,162,75,.4)}
+  #journalBtn{min-height:44px;min-width:44px}
+  #journalBtn:active{background:rgba(201,162,75,.35)}
+  #jClose{min-width:44px;min-height:44px}
+  /* el diario se desplaza por dentro: un degradé abajo avisa que hay más */
+  .j-plate.more{-webkit-mask-image:linear-gradient(#000 calc(100% - 40px),rgba(0,0,0,.25));mask-image:linear-gradient(#000 calc(100% - 40px),rgba(0,0,0,.25))}
+  /* menú: nada debajo de la barra del arcade; en el celular el teclado no aplica */
+  @media (max-width:820px),(max-height:560px){
+    #menu{padding-top:calc(60px + env(safe-area-inset-top));padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  }
+  @media (pointer:coarse){.m-ctrl .kb{display:none}}
+  @media (max-width:600px){
+    #menu{gap:18px;padding-left:16px;padding-right:16px}
+    .m-left{gap:10px}
+    .m-left>.chip:first-child{display:none}
+    .title{font-size:44px}
+    .tag,.mode .dd{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+    .tag{font-size:14px;line-height:1.5;-webkit-line-clamp:3}
+    .mode{padding:12px 14px;gap:12px}.mode .em{font-size:30px}.mode .tt{font-size:20px}
+    .mode .dd{-webkit-line-clamp:3;font-size:13px}
+    .m-right{gap:12px}
+  }
+  /* apaisado bajo: dos columnas, los modos a la derecha (bajo la barra del arcade) y a la vista */
+  @media (max-height:560px) and (min-width:600px){
+    #menu{flex-wrap:nowrap;align-items:flex-start;gap:20px;
+          padding:calc(10px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+    .m-left{flex:1 1 0;min-width:0;align-items:flex-start;text-align:left;gap:8px}
+    .m-ctrl{justify-content:flex-start}
+    .m-left>.chip:first-child{display:none}
+    .m-right{width:min(400px,48vw);flex:0 0 auto;padding-top:50px;gap:10px}
+    .m-right h2{font-size:20px}
+    .tag,.mode .dd{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+    .tag{-webkit-line-clamp:3}
+    .mode .dd{-webkit-line-clamp:2;font-size:12px}
+  }
+  /* HUD vertical: la fila de arriba es corazones + barra del arcade (56 px); el resto va debajo */
+  @media (max-width:600px){
+    .hearts{top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left))}
+    #journalBtn{top:calc(62px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));padding:8px 12px;font-size:12px}
+    #heartWrap,#waveWrap,#fragWrap{top:calc(62px + env(safe-area-inset-top))}
+    #heartWrap{left:calc(8px + env(safe-area-inset-left))}
+    #waveWrap,#fragWrap{right:calc(8px + env(safe-area-inset-right))}
+    #heartWrap .lb,#fragWrap .lb{font-size:11px;letter-spacing:.08em}
+    #npcN,#foeInfo{font-size:12px;letter-spacing:.04em}
+    #exploreHint{top:calc(142px + env(safe-area-inset-top));font-size:12px;letter-spacing:.02em;line-height:1.4}
+    #bossBar,body.m-mission #bossBar{top:calc(142px + env(safe-area-inset-top))}
+    #banner{top:36%;font-size:30px}#banner.long{font-size:20px}
+    #dialog{bottom:calc(12px + env(safe-area-inset-bottom));padding:18px 14px 12px}
+    #dlgName{font-size:15px;top:-13px}
+    #dlgText{min-height:44px;line-height:1.5}
+  }
+  /* HUD apaisado (celular acostado): placas compactas, la pista entre corazones y la barra del arcade */
+  @media (max-height:480px) and (min-width:560px){
+    .hearts{top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));padding:5px 10px;font-size:17px;letter-spacing:2px}
+    #journalBtn{top:calc(56px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));padding:8px 12px;font-size:12px}
+    #waveWrap,#fragWrap{top:calc(62px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));padding:5px 12px}
+    #fragN{font-size:20px}#waveInfo{font-size:18px}
+    #heartWrap{top:calc(8px + env(safe-area-inset-top));width:min(36vw,280px);padding:5px 12px}
+    #heartWrap .lb,#fragWrap .lb{font-size:11px;letter-spacing:.1em}
+    #npcN,#foeInfo{font-size:12px;letter-spacing:.06em}
+    #exploreHint{top:calc(8px + env(safe-area-inset-top));left:calc(140px + env(safe-area-inset-left));transform:none;width:max-content;
+         max-width:calc(100vw - 430px - env(safe-area-inset-left));font-size:12px;letter-spacing:.03em;line-height:1.4;padding:6px 12px}
+    #banner{top:30%;font-size:34px}#banner.long{font-size:22px}
+    #dialog{bottom:calc(10px + env(safe-area-inset-bottom));width:min(72vw,620px);padding:16px 18px 10px}
+    #dlgText{font-size:15px;min-height:40px;line-height:1.45}
+    #promptBtn{bottom:calc(132px + env(safe-area-inset-bottom))}
+    #atkBtn{width:84px;height:84px;right:calc(18px + env(safe-area-inset-right));bottom:calc(18px + env(safe-area-inset-bottom))}
+  }
 </style>
 </head>
 <body>
@@ -289,7 +370,7 @@
        y doce fragmentos de estrella esperan a quien sepa encontrarlos.</p>
     <div class="credit"><span class="credit-k">CREADO POR</span><span class="credit-n"><img class="ml-ava" src="matelabs/mascota-128.webp" alt="">MATELABS</span></div>
     <div class="m-ctrl">
-      <span class="chip">⌨️ WASD · CLIC DERECHO + ARRASTRAR CÁMARA · CLIC/ESPACIO GOLPEAR · E HABLAR · SHIFT CORRER</span>
+      <span class="chip kb">⌨️ WASD · CLIC DERECHO + ARRASTRAR CÁMARA · CLIC/ESPACIO GOLPEAR · E HABLAR · SHIFT CORRER</span>
       <span class="chip">📱 JOYSTICK · DESLIZÁ CÁMARA · BOTÓN ⚔️</span>
     </div>
     <div class="chip gold" id="menuBest" style="display:none"></div>
@@ -354,7 +435,8 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const pick=a=>a[(Math.random()*a.length)|0];
 const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
-const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
+/* vibración corta opcional; con "reducir movimiento" no vibra */
+const buzz=p=>{try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;navigator.vibrate&&navigator.vibrate(p);}catch(e){}};
 function lerpAng(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return a+d*Math.min(1,t);}
 
 /* ================= TERRENO ================= */
@@ -432,6 +514,16 @@ renderer.setSize(W,H,false);
 const scene=new THREE.Scene();
 scene.fog=new THREE.Fog(0xf0c0a0,55,250);
 const camera=new THREE.PerspectiveCamera(60,W/H,0.1,1400);
+/* celular vertical: con 60° verticales el campo horizontal quedaba en ~36° y las criaturas que
+   venían de costado no se veían. En pantallas más altas que anchas se abre el FOV vertical para
+   mantener ~54° horizontales (tope 78°). Apaisado y escritorio: 60° como siempre. */
+function fitCamera(){
+  const a=W/H;
+  camera.aspect=a;
+  camera.fov=a<1?Math.min(78,Math.max(60,2*Math.atan(Math.tan(27*Math.PI/180)/a)*180/Math.PI)):60;
+  camera.updateProjectionMatrix();
+}
+fitCamera();
 
 const sky=new THREE.Mesh(new THREE.SphereGeometry(650,16,12),new THREE.ShaderMaterial({
   side:THREE.BackSide,
@@ -1625,8 +1717,26 @@ function advanceDlg(){
 function closeDlg(){dlgOpen=false;dialogEl.classList.remove('show');document.body.classList.remove('dlg-open');raceArm=false;}
 
 /* ================= COMBATE ================= */
-function attack(){
+/* assist (sólo el botón ⚔️ táctil): si hay una criatura o un jefe al alcance, el guardián se gira
+   hacia el más cercano antes del golpe. En el celular apuntar con el joystick es impreciso;
+   el teclado y el mouse siguen exactamente igual. */
+function aimAssist(){
+  let best=null,bd=1e9;
+  for(const e of enemies){
+    if(e.dead)continue;
+    const d=Math.hypot(e.x-px,e.z-pz);
+    if(d<4.4&&d<bd){bd=d;best=e;}
+  }
+  for(const t in bosses){
+    const b=bosses[t];if(b.state!=='fight')continue;
+    const d=Math.hypot(b.x-px,b.z-pz)-b.def.r*.6;
+    if(d<4.4&&d<bd){bd=d;best=b;}
+  }
+  if(best&&bd>.05)prot=Math.atan2(best.x-px,best.z-pz);
+}
+function attack(assist){
   if(atkCd>0||state!=='play'||dlgOpen||journalOpen)return;
+  if(assist)aimAssist();
   atkCd=.42;swingT=.3;sSwing();attacks++;
   spawnArc();
   orbGlow.scale.set(2.4,2.4,1);
@@ -1853,7 +1963,7 @@ function releaseInput(){
   for(const k in keys)keys[k]=false;
   camDrag=false;
   if(joyId!==null){joyId=null;joyEl.style.display='none';}
-  joyX=joyY=0;camId=null;ptrs.clear();pinchD=0;
+  joyX=joyY=0;camId=null;ptrs.clear();pinchD=0;pinchId=null;
 }
 addEventListener('blur',releaseInput);
 addEventListener('keyup',e=>{
@@ -1883,8 +1993,11 @@ canvas.addEventListener('wheel',e=>{e.preventDefault();
 addEventListener('contextmenu',e=>e.preventDefault());
 
 const ptrs=new Map();
-let joyId=null,camId=null,joyOX=0,joyOY=0,pinchD=0,pinchDist=0;
+let joyId=null,camId=null,joyOX=0,joyOY=0,pinchD=0,pinchDist=0,pinchId=null;
 let joyX=0,joyY=0;
+/* Táctil: joystick (mitad izquierda) y cámara (resto) a la vez. El pellizco de zoom sólo se arma con
+   dos dedos fuera del joystick: antes, mover con el joystick y deslizar la cámara con el otro pulgar
+   contaba como "dos dedos" = pellizco, soltaba el joystick y el personaje se frenaba. */
 canvas.addEventListener('pointerdown',e=>{
   /* el mouse se maneja con mousedown (clic = golpe, clic derecho = cámara). Antes un clic en la
      mitad izquierda también abría el joystick táctil y el personaje seguía al puntero. */
@@ -1894,26 +2007,25 @@ canvas.addEventListener('pointerdown',e=>{
   if(state!=='play')return;
   if(dlgOpen){advanceDlg();return;}
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(ptrs.size===2){
-    const a=[...ptrs.values()];
-    pinchD=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);pinchDist=camDist;
-    joyId=null;joyEl.style.display='none';joyX=joyY=0;camId=null;
-    return;
-  }
   if(e.clientX<W*.45&&joyId===null){
     joyId=e.pointerId;joyOX=e.clientX;joyOY=e.clientY;
     joyEl.style.display='block';
     joyEl.style.left=joyOX+'px';joyEl.style.top=joyOY+'px';
+    joyKEl.style.transform='translate(-50%,-50%)';
   }else if(camId===null){camId=e.pointerId;}
+  else if(pinchId===null){
+    /* segundo dedo de cámara: pellizco entre los dos (el joystick, si está, sigue andando) */
+    const a=ptrs.get(camId);
+    pinchId=e.pointerId;pinchD=Math.max(1,Math.hypot(a.x-e.clientX,a.y-e.clientY));pinchDist=camDist;
+  }
 });
 addEventListener('pointermove',e=>{
   if(!ptrs.has(e.pointerId))return;
   const p=ptrs.get(e.pointerId);
   const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
-  if(ptrs.size===2&&pinchD){
-    const a=[...ptrs.values()];
-    const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
-    camDist=clamp(pinchDist*(pinchD/d),7,20);
+  if(pinchId!==null&&(e.pointerId===pinchId||e.pointerId===camId)){
+    const a=ptrs.get(camId),b=ptrs.get(pinchId);
+    if(a&&b){const d=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y));camDist=clamp(pinchDist*(pinchD/d),7,20);}
     return;
   }
   if(e.pointerId===joyId){
@@ -1930,14 +2042,18 @@ addEventListener('pointermove',e=>{
 const ptrUp=e=>{
   ptrs.delete(e.pointerId);
   if(e.pointerId===joyId){joyId=null;joyEl.style.display='none';joyX=joyY=0;}
-  if(e.pointerId===camId)camId=null;
-  if(ptrs.size<2)pinchD=0;
+  if(e.pointerId===pinchId){pinchId=null;pinchD=0;}
+  if(e.pointerId===camId){
+    /* si suelta el primer dedo del pellizco, el segundo pasa a mover la cámara */
+    camId=pinchId;pinchId=null;pinchD=0;
+  }
 };
 addEventListener('pointerup',ptrUp);addEventListener('pointercancel',ptrUp);
 atkBtn.addEventListener('pointercancel',()=>atkBtn.classList.remove('on'));
 atkBtn.addEventListener('pointerleave',()=>atkBtn.classList.remove('on'));
 
-atkBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audio();atkBtn.classList.add('on');attack();});
+atkBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audio();atkBtn.classList.add('on');
+  if(atkCd<=0&&state==='play')buzz(8);attack(true);});
 atkBtn.addEventListener('pointerup',()=>atkBtn.classList.remove('on'));
 promptBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audio();
   if(dlgOpen)advanceDlg();else if(nearNpc)openDialogue(nearNpc);});
@@ -2727,8 +2843,15 @@ function openJournal(){
   for(const k in keys)keys[k]=false;
   renderJournal();
   $('journal').classList.remove('hidden');document.body.classList.add('journal-open');sBlip();
+  updateJournalMore();
   const t=$('jQuests').querySelector('.tracked')||$('jClose');try{t.focus({preventScroll:true});}catch(e){}
 }
+/* degradé "hay más abajo" en el diario cuando no entra en la pantalla (celulares) */
+function updateJournalMore(){
+  const p=$('journal').querySelector('.j-plate');
+  if(p)p.classList.toggle('more',p.scrollTop+p.clientHeight<p.scrollHeight-6);
+}
+$('journal').querySelector('.j-plate').addEventListener('scroll',updateJournalMore,{passive:true});
 function closeJournal(){
   if(!journalOpen)return;
   journalOpen=false;$('journal').classList.add('hidden');document.body.classList.remove('journal-open');sBlip();
@@ -3361,7 +3484,8 @@ addEventListener('resize',()=>{
   W=innerWidth;H=innerHeight;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,QL.pr));
   renderer.setSize(W,H,false);
-  camera.aspect=W/H;camera.updateProjectionMatrix();
+  fitCamera();
+  if(journalOpen)updateJournalMore();
   if(paused)renderer.render(scene,camera); /* el canvas se borra al redimensionar */
 });
 
@@ -3405,7 +3529,7 @@ window.__valle={
     /* MiniArcade 3.0 */
     difficulty:diffId,quality:qualId,qualChanges,pixelRatio:renderer.getPixelRatio(),shadows:renderer.shadowMap.enabled,
     grass:grassIM.count,flowers:flowerHeadIM.count,pCap,particles:P3.reduce((n,p)=>n+(p.life>0?1:0),0),fogFar:scene.fog.far,camFar:camera.far,
-    triangles:renderer.info.render.triangles,
+    triangles:renderer.info.render.triangles,fov:camera.fov,camDist,camYaw,joy:joyId!==null,
     quests:Object.fromEntries(QUESTS.map(q=>[q.id,{st:qs[q.id].st,n:qs[q.id].n,failed:qs[q.id].failed}])),
     tracked,raceOn,raceT,raceIdx,journalOpen,barrier:barrierColl.r,seals:sealsBroken(),playerPower,invulBonus,
     album:ALBUM.filter(a=>album[a[0]]).map(a=>a[0]),
@@ -3445,6 +3569,9 @@ if(/[?&]e2e\b/.test(location.search)){
     return out;
   };
   window.__valle.setWave=n=>{wave=n;};
+  window.__valle.enemyPos=()=>enemies.filter(e=>!e.dead).map(e=>[e.x,e.z,e.hp]);
+  /* congela a las criaturas en su lugar (para probar golpes sin que caminen) */
+  window.__valle.freezeFoes=()=>{for(const e of enemies){e.speed=0;}};
   window.__valle.npcPos=i=>[NPCS[i].x,NPCS[i].z];
   /* lleva al jugador al lado del habitante y abre la charla como la tecla E */
   window.__valle.talkTo=i=>{const n=NPCS[i];px=n.x+1.2;pz=n.z;nearNpc=n;if(!dlgOpen&&state==='play')openDialogue(n);};

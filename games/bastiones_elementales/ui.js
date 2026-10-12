@@ -156,6 +156,44 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0d0a1a;overscroll-beh
   .be-banner{top:40%}
 }
 @media (pointer:coarse) and (max-height:520px){.be-panel{width:min(520px,calc(100vw - 340px));left:max(150px,env(safe-area-inset-left));transform:none}}
+/* táctil: objetivos ≥ 44 px, textos ≥ 11–12 px, pantallas sin cosas de teclado/gamepad, con lugar para la barra del SDK */
+@media (pointer:coarse){
+  .be-x{width:44px;height:44px;font-size:18px}
+  .be-tip button{min-height:44px;min-width:52px;padding:10px 12px;font-size:12px}
+  .be-tbl th,.be-tbl small{font-size:11px}
+  .be-row small{font-size:11px;letter-spacing:.12em}
+  .be-tip p small,.be-ph h3 small{font-size:11px}
+  .be-boss .t{font-size:11px}
+  .be-pbtn{font-size:12px}.be-pbtn .c{font-size:12px}
+  .be-pbtn:active:not(:disabled),.be-x:active,.be-tip button:active,.be-maps button:active:not(:disabled),.be-scr .k3-b:active,.be-menu .k3-b:active{transform:scale(.95);filter:brightness(1.25)}
+  .be-mk .b{font-size:12px}
+  .be-dfx{font-size:12px}
+  .be-maps button{min-height:60px}.be-maps button b{font-size:12px}
+  .be-menu .k3-b,.be-scr .k3-b{min-height:48px}
+  .be-menu .k3-b[data-go]{min-height:56px}
+  .k3-screen.be-scr,.k3-screen.be-menu{padding-top:calc(max(12px,env(safe-area-inset-top)) + 62px)}
+  .be-opt label,.be-opt .r{min-height:44px;box-sizing:border-box}
+  .be-opt input[type=range]{height:44px;width:min(150px,38vw)}
+  .be-opt input[type=checkbox]{width:26px;height:26px}
+  .be-opt select{min-height:44px}
+  .be-pconly{display:none!important}
+  .be-tbl .pc,.be-tbl .gp{display:none}
+}
+@media (pointer:fine){.be-touchonly{display:none!important}}
+/* la barra del SDK mide 56 px de alto en táctil: en vertical el cartel de oleada va debajo; en teléfonos angostos también el estado */
+@media (pointer:coarse) and (max-width:760px) and (min-height:521px){.be-top{top:calc(max(8px,env(safe-area-inset-top)) + 62px)}}
+@media (pointer:coarse) and (max-width:560px){.be-tip{flex-wrap:wrap;row-gap:6px;padding:8px 10px}.be-tip p{flex:1 1 calc(100% - 48px)}.be-tip button{flex:1}}
+@media (pointer:coarse) and (max-width:430px) and (min-height:521px){.be-status{top:calc(max(8px,env(safe-area-inset-top)) + 62px)}}
+@media (pointer:coarse) and (max-height:520px){
+  .be-top{width:min(300px,calc(100vw - 440px))}
+  /* menú apaisado compacto: todo entra en 360–412 px de alto sin scroll */
+  .k3-screen.be-menu{padding-top:calc(max(8px,env(safe-area-inset-top)) + 56px);padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .be-menu .k3-panel{gap:6px 20px}
+  .be-menu .be-mr{gap:6px}
+  .be-maps button{min-height:52px;padding:5px 6px;gap:1px}
+  .be-maps button .ic{font-size:18px}
+  .be-menu .k3-b:not([data-go]){min-height:44px;padding-top:8px;padding-bottom:8px}
+}
 @media (prefers-reduced-motion:reduce){.be-banner,.be-flash{transition:none}.be-act button.go.ready,.be-mk.ready .b{animation:none}.be-pop.on{animation-duration:.01s;opacity:0}}
 `;
 
@@ -393,7 +431,7 @@ export function createUI(o) {
     help.show(`<span class="k3-kicker">CÓMO JUGAR</span><h1 style="font-size:clamp(24px,6vw,40px)">DEFENDÉ EL CRISTAL</h1>
       <p>Construí torres en las plataformas ◇, frená las oleadas y no dejes que lleguen al cristal 💎. Superá todas las oleadas de un escenario para desbloquear el siguiente. En el Valle del Trueno espera el <b>Titán Elemental</b>.</p>
       <div class="be-h">CONTROLES</div>
-      <table class="be-tbl"><tr><th></th><th>PC</th><th>TÁCTIL</th><th>GAMEPAD</th></tr>${ctl.map(r => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table>
+      <table class="be-tbl"><tr><th></th><th class="pc">PC</th><th>TÁCTIL</th><th class="gp">GAMEPAD</th></tr>${ctl.map(r => `<tr><td><b>${r[0]}</b></td><td class="pc">${r[1]}</td><td>${r[2]}</td><td class="gp">${r[3]}</td></tr>`).join('')}</table>
       <div class="be-h">TORRES</div>
       <table class="be-tbl">${TOWER_ORDER.map(k => { const T = /** @type {any} */ (TOWERS)[k]; return `<tr><td>${T.icon} <b>${T.name}</b></td><td>${esc(T.desc)}</td><td>💰${T.lv[0].cost}</td></tr>`; }).join('')}</table>
       <div class="be-h">SINERGIAS</div>
@@ -418,12 +456,13 @@ export function createUI(o) {
         <label>Invertir arrastre <input type="checkbox" data-o="invert" ${s.invert ? 'checked' : ''}></label>
         <label>Movimiento reducido (sin sacudidas ni destellos) <select data-o="motion"><option value="auto" ${s.motion === 'auto' ? 'selected' : ''}>Auto</option><option value="on" ${s.motion === 'on' ? 'selected' : ''}>Sí</option><option value="off" ${s.motion === 'off' ? 'selected' : ''}>No</option></select></label>
         <label>Mostrar alcance de todas las torres <input type="checkbox" data-o="ranges" ${s.ranges ? 'checked' : ''}></label>
-        ${bind('wave', 'Llamar oleada')}${bind('speed', 'Velocidad x1/x2')}${bind('upgrade', 'Mejorar torre')}${bind('sell', 'Vender torre')}
+        <label class="be-touchonly">Vibración al tocar (celular) <input type="checkbox" data-o="haptics" ${s.haptics ? 'checked' : ''}></label>
+        <div class="be-pconly" style="display:contents">${bind('wave', 'Llamar oleada')}${bind('speed', 'Velocidad x1/x2')}${bind('upgrade', 'Mejorar torre')}${bind('sell', 'Vender torre')}</div>
       </div>
-      <div class="be-h">GAMEPAD</div>
-      <table class="be-tbl"><tr><td>Stick / cruceta</td><td>mover cámara (o elegir en el panel)</td></tr><tr><td>A</td><td>elegir lo que está bajo la retícula / confirmar</td></tr><tr><td>B</td><td>cerrar panel</td></tr><tr><td>X</td><td>mejorar</td></tr><tr><td>Y</td><td>llamar oleada</td></tr><tr><td>LB / RB</td><td>girar cámara</td></tr><tr><td>LT / RT</td><td>zoom</td></tr><tr><td>Select · Start</td><td>velocidad · pausa</td></tr></table>
+      <div class="be-h be-pconly">GAMEPAD</div>
+      <table class="be-tbl be-pconly"><tr><td>Stick / cruceta</td><td>mover cámara (o elegir en el panel)</td></tr><tr><td>A</td><td>elegir lo que está bajo la retícula / confirmar</td></tr><tr><td>B</td><td>cerrar panel</td></tr><tr><td>X</td><td>mejorar</td></tr><tr><td>Y</td><td>llamar oleada</td></tr><tr><td>LB / RB</td><td>girar cámara</td></tr><tr><td>LT / RT</td><td>zoom</td></tr><tr><td>Select · Start</td><td>velocidad · pausa</td></tr></table>
       <p style="font-size:12px">Sonido y calidad gráfica: botón ⚙/⏸ de la barra superior.</p>
-      <div class="k3-btnrow"><button type="button" class="k3-b" data-m="closeOpts">Listo</button><button type="button" class="k3-b alt" data-m="resetBinds">Teclas por defecto</button></div>`);
+      <div class="k3-btnrow"><button type="button" class="k3-b" data-m="closeOpts">Listo</button><button type="button" class="k3-b alt be-pconly" data-m="resetBinds">Teclas por defecto</button></div>`);
     opts.el.querySelectorAll('[data-o]').forEach(inp => inp.addEventListener('change', () => {
       const el = /** @type {HTMLInputElement} */ (inp), k = el.dataset.o;
       o.on('opt', { k, v: el.type === 'checkbox' ? el.checked : el.type === 'range' ? Number(el.value) : el.value });

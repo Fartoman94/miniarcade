@@ -523,37 +523,181 @@ test.describe('Reino del Alba', () => {
     expectNoErrors(errors);
   });
 
-  for (const [w, h] of [[412, 915], [915, 412]]) {
-    test(`layout celular ${w}×${h}: sin scroll ni HUD encimado`, async ({ page, isMobile }) => {
+  /* ---------- móvil: matriz de tamaños (retrato y apaisado) ---------- */
+  /** Medidas del HUD propio contra la barra del SDK, los controles táctiles y el borde de la pantalla. */
+  const measure = page => page.evaluate(() => {
+    const vis = e => { if (!e) return null; const cs = getComputedStyle(e); if (/** @type {HTMLElement} */ (e).hidden || cs.display === 'none' || cs.visibility === 'hidden') return null; const b = e.getBoundingClientRect(); return b.width && b.height ? b : null; };
+    const r = sel => vis(document.querySelector(sel));
+    const over = (a, b) => !!a && !!b && !(a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5);
+    const btns = [...document.querySelectorAll('.k3-btn')].map(vis).filter(Boolean);
+    // los botones de acción se miden uno por uno (el contenedor .k3-btns es más ancho que los botones y no recibe toques)
+    const ub = btns.length ? { left: Math.min(...btns.map(b => b.left)), right: Math.max(...btns.map(b => b.right)), top: Math.min(...btns.map(b => b.top)), bottom: Math.max(...btns.map(b => b.bottom)) } : null;
+    const els = { status: r('#ra-status'), side: r('#ra-side'), bar: r('.mla-bar'), joy: r('.k3-joy'), btns: ub, prompt: r('#ra-prompt'), dialog: r('#ra-dialog'), tip: r('#ra-tip'), obj: r('#ra-obj') };
+    const pairs = [['status', 'side'], ['status', 'bar'], ['side', 'bar'], ['tip', 'bar'], ['obj', 'bar'], ['status', 'joy'], ['status', 'btns'], ['side', 'btns'], ['side', 'joy'], ['prompt', 'joy'], ['prompt', 'btns'], ['prompt', 'side'], ['prompt', 'status'], ['joy', 'btns'], ['dialog', 'bar'], ['dialog', 'status']];
+    // objetivos táctiles: botones de acción, joystick, diario, aviso, barra del SDK y opciones de diálogo
+    const targets = [...document.querySelectorAll('.k3-btn, .k3-joy, #ra-journal-btn, #ra-prompt, .mla-btn, #ra-dialog [data-c], #ra-tip button, #ra-text button')]
+      .map(e => ({ e, b: vis(e) })).filter(o => o.b).map(o => ({ id: o.e.id || o.e.getAttribute('aria-label') || o.e.className, w: Math.round(o.b.width), h: Math.round(o.b.height) }));
+    // textos con información de juego (vida, monedas, zona, objetivo, diálogo)
+    const small = [...document.querySelectorAll('.ra-chip, #ra-zone, #ra-obj, #ra-dialog p, #ra-dialog .n, #ra-boss small, #ra-prompt')]
+      .filter(e => vis(e)).map(e => ({ id: e.id || e.className, fs: parseFloat(getComputedStyle(e).fontSize) })).filter(o => o.fs < 12);
+    return {
+      scrollW: document.documentElement.scrollWidth, innerW: innerWidth, scrollH: document.documentElement.scrollHeight, innerH: innerHeight,
+      els: Object.fromEntries(Object.entries(els).map(([k, b]) => [k, !!b])),
+      overlaps: pairs.filter(([a, b]) => over(els[a], els[b])).map(p => p.join('/')),
+      outside: Object.entries(els).filter(([, b]) => b && (b.left < -1 || b.right > innerWidth + 1 || b.top < -1 || b.bottom > innerHeight + 1)).map(([k]) => k),
+      tiny: targets.filter(t => t.w < 44 || t.h < 44),
+      small,
+      btnRects: btns.map(b => ({ l: b.left, r: b.right, t: b.top, b: b.bottom })),
+      joyRect: els.joy ? { l: els.joy.left, r: els.joy.right, t: els.joy.top, b: els.joy.bottom } : null,
+    };
+  });
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+  for (const [w, h] of SIZES) {
+    test(`móvil ${w}×${h}: menú, HUD, aviso, diálogo con opciones, diario e interior sin cortes ni encimados`, async ({ page, isMobile }) => {
       test.skip(!isMobile, 'sólo en el proyecto móvil');
       await page.setViewportSize({ width: w, height: h });
       const { errors } = await openGame(page, DBG);
       await ready(page);
-      // el menú entra sin scroll horizontal y el botón principal es tocable
-      await expect(page.locator('#ra-menu [data-go]')).toBeInViewport();
+      // menú: sin scroll horizontal, botón principal visible, grande y en la pantalla
+      const go = page.locator('#ra-menu [data-go]');
+      await expect(go).toBeInViewport({ ratio: 1 });
+      const gb = await go.boundingBox();
+      expect(gb.height).toBeGreaterThanOrEqual(56);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await start(page, true);
-      await H(page, "D.manual(true); D.approach('door:herreria') || D.approach('pozo'); D.simulate(0.3); return 1");
+      await H(page, "D.manual(true); D.god(true); D.setHour(10); D.simulate(0.6); return 1");
+      // juego con el tutorial a la vista + aviso de interacción
+      await H(page, "D.approach('door:herreria') || D.approach('pozo'); D.simulate(0.3); return 1");
       await expect(page.locator('#ra-prompt')).toBeVisible();
-      const m = await page.evaluate(() => {
-        const r = sel => { const e = document.querySelector(sel); if (!e || /** @type {HTMLElement} */ (e).hidden) return null; const b = e.getBoundingClientRect(); return b.width && b.height ? b : null; };
-        const over = (a, b) => !!a && !!b && !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
-        const els = { status: r('#ra-status'), side: r('#ra-side'), bar: r('.mla-bar'), joy: r('.k3-joy'), btns: r('.k3-btns'), prompt: r('#ra-prompt') };
-        const pairs = [['status', 'side'], ['status', 'bar'], ['side', 'bar'], ['status', 'joy'], ['side', 'btns'], ['side', 'joy'], ['prompt', 'joy'], ['prompt', 'btns'], ['prompt', 'side'], ['prompt', 'status'], ['joy', 'btns']];
-        return {
-          scrollW: document.documentElement.scrollWidth, innerW: innerWidth, scrollH: document.documentElement.scrollHeight, innerH: innerHeight,
-          missing: Object.keys(els).filter(k => !els[k]),
-          overlaps: pairs.filter(([a, b]) => over(els[a], els[b])).map(p => p.join('/')),
-          inside: Object.entries(els).filter(([, b]) => b && (b.left < -1 || b.right > innerWidth + 1 || b.top < -1 || b.bottom > innerHeight + 1)).map(([k]) => k),
-        };
-      });
+      let m = await measure(page);
       expect(m.scrollW).toBeLessThanOrEqual(m.innerW);
       expect(m.scrollH).toBeLessThanOrEqual(m.innerH);
-      expect(m.missing).toEqual([]);
+      expect(m.els.status && m.els.side && m.els.bar && m.els.joy && m.els.btns && m.els.prompt).toBe(true);
       expect(m.overlaps).toEqual([]);
-      expect(m.inside).toEqual([]);
+      expect(m.outside).toEqual([]);
+      expect(m.tiny).toEqual([]);
+      expect(m.small).toEqual([]);
+      // con más monedas/fama (chips más anchos) el HUD sigue sin pisar la barra del SDK
+      await H(page, "D.setInv('coins', 1234); D.closeDialog(); D.simulate(0.3); return 1");
+      m = await measure(page);
+      expect(m.overlaps).toEqual([]);
+      // el jugador no queda tapado por el joystick ni por los botones (exterior e interior)
+      for (const [sc, sp] of [['aldea', 'inicio'], ['herreria'], ['torre'], ['taberna']]) {
+        await H(page, `D.goto('${sc}'${sp ? `,'${sp}'` : ''}); D.simulate(0.8); return 1`);
+        const ps = await H(page, 'return H.playerScreen');
+        m = await measure(page);
+        const inR = r => r && ps.x >= r.l && ps.x <= r.r && ps.y >= r.t && ps.y <= r.b;
+        expect(ps.y, sc).toBeGreaterThan(0); expect(ps.y, sc).toBeLessThan(h);
+        expect(inR(m.joyRect) || m.btnRects.some(inR), `${sc}: jugador bajo los controles en ${JSON.stringify(ps)}`).toBe(false);
+        // en vertical queda por encima de la franja de los controles; en apaisado (controles a los costados) no más abajo del 62 %
+        const top = Math.min(m.joyRect.t, ...m.btnRects.map(b => b.t));
+        const lim = h > w ? top - 10 : h * 0.62;
+        expect(ps.y, `${sc}: jugador demasiado abajo (${Math.round(ps.y)} ≥ ${Math.round(lim)})`).toBeLessThan(lim);
+      }
+      // diálogo con opciones: entra en la pantalla, no pisa la barra y sus botones son tocables
+      await H(page, "D.goto('aldea','inicio'); D.setHour(10); D.talk('mercader'); let g = 0; while (H.dialog && H.dialog.i < H.dialog.total - 1 && g++ < 10) D.advance(); D.simulate(0.1); return 1");
+      await expect(page.locator('#ra-dialog [data-c]').first()).toBeInViewport({ ratio: 1 });
+      m = await measure(page);
+      expect(m.overlaps).toEqual([]); expect(m.outside).toEqual([]); expect(m.tiny).toEqual([]); expect(m.small).toEqual([]);
+      await page.locator('#ra-dialog [data-c="1"]').tap();
+      await expect(page.locator('#ra-dialog')).toBeHidden();
+      // diario: el botón Cerrar está a la vista y se toca
+      await sim(page, 0.2);
+      await page.locator('#ra-journal-btn').tap();
+      await expect(page.locator('#ra-journal [data-close]')).toBeInViewport({ ratio: 1 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.locator('#ra-journal [data-close]').tap();
+      expect(await H(page, 'return H.state')).toBe('play');
       expectNoErrors(errors);
     });
   }
+
+  test('móvil: el toque que abre un diálogo no saltea líneas y tocar el texto no elige una opción', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    const { errors } = await play(page, true);
+    // dedo sobre USAR → el juego abre el diálogo → al soltar, el clic sintético cae sobre el cuadro recién abierto
+    expect(await H(page, "D.goto('castillo','sur'); return D.approach('npc:capitan')")).toBe(true);
+    await sim(page, 0.1);
+    const ub = await page.locator('.k3-btn[aria-label="use"]').boundingBox();
+    await touch(page, 'touchStart', ub.x + ub.width / 2, ub.y + ub.height / 2);
+    await sim(page, 0.1);
+    expect(await H(page, 'return H.state')).toBe('dialog');
+    await touch(page, 'touchEnd', 0, 0);
+    await page.waitForTimeout(150);
+    expect(await H(page, 'return H.dialog && H.dialog.i')).toBe(0);
+    // tocar el cuadro avanza una línea
+    await page.locator('#ra-dialog p').tap();
+    expect(await H(page, 'return H.dialog && H.dialog.i')).toBe(1);
+    await H(page, 'D.finishDialog(); return 1');
+    // mercader: con las opciones a la vista, tocar el texto no compra; «Ahora no» cierra sin cobrar
+    const coins = await H(page, "D.goto('aldea','inicio'); D.setHour(10); D.setInv('coins', 50); D.talk('mercader'); let g = 0; while (H.dialog && H.dialog.i < H.dialog.total - 1 && g++ < 10) D.advance(); return H.coins");
+    expect(await H(page, 'return H.dialog && H.dialog.choices')).toBeTruthy();
+    await page.locator('#ra-dialog p').tap();
+    expect(await H(page, 'return [H.state, H.coins]')).toEqual(['dialog', coins]);
+    await page.locator('#ra-dialog [data-c="1"]').tap();
+    expect(await H(page, 'return [H.state, H.coins]')).toEqual(['play', coins]);
+    expectNoErrors(errors);
+  });
+
+  test('móvil: multitáctil (joystick + ⚔ a la vez), ayuda de puntería y botones con respuesta visual', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    const { errors } = await play(page, true);
+    await H(page, "D.goto('campos','norte'); D.simulate(0.3); return 1");
+    const jb = await page.locator('.k3-joy').boundingBox(), ab = await page.locator('.k3-btn[aria-label="atk"]').boundingBox();
+    const jx = jb.x + jb.width / 2, jy = jb.y + jb.height / 2, ax = ab.x + ab.width / 2, ay = ab.y + ab.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    const p0 = await H(page, 'return H.player'), sw0 = await H(page, 'return H.swings');
+    // dedo 1 empuja el joystick y lo mantiene; dedo 2 toca ⚔ mientras tanto
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy, id: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: jx + 50, y: jy, id: 1 }] });
+    await sim(page, 0.3);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx + 50, y: jy, id: 1 }, { x: ax, y: ay, id: 2 }] });
+    await expect(page.locator('.k3-btn[aria-label="atk"]')).toHaveClass(/\bon\b/);
+    await sim(page, 0.05);
+    const swings = (await H(page, 'return H.swings')) - sw0;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: jx + 50, y: jy, id: 1 }] });
+    await sim(page, 0.3);
+    const p1 = await H(page, 'return H.player');
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    expect(Math.hypot(p1.x - p0.x, p1.z - p0.z)).toBeGreaterThan(1);
+    expect(swings).toBe(1);
+    // ayuda de puntería: una sombra a un costado; mirando para otro lado, ⚔ la golpea igual
+    const hit = await H(page, `
+      D.teleport(${p0.x}, ${p0.z}); D.simulate(0.5); const p = H.player; D.spawnEnemy('sombra', p.x + 1.6, p.z); D.face(Math.PI); D.simulate(0.02);
+      const e0 = H.enemies.filter(e => !e.dead && e.kind === 'sombra').map(e => e.hp);
+      return { e0 };`);
+    expect(hit.e0.length).toBeGreaterThan(0);
+    await page.locator('.k3-btn[aria-label="atk"]').tap();
+    await sim(page, 0.3);
+    const after = await H(page, "return H.enemies.filter(e => e.kind === 'sombra').map(e => e.dead ? 0 : e.hp)");
+    expect(Math.min(...after)).toBeLessThan(Math.max(...hit.e0));
+    expectNoErrors(errors);
+  });
+
+  test('móvil: girar el teléfono en plena partida reacomoda HUD y cámara; segundo plano pausa', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo en el proyecto móvil');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const { errors } = await play(page, true);
+    await H(page, "D.approach('pozo'); D.simulate(0.3); return 1");
+    const fovP = await H(page, 'return H.fov');
+    expect(fovP).toBeGreaterThan(60); // retrato: FOV más abierto para ver los costados
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForTimeout(250);
+    await H(page, 'D.simulate(0.3); return 1');
+    expect(await H(page, 'return [H.state, Math.round(H.fov)]')).toEqual(['play', 55]);
+    let m = await measure(page);
+    expect(m.overlaps).toEqual([]); expect(m.outside).toEqual([]);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(250);
+    await H(page, 'D.simulate(0.3); return 1');
+    m = await measure(page);
+    expect(m.overlaps).toEqual([]); expect(m.outside).toEqual([]);
+    expect(await H(page, 'return H.state')).toBe('play');
+    // la app pasa a segundo plano → pausa del SDK
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    expect(await H(page, 'return H.paused')).toBe(true);
+    expectNoErrors(errors);
+  });
 
   test('táctil: joystick mueve, el aviso se toca para interactuar y USAR abre la puerta', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'sólo en el proyecto móvil');

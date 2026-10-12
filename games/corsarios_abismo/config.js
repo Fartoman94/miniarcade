@@ -158,7 +158,7 @@ export const SAVE_DEFAULTS = {
   bestScore: 0,
   stats: { sunk: 0, shots: 0, hits: 0, rescued: 0, boarded: 0, treasures: 0 },
   tutorial: { off: false, seen: /** @type {Record<string,boolean>} */ ({}) },
-  opts: { sens: 1, cam: 'lejos', motion: 'auto', aim: true, binds: { port: 'KeyQ', star: 'KeyE', act: 'Space', kit: 'KeyR' } },
+  opts: { sens: 1, cam: 'lejos', motion: 'auto', aim: true, haptics: true, binds: { port: 'KeyQ', star: 'KeyE', act: 'Space', kit: 'KeyR' } },
 };
 export const newRegionState = regionState;
 

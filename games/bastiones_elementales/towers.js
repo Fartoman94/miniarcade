@@ -220,13 +220,14 @@ export function createTowers(ctx) {
   function golemStomp(g) {
     let best = null, bd = 5.5 * 5.5;
     for (const t of list) { if (t.frozenT > 0) continue; const d2 = (t.pad.x - g.x) ** 2 + (t.pad.z - g.z) ** 2; if (d2 < bd) { bd = d2; best = t; } }
-    if (!best) return;
+    if (!best) return false;
     const tw = best;
     ctx.fx.ring(tw.pad.x, tw.pad.z, 0x6ad0ff, 2.2, 2.2, 1.0);
     ctx.fx.ring(g.x, g.z, 0x9ae0ff, 0.5, 3, 0.6);
     ctx.popup(tw.pad, tw.top + 1.5, '¡PISOTÓN HELADO!', '#9ae0ff');
     ctx.sfx.warn();
     ctx.later(1.0, () => { if (list.includes(tw)) { tw.frozenT = 3; ctx.fx.burst(tw.pad.x, 1.4, tw.pad.z, 0xbff0ff, 16, 3); ctx.sfx.freeze(); } });
+    return true;
   }
   /** Pulso del Titán: aturde torres en radio. */
   function stunArea(x, z, rad, dur) {
