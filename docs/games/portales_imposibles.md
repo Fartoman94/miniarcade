@@ -208,10 +208,44 @@ Heap en partida: 10–16 MB. `updateMs` de la simulación ≤ 1,5 ms por cuadro 
 sistemas calientes (raycasts, láseres, partículas, matrices de portal). Degradación para hardware inferior: la calidad
 baja quita los render targets (la pasada más cara), sombras y luces extra.
 
+## Móvil
+Pasada mobile-first (Chromium headless con táctil emulado, perfil Pixel 7, DPR 2; **no** hay celulares reales
+disponibles: nada de esto se probó en un teléfono físico). Capturas reales, antes → después, en
+`.perf/mobile-audit/portales_imposibles/{before,after}-{chico 360×640, vertical 390×844, grande 412×915,
+apaisado 915×412, apaisado2 844×390}-{menu,opts,play}.png` (+ `after-*-hint.png`) y los datos crudos en
+`before-report.json` / `after-report.json` (superposiciones, blancos < 44 px, texto < 12 px, FOV).
+
+| Problema (antes) | Dónde | Arreglo |
+|---|---|---|
+| Chips de estado (♥ 🧬 💎 ★) debajo de la barra del SDK (`#pi-status × .mla-bar`) | los 5 tamaños | en táctil la columna derecha arranca a `60px + safe-area` |
+| Tutorial tapando estado/sala (`#pi-tip × #pi-status/#pi-room`) y con botones de 32 px | 844×390 | el tutorial y la pista flotan en el hueco libre: en horizontal entre joystick y botones (zona del pulgar); en vertical justo encima de los controles. Nunca tapan la mira; si no entran, el texto se desplaza por dentro y los botones quedan siempre visibles a la derecha (`ui.layout()`) |
+| 💡 y ↺ de 36×34 px; título de sala cortado («1-1 · PR… PASO») | vertical | 44 px (en vertical en una fila propia a lo ancho), título en una línea con elipsis |
+| Tiempo de la sala a 10 px, «TUTORIAL» a 10 px, etiquetas de botones a 11 px | todos | 12 / 11 / 12 px |
+| Menú: el subtítulo quedaba debajo de la barra del SDK; «Empezar» de 40 px en horizontal | 360×640, horizontal | las pantallas dejan `60px + safe-area` arriba, versión compacta para alturas cortas, «Empezar» ≥ 56 px, el resto ≥ 48 px |
+| Controles: filas de teclas (inútiles en táctil) y «Listo» fuera de pantalla | todos | en táctil no se muestran teclas; «Listo»/«Volver» quedan fijos abajo (sticky) en Controles, Cómo jugar y Contrarreloj |
+| FOV horizontal ~36° en vertical (se veía por una rendija) | vertical | FOV vertical efectivo que garantiza ~64° horizontales (tope 100°): 96° en 360×640, 100° en 390/412; en horizontal y escritorio queda el de Opciones (72°). También en la cámara del menú; se recalcula al rotar |
+| Disparos táctiles que caían apenas fuera del panel blanco | táctil | ayuda de puntería sólo táctil (botones AZUL/NARANJA y tocar la pantalla): si el disparo exacto falla prueba un cono de ≤ 4,5° y usa la dirección válida más cercana; teclado/mouse sin cambios |
+| 💡 en el pasillo no hacía nada visible | todos | aviso «Las pistas se piden dentro de una sala de prueba» |
+| Al ir a segundo plano con un dedo apoyado podía quedar la cámara girando | táctil | `visibilitychange` suelta arrastre, toque pendiente y controles (la pausa la hace el SDK) |
+
+Además: vibración corta opcional al abrir un portal (12 ms) y al recibir daño (35 ms), con interruptor «Vibración» en
+Controles (sólo táctil) y respetando el movimiento reducido; respuesta visual más fuerte al apretar los botones;
+aviso suave una vez por sesión, sin bloquear, de que en horizontal se ve más (el juego es totalmente jugable en vertical).
+Calidad: en táctil `auto` ya resuelve a «media» (DPR ≤ 1,5) desde el SDK.
+
+Pruebas nuevas (proyecto `mobile`): **matriz de tamaños** (menú en los 5 tamaños: sin scroll horizontal, sin pisar la
+barra, blancos ≥ 44 px, «Empezar» ≥ 56 px, última fila alcanzable; Controles con «Listo» visible; en partida rotando
+360×640 → 390×844 → 412×915 → 915×412 → 844×390 → 360×640 sin superposiciones entre HUD, misiones, barra, joystick,
+botones, mira, tutorial y pista, sin desbordes, blancos ≥ 44 px, FOV correcto y la partida intacta) y **partida sólo
+táctil con dos pulgares** (joystick + SALTO a la vez por CDP multitáctil, respuesta visual, ayuda de puntería que abre
+el portal fuera del borde del panel, pausa al pasar a segundo plano).
+Resultado: 50 pruebas → desktop 22 ✓ / 3 omitidas (sólo celular), mobile 24 ✓ / 1 omitida (matemática pura);
+igual con `ML_WORKERS=1` y `ML_WORKERS=4`.
+
 ## Pendiente / NO PROBADO
 - **Miniatura** `games/thumbs/portales_imposibles.webp`: no la creé (fuera de mis archivos permitidos); generarla con `tools/make-thumbs.mjs`.
 - **Registro** en `games/registry.js`: pendiente (entrada propuesta en el reporte).
-- **NO PROBADO en hardware real**: FPS en celulares/GPU reales; captura del mouse (Pointer Lock) en navegadores reales
+- **NO PROBADO en hardware real**: FPS en celulares/GPU reales; vibración, safe-area con notch y gestos del sistema en teléfonos reales; captura del mouse (Pointer Lock) en navegadores reales
   (en headless se prueba con teclas, botones y `?nolock`); gamepad físico (el SDK lo ignora bajo webdriver).
 - Recursión de portales de un solo nivel (el portal dentro del portal muestra el cuadro anterior); no hay portales a
   través de portales para los disparos.

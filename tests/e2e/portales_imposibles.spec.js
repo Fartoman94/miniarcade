@@ -735,4 +735,132 @@ test.describe('Portales Imposibles', () => {
     await page.setViewportSize({ width: 412, height: 915 });
     expectNoErrors(errors);
   });
+
+  // ---------------- celular: matriz de tamaños, rotación y controles con dos pulgares ----------------
+  const SIZES = [[360, 640], [390, 844], [412, 915], [915, 412], [844, 390]];
+  /** Cajas visibles de la UI del juego, del SDK y de las misiones; superposiciones, desbordes y blancos chicos. */
+  const audit = (page, sel, targets) => page.evaluate(([sel, targets]) => {
+    const vis = e => { if (!e || e.closest('[hidden]')) return null; const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') return null; const b = e.getBoundingClientRect(); return b.width && b.height ? b : null; };
+    const boxes = sel.map(s => { const b = vis(document.querySelector(s)); return b ? { s, x: b.left, y: b.top, r: b.right, b: b.bottom } : null; }).filter(Boolean);
+    const hits = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], c = boxes[j];
+      if (a.x < c.r - 1 && a.r > c.x + 1 && a.y < c.b - 1 && a.b > c.y + 1) hits.push(a.s + ' × ' + c.s);
+    }
+    const out = boxes.filter(b => b.x < -1 || b.y < -1 || b.r > innerWidth + 1 || b.b > innerHeight + 1).map(b => b.s);
+    const small = [...document.querySelectorAll(targets)].map(e => [e, vis(e)]).filter(([, b]) => b && (b.width < 44 || b.height < 44)).map(([e, b]) => `${e.getAttribute('aria-label') || e.textContent.trim().slice(0, 20)} ${Math.round(b.width)}×${Math.round(b.height)}`);
+    return { hits, out, small, sw: document.documentElement.scrollWidth, w: innerWidth };
+  }, [sel, targets]);
+
+  test('celular: matriz de tamaños (vertical y horizontal) en menú y en juego, con rotación a mitad de partida', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    await lowQuality(page);
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    // menú: entra (con scroll interno si hiciera falta), sin scroll horizontal, sin pisar la barra del SDK, blancos ≥ 44 px y el botón principal ≥ 56 px
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 250);
+      const r = await audit(page, ['#pi-menu .k3-kicker', '#pi-menu h1', '#pi-menu [data-go]', '.mla-bar'], '#pi-menu button, .mla-bar button');
+      expect(r.hits, `${w}×${h}`).toEqual([]);
+      expect(r.out, `${w}×${h}`).toEqual([]);
+      expect(r.small, `${w}×${h}`).toEqual([]);
+      expect(r.sw).toBeLessThanOrEqual(r.w);
+      const go = /** @type {any} */ (await page.locator('#pi-menu [data-go]').boundingBox());
+      expect(go.height).toBeGreaterThanOrEqual(56);
+      // la última fila de botones del menú también se alcanza (scroll interno de la pantalla)
+      await page.locator('#pi-menu [data-help]').scrollIntoViewIfNeeded();
+      await expect(page.locator('#pi-menu [data-help]')).toBeInViewport();
+    }
+    // pantallas largas: la acción principal queda fija y visible abajo
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.locator('#pi-menu [data-opts]').tap();
+    await expect(page.locator('#pi-opts [data-back]')).toBeInViewport();
+    await expect(page.locator('#pi-opts [data-bind]')).toHaveCount(0); // en táctil no se muestran teclas
+    await expect(page.locator('#pi-opts [data-haptics]')).toHaveCount(1);
+    await page.locator('#pi-opts [data-back]').tap();
+    await page.setViewportSize({ width: 360, height: 640 });
+    await start(page, true);
+    await expect(page.locator('#pi-tip')).toBeVisible({ timeout: 20_000 });
+    const room0 = await T(page, 'return T.scen');
+    const SEL = ['#pi-status', '#pi-room', '#pi-tip', '#pi-hint', '#pi-obj', '#pi-prompt', '#pi-boss', '.mlm-hud', '.mla-bar', '.k3-joy', '.k3-btn[aria-label="a"]', '.k3-btn[aria-label="b"]', '.k3-btn[aria-label="use"]', '.k3-btn[aria-label="jump"]', '#pi-cross'];
+    const TG = '.k3-btn, #pi-room button, #pi-tip button, #pi-hint button, .mla-bar button';
+    for (const [w, h] of [...SIZES, [360, 640]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 400);
+      await sim(page, 0.15); // relayout del HUD
+      const r = await audit(page, SEL, TG);
+      expect(r.hits, `${w}×${h}`).toEqual([]);
+      expect(r.out, `${w}×${h}`).toEqual([]);
+      expect(r.small, `${w}×${h}`).toEqual([]);
+      expect(r.sw).toBeLessThanOrEqual(r.w);
+      // FOV: en vertical se abre para no ver por una rendija; en horizontal queda el elegido (72°)
+      const fov = await T(page, 'return T.camFov');
+      if (w < h) expect(fov).toBeGreaterThan(90); else expect(fov).toBe(72);
+      // la rotación no rompe la partida
+      expect(await T(page, 'return T.state')).toBe('play');
+      expect(await T(page, 'return T.scen')).toBe(room0);
+    }
+    // también con la pista abierta (tarjeta grande) en vertical chico y horizontal bajo
+    await D(page, "goto(1,'1-2')"); await D(page, 'teleport(0,4.9,-23,0,0)'); await sim(page, 0.3);
+    await page.locator('#pi-room [data-ui="hint"]').tap(); await sim(page, 0.1);
+    await expect(page.locator('#pi-hint')).toBeVisible();
+    for (const [w, h] of [[360, 640], [844, 390]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await wait(page, 300); await sim(page, 0.15);
+      const r = await audit(page, SEL, TG);
+      expect(r.hits, `pista ${w}×${h}`).toEqual([]);
+      expect(r.out, `pista ${w}×${h}`).toEqual([]);
+    }
+    await page.setViewportSize({ width: 412, height: 915 });
+    expectNoErrors(errors);
+  });
+
+  test('celular: partida sólo táctil con dos pulgares (joystick + salto a la vez), ayuda de puntería y pausa al ir a segundo plano', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'sólo celular');
+    await lowQuality(page);
+    const { errors } = await openGame(page, DBG);
+    await ready(page);
+    await start(page, true);
+    await D(page, "goto(1,'1-1')"); await D(page, 'teleport(0,0.9,-3,0,0)'); await sim(page, 0.3);
+    // multitáctil: el pulgar izquierdo empuja el joystick y el derecho salta sin soltarlo
+    const cdp = await page.context().newCDPSession(page);
+    const jb = /** @type {any} */ (await page.locator('.k3-joy').boundingBox());
+    const sb = /** @type {any} */ (await page.locator('.k3-btn[aria-label="jump"]').boundingBox());
+    const jx = jb.x + jb.width / 2, jy = jb.y + jb.height / 2, sx = sb.x + sb.width / 2, sy = sb.y + sb.height / 2;
+    const p0 = await T(page, 'return T.player');
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy, id: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: jx, y: jy - 55, id: 1 }] });
+    await sim(page, 0.3);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy - 55, id: 1 }, { x: sx, y: sy, id: 2 }] });
+    await expect(page.locator('.k3-btn[aria-label="jump"].on')).toHaveCount(1); // respuesta visual al apretar
+    await sim(page, 0.15);
+    const pAir = await T(page, 'return T.player');
+    expect(pAir.y).toBeGreaterThan(p0.y + 0.1);         // saltó…
+    expect(pAir.z).toBeLessThan(p0.z - 0.3);            // …mientras seguía caminando
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await sim(page, 0.8);
+    // ayuda de puntería táctil: un disparo apenas fuera del panel blanco igual abre el portal (el teclado no la usa)
+    await D(page, "goto(1,'1-1')"); await D(page, 'teleport(0,0.9,-3,0,0)'); await sim(page, 0.2);
+    await lookAt(page, -5.94, 1.2, -4.5);
+    const base = await T(page, 'return T.player');
+    const edge = await page.evaluate(([y0, p0]) => {
+      const d = /** @type {any} */ (window).__portales_imposibles.debug;
+      for (let k = 0.01; k < 0.6; k += 0.01) { d.clearPortals(); const r = d.fireAt('A', y0 + k, p0); d.simulate(0.25); if (!r || !r.ok) return k; }
+      return -1;
+    }, [base.yaw, base.pitch]);
+    expect(edge).toBeGreaterThan(0);
+    await D(page, 'clearPortals()'); await D(page, `look(${base.yaw + edge + 0.03}, ${base.pitch})`); await sim(page, 0.3);
+    const hits0 = await T(page, 'return T.assistHits');
+    await page.locator('.k3-btn[aria-label="a"]').tap();
+    await expect.poll(async () => { await sim(page, 0.05); return (await T(page, 'return T.portals')).A !== null; }, POLL).toBe(true);
+    expect(await T(page, 'return T.assistHits')).toBeGreaterThan(hits0);
+    // segundo plano: el SDK pausa y al volver no queda el joystick «trabado»
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy, id: 3 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: jx, y: jy - 55, id: 3 }] });
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect.poll(() => T(page, 'return T.paused'), POLL).toBe(true);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    expectNoErrors(errors);
+  });
 });

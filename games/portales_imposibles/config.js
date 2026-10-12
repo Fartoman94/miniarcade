@@ -68,7 +68,7 @@ export const SAVE_DEFAULTS = {
   goldGun: false,
   bestRun: 0,
   tutorial: { off: false, seen: /** @type {Record<string, boolean>} */ ({}) },
-  opts: { sens: 1, invert: false, motion: 'auto', fov: 72, binds: { jump: 'Space', use: 'KeyE', portalA: 'KeyQ', portalB: 'KeyF', hint: 'KeyH', reset: 'KeyR' } },
+  opts: { sens: 1, invert: false, motion: 'auto', fov: 72, haptics: true, binds: { jump: 'Space', use: 'KeyE', portalA: 'KeyQ', portalB: 'KeyF', hint: 'KeyH', reset: 'KeyR' } },
 };
 export const BIND_NAMES = { jump: 'Saltar', use: 'Usar / agarrar', portalA: 'Portal azul', portalB: 'Portal naranja', hint: 'Pista', reset: 'Reiniciar sala' };
 

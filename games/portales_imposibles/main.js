@@ -39,6 +39,7 @@ function sanitize() {
   s.opts = {
     sens: typeof o.sens === 'number' && o.sens >= 0.3 && o.sens <= 2.5 ? o.sens : 1,
     invert: !!o.invert,
+    haptics: o.haptics === undefined ? true : !!o.haptics,
     motion: ['auto', 'reduce', 'full'].includes(o.motion) ? o.motion : 'auto',
     fov: typeof o.fov === 'number' && o.fov >= 60 && o.fov <= 95 ? o.fov : 72,
     binds: { ...dO.binds, ...(o.binds && typeof o.binds === 'object' ? o.binds : {}) },
@@ -273,6 +274,14 @@ function beginPlay() {
   ui.show(true); input.showTouch(true); input.clear();
   gun.group.visible = true; applyGunColor();
   moved = 0;
+  orientHint();
+}
+/** Celular parado: aviso suave (una vez por sesión) de que en horizontal se juega más cómodo. No bloquea nada. */
+let orientShown = false;
+function orientHint() {
+  if (!input.isTouch || orientShown || innerWidth >= innerHeight) return;
+  orientShown = true;
+  setTimeout(() => { if (state === 'play' && innerWidth < innerHeight) toast('📱↻ Tip: con el teléfono en horizontal ves más del laboratorio', 3200); }, 4500);
 }
 function endRun(won) {
   M.runEnd({ won });
@@ -297,7 +306,7 @@ function hurt(n, fromX, fromZ, kind) {
   const b = P.body, dx = b.pos.x - fromX, dz = b.pos.z - fromZ, l = Math.hypot(dx, dz) || 1;
   b.vel.x += dx / l * 2.5; b.vel.z += dz / l * 2.5;
   if (!reduced()) ui.flash();
-  fx.shake(0.25); sfx.hurt(); emit('hurt');
+  fx.shake(0.25); sfx.hurt(); emit('hurt'); buzz(35);
   if (P.hp <= 0) die(kind);
 }
 function laserBurn(dt) {
@@ -471,11 +480,33 @@ function fmtTime(t, dec = false) { if (!isFinite(t)) return '—'; const m = Mat
 const _f = { x: 0, y: 0, z: 0 }, _e = { x: 0, y: 0, z: 0 };
 const _muzzle = new THREE.Vector3();
 function eye(out) { out.x = P.body.pos.x; out.y = P.body.pos.y + PHYS.eye; out.z = P.body.pos.z; return out; }
-function fire(which, dir) {
+/** Ayuda de puntería sólo táctil: si el disparo exacto no deja portal, prueba un cono chico (≤4,5°) alrededor
+ * y usa la dirección válida más cercana. El mouse/teclado no la usa (escritorio sin cambios). */
+const ASSIST = [0.026, 0.052, 0.078];
+function aimAssist(which, d) {
+  const lists = level.lists();
+  if (portals.shoot(which, _e, d, lists, true).ok) return d;
+  // base perpendicular al disparo
+  let ux = 0, uy = 1, uz = 0; if (Math.abs(d.y) > 0.9) { ux = 1; uy = 0; }
+  let rx = d.y * uz - d.z * uy, ry = d.z * ux - d.x * uz, rz = d.x * uy - d.y * ux; const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+  const vx = ry * d.z - rz * d.y, vy = rz * d.x - rx * d.z, vz = rx * d.y - ry * d.x;
+  for (const a of ASSIST) for (let i = 0; i < 8; i++) {
+    const t = i * Math.PI / 4, c = Math.cos(t) * a, sn = Math.sin(t) * a;
+    let x = d.x + rx * c + vx * sn, y = d.y + ry * c + vy * sn, z = d.z + rz * c + vz * sn; const l = Math.hypot(x, y, z);
+    const nd = { x: x / l, y: y / l, z: z / l };
+    if (portals.shoot(which, _e, nd, lists, true).ok) { assistHits++; return nd; }
+  }
+  return d;
+}
+let assistHits = 0;
+/** Vibración corta opcional (sólo táctil, respeta «Vibración» en Controles y el movimiento reducido). */
+function buzz(ms) { if (!input.isTouch || !S().opts.haptics || reduced()) return; try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* sin vibración */ } }
+function fire(which, dir, assist = false) {
   if (P.shotCd > 0 || state !== 'play' || !P.alive) return null;
   P.shotCd = 0.22;
   eye(_e);
-  const d = dir || PM.lookDir(P.yaw, P.pitch, _f);
+  let d = dir || PM.lookDir(P.yaw, P.pitch, _f);
+  if (assist && input.isTouch) d = aimAssist(which, { x: d.x, y: d.y, z: d.z });
   const res = portals.shoot(which, _e, d, level.lists());
   P.lastShot = which;
   gun.group.updateMatrixWorld(true); _muzzle.set(0, 0, -0.3).applyMatrix4(gun.group.matrixWorld);
@@ -485,7 +516,7 @@ function fire(which, dir) {
   if (!reduced()) gun.group.position.z = -0.27;
   const col = which === 'A' ? 0x35b6ff : 0xff8a24;
   if (res.ok) {
-    sfx.open(which); fx.burst(res.x, res.y, res.z, col, 16, 2.6, 0, 0.5);
+    sfx.open(which); fx.burst(res.x, res.y, res.z, col, 16, 2.6, 0, 0.5); buzz(12);
     P.placedOrder = P.placedOrder.filter(w => w !== which); P.placedOrder.push(which);
     if (run.roomId) run.shots[run.roomId] = (run.shots[run.roomId] || 0) + 1;
     emit('portal');
@@ -660,9 +691,10 @@ function control(dt) {
   if (hz) { die(hz); return; }
   if (level.inFizzler(b) && (portals.A.placed || portals.B.placed)) clearPortals('fizz');
   // portales
-  if (input.hit(bd.portalA, 'F14', 'btn:a') || mouseFire === 'A') fire('A');
-  if (input.hit(bd.portalB, 'F15', 'btn:b') || mouseFire === 'B') fire('B');
-  if (tapFire) { fire(tapFire.w, tapFire.d); tapFire = null; }
+  const tA = input.hit('btn:a'), tB = input.hit('btn:b');
+  if (input.hit(bd.portalA, 'F14') || tA || mouseFire === 'A') fire('A', undefined, tA);
+  if (input.hit(bd.portalB, 'F15') || tB || mouseFire === 'B') fire('B', undefined, tB);
+  if (tapFire) { fire(tapFire.w, tapFire.d, true); tapFire = null; }
   mouseFire = '';
   // usar / agarrar
   updateHeld(dt);
@@ -745,6 +777,9 @@ const endDrag = e => {
 };
 game.root.addEventListener('pointerup', endDrag);
 game.root.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.id) drag = null; });
+// al ir a segundo plano (cambio de app, bloqueo de pantalla) se sueltan el arrastre y los controles: al volver no queda
+// un dedo «fantasma» girando la cámara ni el joystick trabado (la pausa la hace el SDK)
+document.addEventListener('visibilitychange', () => { if (document.hidden) { drag = null; tapFire = null; lookAcc.x = lookAcc.y = 0; input.clear(); } });
 
 /* ======================= cámara ======================= */
 function updateCamera(dt) {
@@ -753,7 +788,7 @@ function updateCamera(dt) {
   const sh = fx.shakeAmt * 0.25;
   camera.position.set(b.pos.x + (Math.random() - 0.5) * sh, b.pos.y + PHYS.eye + bob + (Math.random() - 0.5) * sh, b.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
-  if (camera.fov !== o.fov) { camera.fov = o.fov; camera.updateProjectionMatrix(); }
+  syncFov(o.fov);
   camera.updateMatrixWorld(true);
   // retroceso del arma
   gun.group.position.z += (-0.32 - gun.group.position.z) * Math.min(1, dt * 10);
@@ -764,7 +799,17 @@ function updateCamera(dt) {
   const e = level ? level.env.sunDir : [6, 18, 8];
   sun.target.position.set(b.pos.x, b.pos.y, b.pos.z); sun.position.set(b.pos.x + e[0], b.pos.y + e[1], b.pos.z + e[2]);
 }
+/** FOV vertical efectivo: en vertical (celular parado) el FOV horizontal se desploma, así que se abre el vertical
+ * hasta garantizar ~64° horizontales (tope 100°). En horizontal/escritorio queda el elegido en Opciones. */
+function effFov(f) {
+  const a = camera.aspect || 1;
+  if (a >= 1) return f;
+  const v = 2 * Math.atan(Math.tan(32 * Math.PI / 180) / a) * 180 / Math.PI;
+  return Math.round(Math.min(100, Math.max(f, v)) * 10) / 10;
+}
+function syncFov(f) { const v = effFov(f); if (camera.fov !== v) { camera.fov = v; camera.updateProjectionMatrix(); } }
 function menuCamera(dt) {
+  syncFov(S().opts.fov);
   cam.menuA += dt * (reduced() ? 0 : 0.12);
   const r = level ? level.rooms[0] : null;
   const bb = r ? r.bounds : { x0: -6, x1: 6, y0: 0, y1: 8, z0: -14, z1: 0 };
@@ -789,7 +834,7 @@ function render() {
 /* ======================= pistas ======================= */
 function askHint() {
   const r = currentRoom();
-  if (!r || state !== 'play') { sfx.denied(); return; }
+  if (!r || state !== 'play') { sfx.denied(); if (state === 'play') failMsg('Las pistas se piden dentro de una sala de prueba'); return; }
   const n = Math.min(3, (run.hints[r.id] || 0) + 1);
   run.hints[r.id] = n; run.hintsTotal++;
   ui.hint(r.hints[n - 1], n);
@@ -834,6 +879,7 @@ function hudTick(dt) {
   ui.prompt(state === 'play' ? (P.held ? useKey : cur ? useKey : '') : '', state === 'play' ? (P.held ? 'Soltar cubo' : cur ? cur.label : null) : null);
   ui.boss(level && level.boss && run.roomId === '3-B' ? level.boss.ui() : null);
   ui.objective(objective());
+  if (input.isTouch) ui.layout();
   if (useBtn) { const on = !!cur || !!P.held; useBtn.style.borderColor = on ? ACCENT : ''; useBtn.style.background = on ? 'rgba(155,123,255,.45)' : ''; }
 }
 
@@ -929,12 +975,13 @@ function openOptions(pause) {
   const row = id => `<div class="pi-bind"><span>${/** @type {any} */ (BIND_NAMES)[id]}</span><button type="button" data-bind="${id}" class="${listening === id ? 'wait' : ''}">${listening === id ? 'Apretá una tecla…' : keyLabel(o.binds[id])}</button></div>`;
   optScreen.show(`<span class="k3-kicker">OPCIONES</span><h1 style="font-size:28px">CONTROLES</h1>
     <div class="pi-opts">
-      ${Object.keys(BIND_NAMES).map(row).join('')}
+      ${input.isTouch ? '' : Object.keys(BIND_NAMES).map(row).join('')}
       <label>Sensibilidad <input type="range" min="0.4" max="2" step="0.1" value="${o.sens}" data-sens aria-label="Sensibilidad de la mirada"></label>
       <label>Campo de visión <input type="range" min="60" max="95" step="1" value="${o.fov}" data-fov aria-label="Campo de visión"></label>
       <label>Invertir mirada vertical <input type="checkbox" data-invert ${o.invert ? 'checked' : ''}></label>
+      ${input.isTouch ? `<label>Vibración al abrir portales y recibir daño <input type="checkbox" data-haptics ${o.haptics ? 'checked' : ''}></label>` : ''}
       <label>Movimiento (sacudidas y destellos) <select data-motion><option value="auto"${o.motion === 'auto' ? ' selected' : ''}>Según el sistema</option><option value="reduce"${o.motion === 'reduce' ? ' selected' : ''}>Reducido</option><option value="full"${o.motion === 'full' ? ' selected' : ''}>Completo</option></select></label>
-      <div class="pi-small">Mover: WASD · Mirar: mouse, flechas o arrastrar · Gamepad: X azul, Y naranja, A saltar, B usar, LB/RB girar, LT/RT mirar, Select pista, Start pausa. Sonido y calidad gráfica: botón ⚙/⏸ de la barra.</div>
+      <div class="pi-small">${input.isTouch ? 'Táctil: joystick izquierdo para moverte · arrastrá en cualquier lugar para mirar · tocá un panel blanco o usá AZUL/NARANJA para disparar (con ayuda de puntería) · 💡 pista y ↺ reiniciar arriba a la derecha. En vertical el campo de visión se abre solo. ' : 'Mover: WASD · Mirar: mouse, flechas o arrastrar · Gamepad: X azul, Y naranja, A saltar, B usar, LB/RB girar, LT/RT mirar, Select pista, Start pausa. '}Sonido y calidad gráfica: botón ⚙/⏸ de la barra.</div>
     </div>
     <div class="k3-btnrow"><button class="k3-b" data-back>Listo</button><button class="k3-b alt" data-defaults>Valores por defecto</button></div>`);
 }
@@ -946,6 +993,7 @@ optScreen.el.addEventListener('input', e => {
   if (t.matches('[data-sens]')) o.sens = +t.value;
   if (t.matches('[data-fov]')) o.fov = +t.value;
   if (t.matches('[data-invert]')) o.invert = t.checked;
+  if (t.matches('[data-haptics]')) { o.haptics = t.checked; if (t.checked) buzz(15); }
   if (t.matches('[data-motion]')) o.motion = /** @type {any} */ (t.value);
   persist();
 });
@@ -987,6 +1035,8 @@ const hook = {
   get hp() { return P.hp; }, get maxHp() { return P.maxHp; }, get lives() { return run.lives; },
   get score() { return run.score; }, get runTime() { return run.time; }, get simTime() { return game.simTime; },
   get paused() { return game.paused; },
+  /** FOV vertical efectivo (se abre en vertical) y aciertos de la ayuda de puntería táctil. */
+  get camFov() { return camera.fov; }, get assistHits() { return assistHits; },
   get portals() { return portals.info(); },
   get held() { return P.held ? P.held.id : null; },
   get tip() { return tipId; }, get prompt() { return cur ? cur.label : ''; },
